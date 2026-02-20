@@ -444,10 +444,15 @@ export default function BrandOSPage() {
     setSuggestIdentityError(null);
     setSuggestPaletteLoading(true);
     try {
-      const current =
-        palette.primary || palette.secondary || palette.accent
-          ? { primary: palette.primary, secondary: palette.secondary, accent: palette.accent, ...(palette.background && { background: palette.background }), ...(palette.surface && { surface: palette.surface }) }
-          : undefined;
+      const currentEntries = [
+        ['primary', palette.primary],
+        ['secondary', palette.secondary],
+        ['accent', palette.accent],
+        ['background', palette.background],
+        ['surface', palette.surface],
+      ].filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].length > 0);
+      const current: Record<string, string> | undefined =
+        currentEntries.length > 0 ? Object.fromEntries(currentEntries) : undefined;
       const res = await packsApi.suggestPalette(packId, current ? { current_palette: current } : undefined);
       const nextPalette: Record<string, string> = {
         primary: res.primary,
