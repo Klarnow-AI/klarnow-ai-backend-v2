@@ -3,8 +3,8 @@ import OpenAI from "openai";
 import { NextRequest } from "next/server";
 import type { BrandContext } from "@/app/api/generate/route";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const anthropic = new Anthropic();
+const openai = new OpenAI();
 
 function buildBrandSection(brand: BrandContext): string {
   const sections: string[] = [];
@@ -22,8 +22,7 @@ function buildBrandSection(brand: BrandContext): string {
     if (colors) identity.push(`Brand colors: ${colors}`);
   }
   if (brand.fonts?.length) identity.push(`Fonts: ${brand.fonts.join(", ")}`);
-  if (identity.length)
-    sections.push(`BRAND IDENTITY:\n${identity.join("\n")}`);
+  if (identity.length) sections.push(`BRAND IDENTITY:\n${identity.join("\n")}`);
 
   const messaging: string[] = [];
   if (brand.coreOffer) messaging.push(`Core offer: ${brand.coreOffer}`);
@@ -101,7 +100,9 @@ ${brandName ? `- Brand name is "${brandName}" — NEVER use placeholder text` : 
 ${brandContext?.logoUrl ? `- Include the logo using: <img src="${brandContext.logoUrl}" alt="${brandName}" style="..." />` : ""}
 ${
   brandContext?.colorPalette
-    ? `- Use these brand colors as the dominant palette: ${Object.entries(brandContext.colorPalette)
+    ? `- Use these brand colors as the dominant palette: ${Object.entries(
+        brandContext.colorPalette,
+      )
         .filter(([, v]) => v)
         .map(([k, v]) => `${k}: ${v}`)
         .join(", ")}`
@@ -144,7 +145,7 @@ type ChatMessage = { role: string; content: string };
 
 function streamWithAnthropic(
   systemPrompt: string,
-  messages: ChatMessage[]
+  messages: ChatMessage[],
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
 
@@ -175,7 +176,7 @@ function streamWithAnthropic(
 
 function streamWithOpenAI(
   systemPrompt: string,
-  messages: ChatMessage[]
+  messages: ChatMessage[],
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
 
@@ -211,10 +212,10 @@ export async function POST(req: NextRequest) {
     const { messages, brandContext } = body;
 
     if (!messages) {
-      return new Response(
-        JSON.stringify({ error: "Missing messages" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Missing messages" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const systemPrompt = buildSystemPrompt(brandContext);
@@ -249,7 +250,7 @@ export async function POST(req: NextRequest) {
     } catch (anthropicError) {
       console.error(
         "Anthropic failed, falling back to OpenAI:",
-        anthropicError
+        anthropicError,
       );
       readable = streamWithOpenAI(systemPrompt, messages);
     }
