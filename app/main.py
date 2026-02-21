@@ -48,7 +48,7 @@ if settings.app_env == "development":
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins if _cors_origins else _dev_origins,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
