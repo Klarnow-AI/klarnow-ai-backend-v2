@@ -1,18 +1,17 @@
-# Build from repo root (e.g. Railway):  docker build -f frontend/Dockerfile .
-# Build from frontend/:  docker build -f Dockerfile . --build-arg SRC=.
+# Build context must be repo root (so frontend/ exists).
+# From repo root:  docker build -f frontend/Dockerfile .
+# From frontend/:  docker build -f Dockerfile ..
 FROM node:20-alpine AS base
 
 FROM base AS deps
-ARG SRC=frontend
 WORKDIR /app
-COPY ${SRC}/package.json ${SRC}/package-lock.json* ./
+COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci
 
 FROM base AS builder
 WORKDIR /app
-ARG SRC=frontend
 COPY --from=deps /app/node_modules ./node_modules
-COPY ${SRC}/ .
+COPY frontend/ .
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
 RUN npm run build
