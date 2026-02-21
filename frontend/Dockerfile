@@ -11,6 +11,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+ENV ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+ENV OPENAI_API_KEY=${OPENAI_API_KEY}
 RUN npm run build
 
 FROM base AS runner
