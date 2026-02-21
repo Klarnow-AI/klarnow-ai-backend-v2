@@ -3,9 +3,6 @@ import OpenAI from "openai";
 import { NextRequest } from "next/server";
 import { designSystems, type DesignSystemKey } from "@/lib/designSystems";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 export type BrandContext = {
   brandName?: string;
   coreOffer?: string;
@@ -846,6 +843,7 @@ ${fileList}`;
 // ---------------------------------------------------------------------------
 
 function streamWithAnthropic(
+  anthropic: Anthropic,
   systemPrompt: string,
   messages: ChatMessage[],
   isGeneration: boolean,
@@ -899,6 +897,7 @@ function streamWithAnthropic(
 }
 
 function streamWithOpenAI(
+  openai: OpenAI,
   systemPrompt: string,
   messages: ChatMessage[],
 ): ReadableStream<Uint8Array> {
@@ -949,10 +948,13 @@ export async function POST(req: NextRequest) {
     const systemPrompt = buildSystemPrompt(files, brandContext, selectedStyle);
     const isGeneration = isDefaultFiles(files);
 
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
     let readable: ReadableStream<Uint8Array>;
 
     try {
-      readable = streamWithAnthropic(systemPrompt, messages, isGeneration);
+      readable = streamWithAnthropic(anthropic, systemPrompt, messages, isGeneration);
 
       // Read the first chunk to verify Anthropic is working
       const reader = readable.getReader();
@@ -981,7 +983,7 @@ export async function POST(req: NextRequest) {
       readable = passthrough;
     } catch (anthropicError) {
       console.error("Anthropic failed, falling back to OpenAI:", anthropicError);
-      readable = streamWithOpenAI(systemPrompt, messages);
+      readable = streamWithOpenAI(openai, systemPrompt, messages);
     }
 
     return new Response(readable, {

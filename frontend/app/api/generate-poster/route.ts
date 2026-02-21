@@ -3,9 +3,6 @@ import OpenAI from "openai";
 import { NextRequest } from "next/server";
 import type { BrandContext } from "@/app/api/generate/route";
 
-const anthropic = new Anthropic();
-const openai = new OpenAI();
-
 function buildBrandSection(brand: BrandContext): string {
   const sections: string[] = [];
 
@@ -144,6 +141,7 @@ ${brandSection}`;
 type ChatMessage = { role: string; content: string };
 
 function streamWithAnthropic(
+  anthropic: Anthropic,
   systemPrompt: string,
   messages: ChatMessage[],
 ): ReadableStream<Uint8Array> {
@@ -175,6 +173,7 @@ function streamWithAnthropic(
 }
 
 function streamWithOpenAI(
+  openai: OpenAI,
   systemPrompt: string,
   messages: ChatMessage[],
 ): ReadableStream<Uint8Array> {
@@ -220,9 +219,12 @@ export async function POST(req: NextRequest) {
 
     const systemPrompt = buildSystemPrompt(brandContext);
 
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
     let readable: ReadableStream<Uint8Array>;
     try {
-      readable = streamWithAnthropic(systemPrompt, messages);
+      readable = streamWithAnthropic(anthropic, systemPrompt, messages);
       const reader = readable.getReader();
       const firstChunk = await reader.read();
 
@@ -252,7 +254,7 @@ export async function POST(req: NextRequest) {
         "Anthropic failed, falling back to OpenAI:",
         anthropicError,
       );
-      readable = streamWithOpenAI(systemPrompt, messages);
+      readable = streamWithOpenAI(openai, systemPrompt, messages);
     }
 
     return new Response(readable, {
