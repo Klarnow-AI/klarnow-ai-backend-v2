@@ -7,27 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-
-interface DayCard {
-  id: string;
-  day_number: number;
-  completed_at: string | null;
-  outreach_count: number;
-  followup_count: number;
-  proof_logged: boolean;
-  output_shipped: boolean;
-}
-
-interface Sprint {
-  id: string;
-  mode: string;
-  current_day: number;
-  started_at: string;
-  day_cards: DayCard[];
-}
+import type { SprintRead, DayCardRead } from "@/types/api-types";
 
 interface SprintCalendarProps {
-  sprint: Sprint;
+  sprint: SprintRead;
   onDayClick: (dayNumber: number) => void;
 }
 
@@ -104,7 +87,7 @@ export function SprintCalendar({ sprint, onDayClick }: SprintCalendarProps) {
   // Map sprint days to calendar dates (starting from sprint start date)
   const sprintStartDate = new Date(sprint.started_at);
   
-  const getDayCardForDate = (date: Date): DayCard | null => {
+  const getDayCardReadForDate = (date: Date): DayCardRead | null => {
     const daysSinceStart = Math.floor((date.getTime() - sprintStartDate.getTime()) / (1000 * 60 * 60 * 24));
     if (daysSinceStart >= 0 && daysSinceStart <= 14) {
       return sprint.day_cards.find(card => card.day_number === daysSinceStart) || null;
@@ -112,7 +95,7 @@ export function SprintCalendar({ sprint, onDayClick }: SprintCalendarProps) {
     return null;
   };
 
-  const getProgressPercentage = (card: DayCard): number => {
+  const getProgressPercentage = (card: DayCardRead): number => {
     if (card.completed_at) return 100;
     if (card.day_number < 4 || card.day_number > 13) return 0;
     
@@ -183,7 +166,7 @@ export function SprintCalendar({ sprint, onDayClick }: SprintCalendarProps) {
 
         {/* Days */}
         {daysInMonth.map((date) => {
-          const dayCard = getDayCardForDate(date);
+          const dayCard = getDayCardReadForDate(date);
           const isToday = formatDate(date, "yyyy-MM-dd") === formatDate(new Date(), "yyyy-MM-dd");
           const isSprintDay = dayCard !== null;
           const isCompleted = !!dayCard?.completed_at;

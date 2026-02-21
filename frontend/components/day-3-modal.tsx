@@ -71,8 +71,8 @@ export function Day3Modal({
     setError("");
     try {
       await sprintApi.completeDay(packId, sprintId, 3, {
-        pitch_script: pitchScript.trim() || undefined,
-        voice_notes_sent: voiceNotesSent,
+        ...(pitchScript.trim() && { pitch_script: pitchScript.trim() }),
+        voice_notes_sent: String(voiceNotesSent),
       });
       onComplete?.();
     } catch (err) {

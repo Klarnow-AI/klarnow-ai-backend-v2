@@ -18,7 +18,7 @@ import {
 
 export type PosterWithMeta = PosterAsset & {
   id?: string;
-  chat_messages?: { role: string; content: string }[];
+  chat_messages?: { role: "user" | "assistant"; content: string }[];
 };
 import { Spinner } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
@@ -113,7 +113,7 @@ function ResizableLayout({
   onDeletePoster: (index: number) => void;
   onFilesGenerated: (
     files: Record<string, string>,
-    messages: { role: string; content: string }[]
+    messages: { role: "user" | "assistant"; content: string }[]
   ) => void;
   onGeneratingChange: (generating: boolean) => void;
 }) {
@@ -221,7 +221,7 @@ export default function PostersPage() {
   const handleFilesGenerated = useCallback(
     async (
       files: Record<string, string>,
-      messages: { role: string; content: string }[]
+      messages: { role: "user" | "assistant"; content: string }[]
     ) => {
       const newPosters: PosterWithMeta[] = [];
       for (const [name, code] of Object.entries(files)) {

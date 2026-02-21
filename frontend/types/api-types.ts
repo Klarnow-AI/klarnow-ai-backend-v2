@@ -57,6 +57,10 @@ export type DayCardRead = {
   ai_output: Record<string, unknown> | null;
   user_action: string | null;
   definition_of_done: string | null;
+  outreach_count: number;
+  followup_count: number;
+  proof_logged: boolean;
+  output_shipped: boolean;
   completed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -66,6 +70,7 @@ export type SprintRead = {
   id: string;
   pack_id: string;
   status: string;
+  mode: string;
   current_day: number;
   started_at: string;
   completed_at: string | null;
@@ -281,7 +286,7 @@ export type MessageListResponse = {
 };
 
 /** Creative assets (poster, flyer, video). */
-export type CreativeAssetChatMessage = { role: string; content: string };
+export type CreativeAssetChatMessage = { role: "user" | "assistant"; content: string };
 
 export type CreativeAsset = {
   id: string;
