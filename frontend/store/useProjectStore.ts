@@ -40,6 +40,7 @@ const initialProjectState = {
   isGenerating: false,
   selectedStyle: null as string | null,
   liveUrl: null as string | null,
+  fileHistory: [] as Array<Record<string, string>>,
 };
 
 type ProjectState = typeof initialProjectState & {
@@ -52,6 +53,8 @@ type ProjectState = typeof initialProjectState & {
   setMessages: (messages: Message[]) => void;
   setIsGenerating: (v: boolean) => void;
   syncToBackend: () => void;
+  pushToHistory: () => void;
+  undoLastChange: () => void;
   reset: () => void;
 };
 
@@ -68,6 +71,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       isGenerating: false,
       selectedStyle: null,
       liveUrl: null,
+      fileHistory: [],
     });
   },
 
@@ -102,6 +106,20 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   setIsGenerating: (v) => set({ isGenerating: v }),
 
   syncToBackend: () => debouncedSync(),
+
+  pushToHistory: () => {
+    const { files, fileHistory } = get();
+    const snapshot = { ...files };
+    set({ fileHistory: [snapshot, ...fileHistory].slice(0, 10) });
+  },
+
+  undoLastChange: () => {
+    const { fileHistory } = get();
+    if (fileHistory.length === 0) return;
+    const [prev, ...rest] = fileHistory;
+    set({ files: prev, fileHistory: rest });
+    debouncedSync();
+  },
 
   reset: () => {
     if (syncTimer) clearTimeout(syncTimer);

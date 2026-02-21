@@ -10,6 +10,8 @@ from app.core.db.session import get_db
 from app.core.errors import NotFoundError
 from app.modules.packs.models import User
 from app.modules.packs.services import get_pack_for_user
+from app.modules.clients.services import create_lead
+from app.modules.public_site.schemas import PublicLeadCaptureBody, PublicLeadCaptureResponse
 from app.modules.builder.schemas import (
     BuilderProjectCreate,
     BuilderProjectList,
@@ -149,4 +151,31 @@ def serve_published_site(project_id: UUID, db=Depends(get_db)):
     project = get_published(db, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Site not found or not yet published")
-    return HTMLResponse(content=build_deploy_html(project.files))
+    return HTMLResponse(content=build_deploy_html(project.files, project_id=str(project.id)))
+
+
+@public_router.post(
+    "/{project_id}/lead",
+    response_model=PublicLeadCaptureResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def capture_builder_lead(project_id: UUID, body: PublicLeadCaptureBody, db=Depends(get_db)):
+    """Capture a lead submitted from a published builder site (no auth)."""
+    # Honeypot: bots often fill every field
+    if body.website and str(body.website).strip():
+        raise HTTPException(status_code=400, detail="Invalid form submission")
+    if not (body.email and str(body.email).strip()) and not (body.phone and str(body.phone).strip()):
+        raise HTTPException(status_code=400, detail="Please provide at least an email or phone number")
+    project = get_published(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Site not found or not yet published")
+    lead = create_lead(
+        db,
+        pack_id=project.pack_id,
+        name=body.name,
+        email=body.email,
+        phone=body.phone,
+        summary=body.summary,
+        source="builder_site",
+    )
+    return PublicLeadCaptureResponse(lead_id=str(lead.id))

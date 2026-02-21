@@ -286,7 +286,10 @@ export type MessageListResponse = {
 };
 
 /** Creative assets (poster, flyer, video). */
-export type CreativeAssetChatMessage = { role: "user" | "assistant"; content: string };
+export type CreativeAssetChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
 
 export type CreativeAsset = {
   id: string;
@@ -351,15 +354,25 @@ export type GenerateStarterBrandBody = {
 
 export type GenerateStarterBrandResponse = {
   wordmark_svg_or_url: string;
-  palette: { primary?: string; secondary?: string; accent?: string; [key: string]: string | undefined };
+  palette: {
+    primary?: string;
+    secondary?: string;
+    accent?: string;
+    [key: string]: string | undefined;
+  };
 };
 
 export type GenerateLogoBody = {
   brand_name: string;
-  prompt?: string | null;  // style description
-  color_scheme?: string | null;  // e.g. "blue and white"
-  color_palette?: { primary?: string; secondary?: string; accent?: string; [key: string]: string | undefined } | null;  // brand colors for logo
-  brand_os_summary?: string | null;  // Brand OS context for generation
+  prompt?: string | null; // style description
+  color_scheme?: string | null; // e.g. "blue and white"
+  color_palette?: {
+    primary?: string;
+    secondary?: string;
+    accent?: string;
+    [key: string]: string | undefined;
+  } | null; // brand colors for logo
+  brand_os_summary?: string | null; // Brand OS context for generation
 };
 
 export type GenerateLogoResponse = {

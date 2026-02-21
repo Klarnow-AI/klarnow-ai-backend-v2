@@ -75,7 +75,7 @@ _DEPLOY_FOOTER = """\
 </html>"""
 
 
-def build_deploy_html(files: dict) -> str:
+def build_deploy_html(files: dict, project_id: str | None = None) -> str:
     """Build a self-contained HTML page from a dict of project files."""
     app_code = files.get("/App.tsx") or files.get("App.tsx") or ""
 
@@ -94,7 +94,13 @@ def build_deploy_html(files: dict) -> str:
     # accidentally close the wrapping <script type="text/babel"> tag.
     escaped = bundle.replace("</script>", r"<\/script>")
 
-    return _DEPLOY_HEADER + escaped + _DEPLOY_FOOTER
+    # Inject the lead capture URL so any form in the page can POST to it.
+    header = _DEPLOY_HEADER
+    if project_id:
+        lead_tag = f'  <script>window.KLARO_LEAD_URL="/p/{project_id}/lead";</script>\n'
+        header = header.replace("</head>", lead_tag + "</head>", 1)
+
+    return header + escaped + _DEPLOY_FOOTER
 
 
 @log_service_action()

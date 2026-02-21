@@ -60,7 +60,9 @@ def create_proposal_route(
     db=Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_pack_access(db, pack_id, current_user.id)
+    pack = _ensure_pack_access(db, pack_id, current_user.id)
+    from app.core.gates import can_create_proposal
+    can_create_proposal(db, pack)
     # Allow client_id only if user owns that client
     if body.client_id:
         from app.modules.clients.services import get_for_user as get_client_for_user

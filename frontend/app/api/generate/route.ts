@@ -803,6 +803,84 @@ VAGUE EDIT HANDLING: If request is truly ambiguous (multiple valid interpretatio
 <q type="select" options="Improve the visual design,Improve the copy & messaging,Add missing sections,Better mobile experience,Make it feel more premium,Increase visual energy">What should I focus on?</q>
 </questions>
 
+═══ LEAD CAPTURE FORMS — REQUIRED PATTERN ═══
+
+Every contact / enquiry / booking / signup form MUST submit to the lead capture API.
+Use this pattern exactly — no exceptions:
+
+\`\`\`tsx
+const ContactForm = () => {
+  const [name, setName] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [phone, setPhone] = React.useState("");
+  const [message, setMessage] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [done, setDone] = React.useState(false);
+  const [error, setError] = React.useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const url = (window as any).KLARO_LEAD_URL;
+      if (!url) throw new Error("Form not configured");
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email: email || null, phone: phone || null, summary: message || null }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || "Something went wrong");
+      }
+      setDone(true);
+    } catch (err: any) {
+      setError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (done) return (
+    <div className="text-center py-8">
+      <div className="text-4xl mb-3">✅</div>
+      <h3 className="text-xl font-bold text-gray-900 mb-2">You're all set!</h3>
+      <p className="text-gray-500">We'll be in touch shortly.</p>
+    </div>
+  );
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <input type="text" placeholder="Full name *" required value={name} onChange={e => setName(e.target.value)}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" />
+      <input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" />
+      <input type="tel" placeholder="Phone number" value={phone} onChange={e => setPhone(e.target.value)}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" />
+      <textarea placeholder="Message (optional)" value={message} onChange={e => setMessage(e.target.value)} rows={3}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 resize-none" />
+      {/* Honeypot — must stay hidden */}
+      <input type="text" name="website" style={{display:"none"}} tabIndex={-1} autoComplete="off" />
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+      <button type="submit" disabled={loading}
+        className="w-full py-4 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed text-lg">
+        {loading ? "Sending…" : "Send Message"}
+      </button>
+      <p className="text-xs text-gray-400 text-center">At least one of email or phone is required</p>
+    </form>
+  );
+};
+\`\`\`
+
+RULES:
+- ALWAYS use this form pattern for contact / enquiry / booking / signup sections — adapt styling to match the design system
+- The button text and placeholder copy should match the brand/context (e.g. "Book My Free Call", "Get a Quote", "Join the Waitlist")
+- Keep the honeypot hidden input — never remove it
+- At minimum collect name + email OR phone (user's choice)
+- Use the message/summary field for any extra information (project details, inquiry type, etc.)
+- Never use a plain <form action="..."> — always use this React controlled + fetch pattern
+
 ═══ TECHNICAL RULES ═══
 
 - React with TypeScript — use type annotations where helpful
