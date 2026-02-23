@@ -31,8 +31,15 @@ Select.displayName = "Select";
 const SelectTrigger = Select;
 const SelectValue: React.FC<{ placeholder?: string }> = () => null;
 const SelectContent: React.FC<{ children: React.ReactNode }> = ({ children }) => <>{children}</>;
-const SelectItem: React.FC<{ value: string; children: React.ReactNode }> = ({ value, children }) => (
-  <option value={value}>{children}</option>
+type SelectItemProps = React.OptionHTMLAttributes<HTMLOptionElement> & {
+  value: string;
+  children: React.ReactNode;
+};
+
+const SelectItem: React.FC<SelectItemProps> = ({ value, children, ...props }) => (
+  <option value={value} {...props}>
+    {children}
+  </option>
 );
 
 export { Select, SelectTrigger, SelectValue, SelectContent, SelectItem };

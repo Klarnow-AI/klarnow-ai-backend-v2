@@ -112,7 +112,7 @@ export default function ProposalsPage() {
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [generatingDraft, setGeneratingDraft] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
-  const [editingProposal, setEditingProposal] = useState<ProposalWithPack | null>(null);
+  const [editingProposal, setEditingProposal] = useState<Proposal | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 

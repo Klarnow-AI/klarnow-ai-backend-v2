@@ -97,7 +97,7 @@ export default function SettingsPage() {
           ) : connectStatus?.connected ? (
             <p className="text-sm text-muted-foreground">
               Onboarding in progress. Complete the steps in Stripe, or{" "}
-              <Button variant="link" className="p-0 h-auto text-primary" onClick={handleConnectStripe} disabled={connectLoading}>
+              <Button variant="ghost" className="p-0 h-auto text-primary underline-offset-4 hover:underline" onClick={handleConnectStripe} disabled={connectLoading}>
                 {connectLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "try again"}.
               </Button>
             </p>
