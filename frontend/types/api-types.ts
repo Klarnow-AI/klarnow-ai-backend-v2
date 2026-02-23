@@ -241,6 +241,126 @@ export type InvoicesSummary = {
   overdue: number;
 };
 
+/** Proposal (revenue). API: /api/v1/revenue */
+export type ProposalStatus = "draft" | "sent" | "accepted" | "declined";
+
+/** Kanban columns: one per status (Option B). */
+export const PROPOSAL_KANBAN_STAGES: ProposalStatus[] = [
+  "draft",
+  "sent",
+  "accepted",
+  "declined",
+];
+
+export type Proposal = {
+  id: string;
+  pack_id: string;
+  client_id: string | null;
+  /** When listing proposals, API may include resolved client/lead name. */
+  client_name?: string | null;
+  status: string;
+  amount: string;
+  currency: string;
+  due_date: string | null;
+  content: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProposalCreateBody = {
+  amount: string;
+  currency?: string;
+  due_date?: string | null;
+  content?: Record<string, unknown> | null;
+  client_id?: string | null;
+};
+
+export type ProposalUpdateBody = {
+  status?: string;
+  amount?: string;
+  currency?: string;
+  due_date?: string | null;
+  content?: Record<string, unknown> | null;
+};
+
+export type ProposalListResponse = {
+  items: Proposal[];
+  total: number;
+};
+
+/** Generated proposal draft from POST .../proposals/generate */
+export type ProposalLineItem = {
+  label: string;
+  amount: string | null;
+  description: string;
+};
+
+export type ProposalGeneratedContent = {
+  description?: string;
+  line_items?: ProposalLineItem[];
+  terms?: string;
+  notes?: string;
+};
+
+export type ProposalGenerateResponse = {
+  content: ProposalGeneratedContent;
+  suggested_amount: string | null;
+  suggested_due_date: string | null;
+};
+
+/** Invoice (revenue). API: /api/v1/revenue */
+export type Invoice = {
+  id: string;
+  pack_id: string;
+  client_id: string | null;
+  client_name?: string | null;
+  client_email?: string | null;
+  status: string;
+  amount: string;
+  currency: string;
+  due_date: string | null;
+  content: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+  stripe_invoice_id?: string | null;
+  stripe_hosted_url?: string | null;
+};
+
+export type InvoiceCreateBody = {
+  amount: string;
+  currency?: string;
+  due_date?: string | null;
+  content?: Record<string, unknown> | null;
+  client_id?: string | null;
+};
+
+export type InvoiceUpdateBody = {
+  status?: string;
+  amount?: string;
+  currency?: string;
+  due_date?: string | null;
+  content?: Record<string, unknown> | null;
+};
+
+export type InvoiceListResponse = {
+  items: Invoice[];
+  total: number;
+};
+
+export type ConnectStatusResponse = {
+  connected: boolean;
+  onboarding_complete: boolean;
+};
+
+export type ConnectOnboardingLinkResponse = {
+  url: string;
+};
+
+export type InvoicePublishResponse = {
+  payment_link: string;
+  stripe_invoice_id: string;
+};
+
 export type PackSummaryResponse = {
   pack: Pack;
   brand_os: BrandOSSummary | null;
@@ -408,6 +528,15 @@ export type GenerateMockupsResponse = {
   }>;
 };
 
+/** Pipeline stages for Kanban columns */
+export const PIPELINE_STAGES = [
+  "contacted",
+  "drafting",
+  "proposal",
+  "closed",
+] as const;
+export type PipelineStage = (typeof PIPELINE_STAGES)[number];
+
 /** Leads (pack-scoped). API: /api/v1/clients/leads */
 export type Lead = {
   id: string;
@@ -421,6 +550,10 @@ export type Lead = {
   budget_range: string | null;
   urgency: string | null;
   client_id: string | null;
+  pipeline_stage: string;
+  due_date: string | null;
+  deal_value: number | null;
+  assigned_user_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -440,6 +573,10 @@ export type LeadCreateBody = {
   budget_range?: string | null;
   urgency?: string | null;
   client_id?: string | null;
+  pipeline_stage?: string | null;
+  due_date?: string | null;
+  deal_value?: number | null;
+  assigned_user_id?: string | null;
 };
 
 export type LeadUpdateBody = {
@@ -452,6 +589,10 @@ export type LeadUpdateBody = {
   budget_range?: string | null;
   urgency?: string | null;
   client_id?: string | null;
+  pipeline_stage?: string | null;
+  due_date?: string | null;
+  deal_value?: number | null;
+  assigned_user_id?: string | null;
 };
 
 /** Website (pack-scoped). API: /api/v1/packs/:packId/conversion-page */

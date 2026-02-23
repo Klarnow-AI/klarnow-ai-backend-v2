@@ -46,6 +46,18 @@ export const auth = {
       localStorage.setItem("klarnow_token", data.access_token);
     return data;
   },
+  async requestPasswordReset(email: string) {
+    await api(`${AUTH_PREFIX}/forgot-password`, {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+  },
+  async resetPassword(token: string, newPassword: string) {
+    await api(`${AUTH_PREFIX}/reset-password`, {
+      method: "POST",
+      body: JSON.stringify({ token, new_password: newPassword }),
+    });
+  },
   logout() {
     if (typeof window !== "undefined") localStorage.removeItem("klarnow_token");
   },

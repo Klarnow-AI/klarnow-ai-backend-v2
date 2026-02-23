@@ -26,6 +26,9 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
+    # Stripe Connect: one connected account per user for invoicing
+    stripe_connect_account_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    stripe_connect_onboarding_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     packs: Mapped[list["Pack"]] = relationship(
         "Pack", back_populates="created_by_user", cascade="all, delete-orphan"
@@ -38,6 +41,15 @@ class EmailLoginCode(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     code: Mapped[str] = mapped_column(String(8), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_token"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    token: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 

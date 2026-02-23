@@ -20,6 +20,19 @@ export function handleUnauthorized(): void {
   window.dispatchEvent(new CustomEvent("auth:401"));
 }
 
+/** Normalize backend error detail to a string (handles array or nested shapes). */
+function normalizeDetail(detail: unknown): string {
+  if (detail == null) return "";
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const first = detail[0];
+    if (first && typeof first === "object" && "msg" in first) return String((first as { msg?: unknown }).msg ?? first);
+    return detail.map(String).join("; ");
+  }
+  if (typeof detail === "object" && "msg" in detail) return String((detail as { msg?: unknown }).msg);
+  return String(detail);
+}
+
 export async function api<T>(
   path: string,
   options: RequestInit & { base?: string } = {}
@@ -40,7 +53,8 @@ export async function api<T>(
   if (!res.ok) {
     if (res.status === 401 && getToken()) handleUnauthorized();
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || String(res.status));
+    const message = normalizeDetail(err.detail) || String(res.status);
+    throw new Error(message);
   }
   if (res.status === 204) return undefined as T;
   return res.json();

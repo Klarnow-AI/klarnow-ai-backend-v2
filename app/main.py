@@ -1,7 +1,10 @@
+import logging
+import traceback
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
 from app.core.errors import AppError, app_error_handler
@@ -24,6 +27,7 @@ from app.modules.subscription.routes import router as subscription_router
 from app.modules.tasks.routes import router as tasks_router
 from app.modules.response_rules.routes import router as response_rules_router
 from app.modules.builder.routes import router as builder_router, public_router as builder_public_router
+from app.modules.builder.subdomain_routes import router as builder_subdomain_router
 
 
 @asynccontextmanager
@@ -57,6 +61,20 @@ app.add_middleware(
 app.add_exception_handler(AppError, app_error_handler)  # pyright: ignore[reportArgumentType]
 
 
+def _generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Log unhandled exceptions and return consistent JSON 500."""
+    log = logging.getLogger("uvicorn.error")
+    log.exception("Unhandled exception: %s", exc)
+    if settings.app_env == "development":
+        detail = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    else:
+        detail = "Internal server error"
+    return JSONResponse(status_code=500, content={"detail": detail})
+
+
+app.add_exception_handler(Exception, _generic_exception_handler)
+
+
 @app.get("/health")
 def health():
     """Health check for load balancers and monitoring."""
@@ -83,3 +101,5 @@ app.include_router(tasks_router, tags=["tasks"])
 app.include_router(response_rules_router, tags=["response-rules"])
 app.include_router(builder_router, prefix="/api/v1/builder", tags=["builder"])
 app.include_router(builder_public_router, prefix="/p", tags=["sites"])
+# Subdomain site serving: GET / and POST /lead when Host is *.sites_domain
+app.include_router(builder_subdomain_router, prefix="", tags=["sites-subdomain"])

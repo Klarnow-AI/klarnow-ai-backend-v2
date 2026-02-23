@@ -58,3 +58,6 @@ class Invoice(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
+    # Stripe: when invoice is published for payment, store Stripe invoice id and hosted URL
+    stripe_invoice_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    stripe_hosted_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)

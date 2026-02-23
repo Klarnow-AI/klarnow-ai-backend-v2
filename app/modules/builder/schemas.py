@@ -27,6 +27,7 @@ class BuilderProjectRead(BaseModel):
     files: dict
     messages: list
     live_url: str | None = None
+    subdomain_slug: str | None = None
     published_at: datetime | None = None
     created_at: datetime
     updated_at: datetime

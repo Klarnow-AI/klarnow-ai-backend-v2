@@ -31,6 +31,7 @@ class BuilderProject(Base):
     files: Mapped[dict] = mapped_column(JSON, default=dict)
     messages: Mapped[list] = mapped_column(JSON, default=list)
     live_url: Mapped[str | None] = mapped_column(String(2048), nullable=True, default=None)
+    subdomain_slug: Mapped[str | None] = mapped_column(String(63), nullable=True, default=None, unique=True, index=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(

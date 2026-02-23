@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "@/components/icons";
 import { Spinner } from "@/components/ui/page-loader";
@@ -30,6 +31,7 @@ export function AuthModal({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingEmail, setCheckingEmail] = useState(false);
+  const router = useRouter();
   const {
     checkEmailRegistered,
     requestLoginCode,
@@ -268,6 +270,20 @@ export function AuthModal({
                           }
                           className="rounded-xl h-11"
                         />
+                        {passwordMode === "login" && (
+                          <p className="text-right">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onOpenChange(false);
+                                router.push("/forgot-password");
+                              }}
+                              className="text-sm font-medium text-foreground underline-offset-2 hover:no-underline"
+                            >
+                              Forgot password?
+                            </button>
+                          </p>
+                        )}
                       </div>
                       <Button
                         type="submit"

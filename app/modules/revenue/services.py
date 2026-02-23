@@ -127,6 +127,8 @@ def update_invoice(
     currency: str | None = None,
     due_date: date | None = None,
     content: dict | None = None,
+    stripe_invoice_id: str | None = None,
+    stripe_hosted_url: str | None = None,
 ) -> Invoice:
     if status is not None:
         invoice.status = status
@@ -138,6 +140,10 @@ def update_invoice(
         invoice.due_date = due_date
     if content is not None:
         invoice.content = content
+    if stripe_invoice_id is not None:
+        invoice.stripe_invoice_id = stripe_invoice_id
+    if stripe_hosted_url is not None:
+        invoice.stripe_hosted_url = stripe_hosted_url
     db.commit()
     db.refresh(invoice)
     return invoice

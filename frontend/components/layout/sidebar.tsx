@@ -10,8 +10,6 @@ import {
   FolderKanban,
   Palette,
   Users,
-  Wallet,
-  Download,
   Settings,
   HelpCircle,
   MenuCollapse,
@@ -27,7 +25,6 @@ import {
   Film,
   FileCheck,
   Receipt,
-  Shield,
   Lock,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
@@ -43,8 +40,8 @@ const navItems = [
   { href: "/packs", label: "Packs", icon: FolderKanban },
   { href: "/studio", label: "Studio", icon: Palette },
   { href: "/clients", label: "Clients", icon: Users },
-  { href: "/money", label: "Money", icon: Wallet },
-  { href: "/exports", label: "Exports", icon: Download },
+  { href: "/proposals", label: "Proposals", icon: FileCheck },
+  { href: "/invoices", label: "Invoices", icon: Receipt },
 ];
 
 const packNavItems = [
@@ -55,9 +52,6 @@ const packNavItems = [
   { href: "/posters", label: "Posters & Flyers", icon: ImageIcon },
   { href: "/ad-factory", label: "Ad Factory", icon: Film },
   { href: "/leads", label: "Leads", icon: Users },
-  { href: "/proposal", label: "Proposal", icon: FileCheck },
-  { href: "/invoice", label: "Invoice", icon: Receipt },
-  { href: "/proof-vault", label: "Proof Vault", icon: Shield },
 ];
 
 const navToSection: Record<string, string> = {
@@ -66,9 +60,6 @@ const navToSection: Record<string, string> = {
   "/posters": "posters",
   "/ad-factory": "ad_factory",
   "/leads": "leads",
-  "/proposal": "proposal",
-  "/invoice": "invoice",
-  "/proof-vault": "proof_vault",
 };
 
 const SIDEBAR_WIDTH_EXPANDED = 280;

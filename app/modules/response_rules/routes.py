@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
+from app.modules.packs.models import User
 from app.modules.response_rules import services
 
 
@@ -33,7 +34,7 @@ class UpdateRuleRequest(BaseModel):
 @router.get("", response_model=list[ResponseRuleRead])
 def get_rules(
     pack_id: UUID = Query(...),
-    current_user_id: UUID = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Get all response rules for a pack."""
@@ -44,7 +45,7 @@ def get_rules(
 @router.post("/generate", response_model=list[ResponseRuleRead])
 def generate_rules(
     pack_id: UUID = Query(...),
-    current_user_id: UUID = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Generate default response rules for a pack."""
@@ -56,7 +57,7 @@ def generate_rules(
 def update_rule(
     rule_id: UUID,
     request: UpdateRuleRequest,
-    current_user_id: UUID = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Update a response rule."""
@@ -67,7 +68,7 @@ def update_rule(
 @router.post("/lock", response_model=list[ResponseRuleRead])
 def lock_rules(
     pack_id: UUID = Query(...),
-    current_user_id: UUID = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Lock all response rules for a pack (Day 8)."""

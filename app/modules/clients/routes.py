@@ -26,6 +26,7 @@ from app.modules.clients.services import (
     update,
     delete,
     list_leads_for_pack,
+    list_qualified_leads_for_pack,
     get_lead_for_pack_user,
     create_lead,
     update_lead,
@@ -66,12 +67,16 @@ def _ensure_pack_access(db, pack_id: UUID, user_id: UUID) -> None:
 @router.get("/leads", response_model=LeadList)
 def list_leads(
     pack_id: UUID = Query(..., description="Pack id"),
+    qualified_only: bool = Query(False, description="If true, return only qualified leads"),
     db=Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """List leads for a pack. Pack must belong to current user."""
     _ensure_pack_access(db, pack_id, current_user.id)
-    items = list_leads_for_pack(db, pack_id)
+    if qualified_only:
+        items = list_qualified_leads_for_pack(db, pack_id)
+    else:
+        items = list_leads_for_pack(db, pack_id)
     return LeadList(items=[LeadRead.model_validate(l) for l in items], total=len(items))
 
 
@@ -97,6 +102,10 @@ def create_lead_route(
         budget_range=body.budget_range,
         urgency=body.urgency,
         client_id=body.client_id,
+        pipeline_stage=body.pipeline_stage,
+        due_date=body.due_date,
+        deal_value=body.deal_value,
+        assigned_user_id=body.assigned_user_id,
     )
     try:
         from app.modules.tasks.services import create_lead_contact_task

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
+from app.modules.packs.models import User
 from app.modules.tasks import services
 
 
@@ -34,7 +35,7 @@ class FollowUpTaskRead(BaseModel):
 def get_tasks(
     pack_id: UUID = Query(...),
     status: str | None = Query(None),
-    current_user_id: UUID = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Get follow-up tasks for a pack."""
@@ -51,7 +52,7 @@ def get_tasks(
 @router.post("/{task_id}/complete", response_model=FollowUpTaskRead)
 def complete_task(
     task_id: UUID,
-    current_user_id: UUID = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Mark task as completed."""
@@ -62,7 +63,7 @@ def complete_task(
 @router.post("/{task_id}/skip", response_model=FollowUpTaskRead)
 def skip_task(
     task_id: UUID,
-    current_user_id: UUID = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Mark task as skipped."""

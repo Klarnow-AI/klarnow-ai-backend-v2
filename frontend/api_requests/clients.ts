@@ -9,8 +9,10 @@ import type {
 const CLIENTS_PREFIX = "/api/v1/clients";
 
 export const clients = {
-  listLeads: (packId: string) =>
-    api<LeadListResponse>(`${CLIENTS_PREFIX}/leads?pack_id=${packId}`),
+  listLeads: (packId: string, qualifiedOnly?: boolean) =>
+    api<LeadListResponse>(
+      `${CLIENTS_PREFIX}/leads?pack_id=${packId}${qualifiedOnly ? "&qualified_only=true" : ""}`,
+    ),
 
   createLead: (body: LeadCreateBody) =>
     api<Lead>(`${CLIENTS_PREFIX}/leads`, {
@@ -18,8 +20,7 @@ export const clients = {
       body: JSON.stringify(body),
     }),
 
-  getLead: (leadId: string) =>
-    api<Lead>(`${CLIENTS_PREFIX}/leads/${leadId}`),
+  getLead: (leadId: string) => api<Lead>(`${CLIENTS_PREFIX}/leads/${leadId}`),
 
   updateLead: (leadId: string, body: LeadUpdateBody) =>
     api<Lead>(`${CLIENTS_PREFIX}/leads/${leadId}`, {

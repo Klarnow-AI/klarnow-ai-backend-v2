@@ -18,6 +18,7 @@ from app.modules.builder.schemas import (
     BuilderProjectRead,
     BuilderProjectUpdate,
 )
+from app.core.config import get_settings
 from app.modules.builder.services import (
     get_for_pack,
     get_by_id,
@@ -28,6 +29,8 @@ from app.modules.builder.services import (
     publish,
     get_published,
     build_deploy_html,
+    slug_from_name,
+    ensure_unique_subdomain_slug,
 )
 
 # Public router — no auth, mounted at /p in main.py
@@ -132,11 +135,20 @@ def publish_project(
     db=Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Publish a builder project, making it publicly accessible at /p/{project_id}."""
+    """Publish a builder project. When sites_domain is set, uses subdomain (pack name slug); else /p/{project_id}."""
     project = get_by_id(db, project_id, current_user.id)
     if not project:
         raise NotFoundError("Builder project not found")
-    live_url = str(request.base_url).rstrip("/") + f"/p/{project_id}"
+    settings = get_settings()
+    if settings.sites_domain and settings.sites_domain.strip():
+        pack = get_pack_for_user(db, project.pack_id, current_user.id)
+        if not pack:
+            raise NotFoundError("Pack not found")
+        base_slug = slug_from_name(pack.name)
+        project.subdomain_slug = ensure_unique_subdomain_slug(db, base_slug, project.id)
+        live_url = f"https://{project.subdomain_slug}.{settings.sites_domain.strip()}"
+    else:
+        live_url = str(request.base_url).rstrip("/") + f"/p/{project_id}"
     project = publish(db, project, live_url)
     return BuilderProjectRead.model_validate(project)
 

@@ -1,11 +1,18 @@
 """Client and Lead services. Client by user; Lead by pack (pack ownership checked in routes)."""
 
+from datetime import date
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
 from app.core.logging import log_service_action
-from app.modules.clients.models import Client, Lead, LEAD_STATUS_QUALIFIED
+from app.modules.clients.models import (
+    Client,
+    Lead,
+    LEAD_STATUS_QUALIFIED,
+    PIPELINE_STAGE_CONTACTED,
+)
 
 
 @log_service_action()
@@ -69,6 +76,16 @@ def list_leads_for_pack(db: Session, pack_id: UUID) -> list[Lead]:
 
 
 @log_service_action()
+def list_qualified_leads_for_pack(db: Session, pack_id: UUID) -> list[Lead]:
+    return (
+        db.query(Lead)
+        .filter(Lead.pack_id == pack_id, Lead.status == LEAD_STATUS_QUALIFIED)
+        .order_by(Lead.created_at.desc())
+        .all()
+    )
+
+
+@log_service_action()
 def count_qualified_leads_for_pack(db: Session, pack_id: UUID) -> int:
     return (
         db.query(Lead)
@@ -117,6 +134,10 @@ def create_lead(
     budget_range: str | None = None,
     urgency: str | None = None,
     client_id: UUID | None = None,
+    pipeline_stage: str | None = None,
+    due_date: date | None = None,
+    deal_value: Decimal | None = None,
+    assigned_user_id: UUID | None = None,
 ) -> Lead:
     lead = Lead(
         pack_id=pack_id,
@@ -128,6 +149,10 @@ def create_lead(
         budget_range=budget_range,
         urgency=urgency,
         client_id=client_id,
+        pipeline_stage=pipeline_stage or PIPELINE_STAGE_CONTACTED,
+        due_date=due_date,
+        deal_value=deal_value,
+        assigned_user_id=assigned_user_id,
     )
     db.add(lead)
     db.commit()
@@ -148,6 +173,10 @@ def update_lead(
     budget_range: str | None = None,
     urgency: str | None = None,
     client_id: UUID | None = None,
+    pipeline_stage: str | None = None,
+    due_date: date | None = None,
+    deal_value: Decimal | None = None,
+    assigned_user_id: UUID | None = None,
 ) -> Lead:
     if name is not None:
         lead.name = name
@@ -167,6 +196,14 @@ def update_lead(
         lead.urgency = urgency
     if client_id is not None:
         lead.client_id = client_id
+    if pipeline_stage is not None:
+        lead.pipeline_stage = pipeline_stage
+    if due_date is not None:
+        lead.due_date = due_date
+    if deal_value is not None:
+        lead.deal_value = deal_value
+    if assigned_user_id is not None:
+        lead.assigned_user_id = assigned_user_id
     db.commit()
     db.refresh(lead)
     return lead

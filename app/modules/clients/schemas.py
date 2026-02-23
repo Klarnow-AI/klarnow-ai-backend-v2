@@ -1,6 +1,7 @@
 """Client Pydantic schemas."""
 
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -49,6 +50,10 @@ class LeadBase(BaseModel):
     budget_range: str | None = None
     urgency: str | None = None
     client_id: UUID | None = None
+    pipeline_stage: str | None = None
+    due_date: date | None = None
+    deal_value: Decimal | None = None
+    assigned_user_id: UUID | None = None
 
 
 class LeadCreate(LeadBase):
@@ -65,6 +70,10 @@ class LeadUpdate(BaseModel):
     budget_range: str | None = None
     urgency: str | None = None
     client_id: UUID | None = None
+    pipeline_stage: str | None = None
+    due_date: date | None = None
+    deal_value: Decimal | None = None
+    assigned_user_id: UUID | None = None
 
     model_config = {"extra": "forbid"}
 
@@ -73,6 +82,7 @@ class LeadRead(LeadBase):
     id: UUID
     pack_id: UUID
     status: str
+    pipeline_stage: str
     created_at: datetime
     updated_at: datetime
 

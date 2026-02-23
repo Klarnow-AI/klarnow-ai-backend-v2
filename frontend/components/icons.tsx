@@ -59,6 +59,7 @@ import {
   PencilEdit01Icon,
   StarIcon,
   LockIcon,
+  Notification01Icon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 
@@ -140,3 +141,4 @@ export const RotateCcw = createIcon(RotateLeft01Icon, "RotateCcw");
 export const Pencil = createIcon(PencilEdit01Icon, "Pencil");
 export const Star = createIcon(StarIcon, "Star");
 export const Lock = createIcon(LockIcon, "Lock");
+export const Bell = createIcon(Notification01Icon, "Bell");

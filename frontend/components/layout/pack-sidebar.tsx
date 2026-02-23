@@ -11,9 +11,6 @@ import {
   Image,
   Film,
   Users,
-  FileCheck,
-  Receipt,
-  Shield,
   ChevronLeft,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
@@ -26,9 +23,6 @@ const packNav = [
   { href: "/posters", label: "Posters & Flyers", icon: Image },
   { href: "/ad-factory", label: "Ad Factory", icon: Film },
   { href: "/leads", label: "Leads", icon: Users },
-  { href: "/proposal", label: "Proposal", icon: FileCheck },
-  { href: "/invoice", label: "Invoice", icon: Receipt },
-  { href: "/proof-vault", label: "Proof Vault", icon: Shield },
 ];
 
 export function PackSidebar() {

@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     secret_key: str = ""
     access_token_expiry_time: int = 60  # minutes
     frontend_url: str = "http://localhost:3000"
+    # Optional: when set, published sites use subdomains (e.g. sites.klarnow.com → acme.sites.klarnow.com)
+    sites_domain: str = ""
 
     # Database
     database_url: str = ""
@@ -39,6 +41,10 @@ class Settings(BaseSettings):
 
     # Optional: Black Forest Labs (FLUX.2 Pro)
     bfl_api_key: str = ""
+
+    # Optional: Stripe (Connect + Invoicing)
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
 
     # Orchestrator cost/safety (Phase 7)
     max_tool_chain_length: int = 5

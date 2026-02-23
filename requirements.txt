@@ -24,3 +24,5 @@ Pillow
 numpy
 tenacity
 google-genai
+reportlab
+stripe

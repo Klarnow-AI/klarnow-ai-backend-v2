@@ -9,6 +9,10 @@ from sqlalchemy.orm import Session
 from app.core.logging import log_service_action
 from app.modules.builder.models import BuilderProject
 
+# Subdomains that must not be used (reserved or ambiguous)
+_RESERVED_SUBDOMAINS = frozenset({"www", "api", "app", "admin", "mail", "ftp", "staging"})
+_SUBDOMAIN_MAX_LEN = 63
+
 
 # ---------------------------------------------------------------------------
 # HTML builder — converts stored files into a self-contained deployable page
@@ -75,8 +79,14 @@ _DEPLOY_FOOTER = """\
 </html>"""
 
 
-def build_deploy_html(files: dict, project_id: str | None = None) -> str:
-    """Build a self-contained HTML page from a dict of project files."""
+def build_deploy_html(
+    files: dict,
+    project_id: str | None = None,
+    lead_url: str | None = None,
+) -> str:
+    """Build a self-contained HTML page from a dict of project files.
+    If lead_url is set (e.g. /lead for subdomain), use it; else use /p/{project_id}/lead when project_id is set.
+    """
     app_code = files.get("/App.tsx") or files.get("App.tsx") or ""
 
     bundle = ""
@@ -96,7 +106,10 @@ def build_deploy_html(files: dict, project_id: str | None = None) -> str:
 
     # Inject the lead capture URL so any form in the page can POST to it.
     header = _DEPLOY_HEADER
-    if project_id:
+    if lead_url:
+        lead_tag = f'  <script>window.KLARO_LEAD_URL="{lead_url}";</script>\n'
+        header = header.replace("</head>", lead_tag + "</head>", 1)
+    elif project_id:
         lead_tag = f'  <script>window.KLARO_LEAD_URL="/p/{project_id}/lead";</script>\n'
         header = header.replace("</head>", lead_tag + "</head>", 1)
 
@@ -185,6 +198,71 @@ def get_published(db: Session, project_id: UUID) -> BuilderProject | None:
         db.query(BuilderProject)
         .filter(
             BuilderProject.id == project_id,
+            BuilderProject.live_url.isnot(None),
+        )
+        .first()
+    )
+
+
+def slug_from_name(name: str) -> str:
+    """Produce a DNS-safe subdomain slug from a pack/project name: [a-z0-9-], max 63 chars."""
+    if not name or not name.strip():
+        return "site"
+    s = name.strip().lower()
+    s = re.sub(r"[^a-z0-9\s-]", "", s)
+    s = re.sub(r"[-\s]+", "-", s).strip("-")
+    if not s:
+        return "site"
+    return s[: _SUBDOMAIN_MAX_LEN] if len(s) > _SUBDOMAIN_MAX_LEN else s
+
+
+@log_service_action()
+def ensure_unique_subdomain_slug(
+    db: Session,
+    base_slug: str,
+    project_id: UUID,
+) -> str:
+    """Return a unique subdomain_slug for the given base_slug (e.g. from pack name).
+    If base_slug is reserved or taken, appends -2, -3, ... or short project id.
+    """
+    slug = base_slug or "site"
+    if slug in _RESERVED_SUBDOMAINS:
+        slug = f"{slug}-{str(project_id).replace('-', '')[:8]}"
+    existing = (
+        db.query(BuilderProject.subdomain_slug)
+        .filter(
+            BuilderProject.subdomain_slug == slug,
+            BuilderProject.id != project_id,
+        )
+        .first()
+    )
+    if not existing:
+        return slug
+    for n in range(2, 1000):
+        candidate = f"{base_slug}-{n}"[:_SUBDOMAIN_MAX_LEN]
+        if (
+            db.query(BuilderProject.subdomain_slug)
+            .filter(
+                BuilderProject.subdomain_slug == candidate,
+                BuilderProject.id != project_id,
+            )
+            .first()
+            is None
+        ):
+            return candidate
+    return f"{base_slug}-{str(project_id).replace('-', '')[:8]}"
+
+
+def get_published_by_subdomain(db: Session, subdomain: str) -> BuilderProject | None:
+    """Resolve a published builder project by subdomain (subdomain_slug). No auth."""
+    if not subdomain or not subdomain.strip():
+        return None
+    slug = subdomain.strip().lower()
+    return (
+        db.query(BuilderProject)
+        .filter(
+            BuilderProject.subdomain_slug == slug,
+            BuilderProject.published_at.isnot(None),
             BuilderProject.live_url.isnot(None),
         )
         .first()

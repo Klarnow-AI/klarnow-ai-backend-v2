@@ -20,6 +20,7 @@ type AuthContextValue = {
   checkEmailRegistered: (email: string) => Promise<{ registered: boolean }>;
   requestLoginCode: (email: string) => Promise<void>;
   verifyLoginCode: (email: string, code: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
   logout: () => void;
 };
 
@@ -76,6 +77,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAuthenticated(true);
   }, []);
 
+  const requestPasswordReset = useCallback(async (email: string) => {
+    await authApi.requestPasswordReset(email);
+  }, []);
+
   const logout = useCallback(() => {
     authApi.logout();
     clearStores();
@@ -92,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         checkEmailRegistered,
         requestLoginCode,
         verifyLoginCode,
+        requestPasswordReset,
         logout,
       }}
     >

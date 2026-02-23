@@ -13,11 +13,12 @@ from app.core.auth.password import hash_password, verify_password
 from app.core.config import get_settings
 from app.core.db.session import get_db
 from app.core.errors import AppError, UnauthorizedError
-from app.modules.packs.models import User, EmailLoginCode
+from app.modules.packs.models import User, EmailLoginCode, PasswordResetToken
 
 router = APIRouter()
 
 CODE_EXPIRY_MINUTES = 15
+RESET_TOKEN_EXPIRY_MINUTES = 60
 
 
 class LoginBody(BaseModel):
@@ -43,6 +44,15 @@ class CheckEmailBody(BaseModel):
     email: EmailStr
 
 
+class ForgotPasswordBody(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordBody(BaseModel):
+    token: str
+    new_password: str
+
+
 class CheckEmailResponse(BaseModel):
     registered: bool
 
@@ -64,6 +74,26 @@ def _send_login_code_email(to_email: str, code: str) -> bool:
             "to": to_email,
             "subject": "Your Klarnow AI sign-in code",
             "html": f"<p>Your sign-in code is: <strong>{code}</strong></p><p>It expires in {CODE_EXPIRY_MINUTES} minutes. If you didn't request this, you can ignore this email.</p>",
+        })
+        return True
+    except Exception:
+        return False
+
+
+def _send_password_reset_email(to_email: str, token: str) -> bool:
+    settings = get_settings()
+    if not settings.resend_api_key:
+        return False
+    base_url = (settings.frontend_url or "http://localhost:3000").rstrip("/")
+    reset_url = f"{base_url}/reset-password?token={token}"
+    try:
+        import resend
+        resend.api_key = settings.resend_api_key
+        resend.Emails.send({
+            "from": settings.resend_from_email or "onboarding@resend.dev",
+            "to": to_email,
+            "subject": "Reset your Klarnow AI password",
+            "html": f"<p>Click the link below to reset your password. It expires in {RESET_TOKEN_EXPIRY_MINUTES} minutes.</p><p><a href=\"{reset_url}\">Reset password</a></p><p>If you didn't request this, you can ignore this email.</p>",
         })
         return True
     except Exception:
@@ -167,6 +197,54 @@ def login(
     return TokenResponse(access_token=token)
 
 
+@router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
+def forgot_password(
+    body: ForgotPasswordBody,
+    db: Session = Depends(get_db),
+):
+    """If user exists, create a reset token and send email. Always return 204 to avoid email enumeration."""
+    user = db.query(User).filter(User.email == body.email).first()
+    if user:
+        db.query(PasswordResetToken).filter(PasswordResetToken.email == body.email).delete()
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_EXPIRY_MINUTES)
+        row = PasswordResetToken(
+            email=body.email,
+            token=token,
+            expires_at=expires_at,
+        )
+        db.add(row)
+        db.commit()
+        _send_password_reset_email(body.email, token)
+    return None
+
+
+@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+def reset_password(
+    body: ResetPasswordBody,
+    db: Session = Depends(get_db),
+):
+    """Validate token and set new password; token is single-use."""
+    now = datetime.now(timezone.utc)
+    row = (
+        db.query(PasswordResetToken)
+        .filter(
+            PasswordResetToken.token == body.token.strip(),
+            PasswordResetToken.expires_at > now,
+        )
+        .first()
+    )
+    if not row:
+        raise AppError("Invalid or expired reset link", status_code=status.HTTP_400_BAD_REQUEST)
+    user = db.query(User).filter(User.email == row.email).first()
+    if not user:
+        raise AppError("Invalid or expired reset link", status_code=status.HTTP_400_BAD_REQUEST)
+    user.hashed_password = hash_password(body.new_password)
+    db.delete(row)
+    db.commit()
+    return None
+
+
 @router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
 def delete_account(
     db: Session = Depends(get_db),
@@ -178,8 +256,9 @@ def delete_account(
     proposals, invoices, proofs, conversion pages, plan trackers, etc.), clients,
     chat conversations and messages. The operation cannot be undone.
     """
-    # Remove any email login codes for this user (table is keyed by email, not user_id)
+    # Remove any email login codes and password reset tokens for this user (tables are keyed by email)
     db.query(EmailLoginCode).filter(EmailLoginCode.email == current_user.email).delete()
+    db.query(PasswordResetToken).filter(PasswordResetToken.email == current_user.email).delete()
     # Deleting the user cascades to: Pack, Client, Conversation (and Message via Conversation).
     # Pack deletion cascades to all pack-scoped tables (brand_os, campaign, etc.)
     db.delete(current_user)

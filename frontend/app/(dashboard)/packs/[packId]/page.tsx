@@ -12,7 +12,6 @@ import {
   Users,
   FileCheck,
   Receipt,
-  Shield,
   ChevronRight,
   Film,
 } from "@/components/icons";
@@ -43,7 +42,6 @@ function getStageLabel(stage: string | undefined): string {
 const PACK_SUMMARY_CARDS: string[] = [
   "brand_os",
   "plan_tracker",
-  "proof_vault",
 ];
 
 const PACK_OVERVIEW_MODULES: Record<
@@ -51,6 +49,7 @@ const PACK_OVERVIEW_MODULES: Record<
   {
     title: string;
     hrefSuffix: string;
+    getHref?: (packId: string) => string;
     icon: React.ComponentType<{ className?: string; size?: number }>;
     emptyMessage: string;
     getContent: (summary: PackSummaryResponse) => React.ReactNode;
@@ -177,6 +176,7 @@ const PACK_OVERVIEW_MODULES: Record<
   proposals: {
     title: "Proposals",
     hrefSuffix: "/proposal",
+    getHref: (packId) => `/proposals?pack=${packId}`,
     icon: FileCheck,
     emptyMessage: "No proposals yet.",
     getContent: (s) =>
@@ -193,6 +193,7 @@ const PACK_OVERVIEW_MODULES: Record<
   invoices: {
     title: "Invoices",
     hrefSuffix: "/invoice",
+    getHref: (packId) => `/invoices?pack=${packId}`,
     icon: Receipt,
     emptyMessage: "No invoices yet.",
     getContent: (s) =>
@@ -203,20 +204,6 @@ const PACK_OVERVIEW_MODULES: Record<
             s.invoices.paid > 0 ||
             s.invoices.overdue > 0) &&
             ` — ${s.invoices.sent} sent, ${s.invoices.paid} paid${s.invoices.overdue > 0 ? `, ${s.invoices.overdue} overdue` : ""}`}
-        </p>
-      ) : null,
-  },
-  proof_vault: {
-    title: "Proof Vault",
-    hrefSuffix: "/proof-vault",
-    icon: Shield,
-    emptyMessage:
-      "Upload testimonials, case studies, and social proof to strengthen your website.",
-    getContent: (s) =>
-      s.proofs_count > 0 ? (
-        <p>
-          {s.proofs_count} proof asset{s.proofs_count !== 1 ? "s" : ""}{" "}
-          uploaded.
         </p>
       ) : null,
   },
@@ -514,7 +501,7 @@ export default function PackOverviewPage() {
                   <SummarySection
                     key={moduleKey}
                     title={mod.title}
-                    href={`/packs/${packId}${mod.hrefSuffix}`}
+                    href={mod.getHref ? mod.getHref(packId) : `/packs/${packId}${mod.hrefSuffix}`}
                     icon={mod.icon}
                     emptyMessage={mod.emptyMessage}
                     className={isThird ? "col-span-2" : undefined}
