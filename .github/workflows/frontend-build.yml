@@ -1,0 +1,39 @@
+# Build frontend Docker image only when frontend (or Docker config) changes.
+# Uses Docker layer cache to speed up repeated builds.
+name: Frontend build
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - "frontend/**"
+      - "frontend/Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/frontend-build.yml"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "frontend/**"
+      - "frontend/Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/frontend-build.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build frontend image (with cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./frontend/Dockerfile
+          push: false
+          load: true
+          tags: klarnow-frontend:build
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

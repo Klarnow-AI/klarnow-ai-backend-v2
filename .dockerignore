@@ -1,0 +1,26 @@
+# Git and env
+.git
+.gitignore
+.env
+.env.*
+
+# IDE and tooling
+.cursor
+.claude
+
+# Python (not needed for frontend; backend image runs pip install)
+.venv
+__pycache__
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Frontend build artifacts (recreated in Docker)
+frontend/.next
+frontend/node_modules
+
+# Docs and misc (not copied by either Dockerfile)
+docs
+*.md
