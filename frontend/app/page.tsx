@@ -5,11 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import {
-  Sun,
-  ChevronDown,
-  FolderPlus,
-} from "@/components/icons";
+import { Sun, FolderPlus } from "@/components/icons";
 import { PageLoader } from "@/components/ui/page-loader";
 import { useAuth } from "@/contexts/auth-context";
 import { useLandingContext } from "@/hooks/use-landing-context";
@@ -71,7 +67,6 @@ export default function LandingPage() {
   const { resolved: themeResolved } = useTheme();
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [autoOpen, setAutoOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [onboardingModalOpen, setOnboardingModalOpen] = useState(false);
@@ -311,23 +306,6 @@ export default function LandingPage() {
             placeholder="Describe the offer you want to launch…"
             wrapperClassName="mb-2"
           />
-          {/* Auto chip - below input */}
-          <div className="flex justify-center mb-4">
-            <Chip
-              size="sm"
-              trailing={
-                <ChevronDown
-                  className={cn(
-                    "h-4 w-4 transition-transform",
-                    autoOpen && "rotate-180",
-                  )}
-                />
-              }
-              onClick={() => setAutoOpen(!autoOpen)}
-            >
-              Auto
-            </Chip>
-          </div>
 
           {/* Next Action chips (stateful from API, max 3) */}
           <div className="flex flex-wrap items-center justify-center gap-2">

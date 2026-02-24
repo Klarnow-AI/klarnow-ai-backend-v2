@@ -59,6 +59,7 @@ async function proxyRequest(
   };
   if (req.method !== "GET" && req.method !== "HEAD" && req.body) {
     init.body = req.body;
+    (init as RequestInit & { duplex?: "half" }).duplex = "half";
   }
   try {
     const res = await fetch(url, init);
