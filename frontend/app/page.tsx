@@ -89,7 +89,7 @@ export default function LandingPage() {
   const logoSrc =
     themeResolved === "dark"
       ? "/logos/logo_white.svg"
-      : "/logos/logo_color.svg";
+      : "/logos/logo_black.svg";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,10 +133,7 @@ export default function LandingPage() {
     context?.leadCount ?? null,
   );
   const showStrip = context?.pack != null;
-  const sprintDay =
-    context?.stage === "sprint"
-      ? (context.sprintDay ?? 0)
-      : 0;
+  const sprintDay = context?.stage === "sprint" ? (context.sprintDay ?? 0) : 0;
   const show14Dots = context?.pack != null && context?.stage === "sprint";
 
   return (
@@ -270,9 +267,13 @@ export default function LandingPage() {
           {showStrip && context?.pack && (
             <div className="flex items-center justify-center gap-3 mb-4 text-xs text-muted-foreground flex-wrap">
               <span>Pack: {context.pack.name}</span>
-              <span aria-hidden className="text-muted-foreground/50">·</span>
+              <span aria-hidden className="text-muted-foreground/50">
+                ·
+              </span>
               <span>Stage: {stageLabel}</span>
-              <span aria-hidden className="text-muted-foreground/50">·</span>
+              <span aria-hidden className="text-muted-foreground/50">
+                ·
+              </span>
               <span>{getTodayLabel()}</span>
             </div>
           )}
@@ -388,7 +389,7 @@ export default function LandingPage() {
                       {chip.label}
                     </Chip>
                   </motion.div>
-                )
+                ),
               )}
           </div>
         </motion.div>

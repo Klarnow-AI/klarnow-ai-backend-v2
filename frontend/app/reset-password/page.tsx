@@ -35,7 +35,9 @@ function ResetPasswordForm() {
       await auth.resetPassword(token, password);
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid or expired reset link");
+      setError(
+        err instanceof Error ? err.message : "Invalid or expired reset link",
+      );
     } finally {
       setLoading(false);
     }
@@ -64,10 +66,11 @@ function ResetPasswordForm() {
     return (
       <div className="space-y-4">
         <p className="text-muted-foreground text-sm">
-          Your password has been reset. You can now log in with your new password.
+          Your password has been reset. You can now log in with your new
+          password.
         </p>
         <Link href="/">
-          <Button className="w-full h-11 rounded-xl bg-foreground text-background hover:bg-foreground/90">
+          <Button className="w-full rounded-full bg-foreground text-background hover:bg-foreground/90">
             Log in
           </Button>
         </Link>
@@ -94,7 +97,7 @@ function ResetPasswordForm() {
           onChange={(e) => setPassword(e.target.value)}
           required
           autoComplete="new-password"
-          className="rounded-xl h-11"
+          className="rounded-full"
         />
       </div>
       <div className="space-y-2">
@@ -109,19 +112,15 @@ function ResetPasswordForm() {
           onChange={(e) => setConfirm(e.target.value)}
           required
           autoComplete="new-password"
-          className="rounded-xl h-11"
+          className="rounded-full"
         />
       </div>
       <Button
         type="submit"
-        className="w-full h-11 rounded-xl bg-foreground text-background hover:bg-foreground/90"
+        className="w-full rounded-full bg-foreground text-background hover:bg-foreground/90"
         disabled={loading}
       >
-        {loading ? (
-          <Spinner className="h-5 w-5" />
-        ) : (
-          "Reset password"
-        )}
+        {loading ? <Spinner className="h-5 w-5" /> : "Reset password"}
       </Button>
     </form>
   );

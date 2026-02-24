@@ -1,23 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useParams, useRouter } from "next/navigation";
+import { usePathname, useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageSquare,
   FolderKanban,
-  Palette,
   Users,
-  Settings,
   HelpCircle,
   MenuCollapse,
-  ChevronLeft,
   ChevronRight,
+  ChevronDown,
   LogOut,
   Feedback,
-  LayoutDashboard,
   Target,
   FileCode,
   Calendar,
@@ -26,32 +23,64 @@ import {
   FileCheck,
   Receipt,
   Lock,
+  Plus,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 import { useTheme } from "@/contexts/theme-context";
 import { packs as packsApi, type Pack } from "@/lib/api";
-import { subscriptionApi, type SubscriptionRead } from "@/api_requests/subscription";
+import {
+  subscriptionApi,
+  type SubscriptionRead,
+} from "@/api_requests/subscription";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { usePackGates } from "@/hooks/use-pack-gates";
 
-const navItems = [
-  { href: "/chat", label: "Chat", icon: MessageSquare },
-  { href: "/packs", label: "Packs", icon: FolderKanban },
-  { href: "/studio", label: "Studio", icon: Palette },
-  { href: "/clients", label: "Clients", icon: Users },
-  { href: "/proposals", label: "Proposals", icon: FileCheck },
-  { href: "/invoices", label: "Invoices", icon: Receipt },
+const STORAGE_KEY_LAST_PACK = "sidebar-last-pack-id";
+
+const buildItems = [
+  { href: "/chat", label: "Chat", icon: MessageSquare, pathMatch: "/chat" },
+  {
+    href: "/plan-tracker",
+    label: "Plan and tracker",
+    icon: Calendar,
+    pathMatch: "/plan-tracker",
+  },
+  {
+    href: "/brand-os",
+    label: "Brand Identity",
+    icon: Target,
+    pathMatch: "/brand-os",
+  },
+  { href: "/website", label: "Website", icon: FileCode, pathMatch: "/website" },
+  {
+    href: "/posters",
+    label: "Poster & flyer",
+    icon: ImageIcon,
+    pathMatch: "/posters",
+  },
+  {
+    href: "/ad-factory",
+    label: "Ad factory",
+    icon: Film,
+    pathMatch: "/ad-factory",
+  },
 ];
 
-const packNavItems = [
-  { href: "", label: "Overview", icon: LayoutDashboard },
-  { href: "/plan-tracker", label: "Plan & Tracker", icon: Calendar },
-  { href: "/brand-os", label: "Brand Identity", icon: Target },
-  { href: "/website", label: "Website", icon: FileCode },
-  { href: "/posters", label: "Posters & Flyers", icon: ImageIcon },
-  { href: "/ad-factory", label: "Ad Factory", icon: Film },
-  { href: "/leads", label: "Leads", icon: Users },
+const resultItems = [
+  { href: "/leads", label: "Leads", icon: Users, pathMatch: "/leads" },
+  {
+    href: "/proposals",
+    label: "Proposals",
+    icon: FileCheck,
+    pathMatch: "/proposals",
+  },
+  {
+    href: "/invoices",
+    label: "Invoices",
+    icon: Receipt,
+    pathMatch: "/invoices",
+  },
 ];
 
 const navToSection: Record<string, string> = {
@@ -74,40 +103,21 @@ const navLinkClass = (isActive: boolean, collapsed?: boolean) =>
       : "text-muted-foreground hover:text-foreground hover:bg-muted",
   );
 
-const itemVariants = {
-  hidden: { opacity: 0, x: -12 },
-  visible: (i: number) => ({
-    opacity: 1,
-    x: 0,
-    transition: { duration: 0.25, ease: "easeOut", delay: 0.04 * i },
-  }),
-  exit: { opacity: 0, x: -8, transition: { duration: 0.15 } },
-};
-
-const listVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { delayChildren: 0.05 },
-  },
-  exit: {
-    opacity: 0,
-    transition: { duration: 0.2 },
-  },
-};
-
 const STORAGE_KEY_SIDEBAR = "sidebar-collapsed";
 
 export function Sidebar() {
   const pathname = usePathname();
   const params = useParams();
-  const router = useRouter();
-  const packId = params.packId as string | undefined;
+  const urlPackId = params.packId as string | undefined;
   const { logout } = useAuth();
   const [packList, setPackList] = useState<Pack[]>([]);
   const [currentPack, setCurrentPack] = useState<Pack | null>(null);
   const [collapsed, setCollapsed] = useState(false);
-  const [subscription, setSubscription] = useState<SubscriptionRead | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionRead | null>(
+    null,
+  );
+  const [packDropdownOpen, setPackDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
@@ -115,41 +125,75 @@ export function Sidebar() {
       if (stored != null) setCollapsed(JSON.parse(stored));
     } catch {}
   }, []);
+
   const { resolved: themeResolved } = useTheme();
   const logoSrc =
     themeResolved === "dark"
       ? "/logos/logo_white.svg"
-      : "/logos/logo_color.svg";
+      : "/logos/logo_black.svg";
 
-  const inPackContext = pathname.startsWith("/packs");
-  const onPacksList = pathname === "/packs";
-  const onPackDetail = inPackContext && !!packId;
-  const { gates } = usePackGates(onPackDetail ? packId : null);
-
-  useEffect(() => {
-    if (onPacksList) {
-      packsApi
-        .list()
-        .then((res) => setPackList(res.items))
-        .catch(() => setPackList([]));
-    }
-  }, [onPacksList]);
+  const inPackDetail =
+    pathname.startsWith("/packs/") && !!urlPackId && pathname !== "/packs";
+  const resolvedPackId =
+    urlPackId ??
+    (typeof window !== "undefined"
+      ? localStorage.getItem(STORAGE_KEY_LAST_PACK)
+      : null);
+  const effectivePackId = urlPackId ?? resolvedPackId;
+  const { gates } = usePackGates(effectivePackId || null);
 
   useEffect(() => {
-    if (onPackDetail && packId) {
-      const fromList = packList.find((p) => p.id === packId);
+    packsApi
+      .list()
+      .then((res) => setPackList(res.items))
+      .catch(() => setPackList([]));
+  }, []);
+
+  useEffect(() => {
+    if (urlPackId) {
+      const fromList = packList.find((p) => p.id === urlPackId);
       if (fromList) {
         setCurrentPack(fromList);
+        try {
+          localStorage.setItem(STORAGE_KEY_LAST_PACK, urlPackId);
+        } catch {}
         return;
       }
       packsApi
-        .get(packId)
-        .then((p) => setCurrentPack(p))
+        .get(urlPackId)
+        .then((p) => {
+          setCurrentPack(p);
+          try {
+            localStorage.setItem(STORAGE_KEY_LAST_PACK, urlPackId);
+          } catch {}
+        })
         .catch(() => setCurrentPack(null));
     } else {
-      setCurrentPack(null);
+      if (resolvedPackId && packList.length > 0) {
+        const fromList = packList.find((p) => p.id === resolvedPackId);
+        setCurrentPack(fromList ?? null);
+      } else {
+        setCurrentPack(null);
+      }
     }
-  }, [onPackDetail, packId, packList]);
+  }, [urlPackId, resolvedPackId, packList]);
+
+  useEffect(() => {
+    if (!packDropdownOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current?.contains(e.target as Node)) return;
+      setPackDropdownOpen(false);
+    }
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") setPackDropdownOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [packDropdownOpen]);
 
   useEffect(() => {
     subscriptionApi
@@ -168,6 +212,30 @@ export function Sidebar() {
     });
   };
 
+  const packForLinks = effectivePackId ?? packList[0]?.id ?? null;
+  const chatHref = packForLinks ? `/chat?pack=${packForLinks}` : "/chat";
+
+  const buildHref = (pathSuffix: string): string => {
+    if (pathSuffix === "/chat") return chatHref;
+    if (!packForLinks) return "/packs";
+    return `/packs/${packForLinks}${pathSuffix}`;
+  };
+
+  const resultHref = (pathSuffix: string): string => {
+    if (pathSuffix === "/proposals")
+      return packForLinks ? `/proposals?pack=${packForLinks}` : "/proposals";
+    if (pathSuffix === "/invoices")
+      return packForLinks ? `/invoices?pack=${packForLinks}` : "/invoices";
+    if (!packForLinks) return "/packs";
+    return `/packs/${packForLinks}${pathSuffix}`;
+  };
+
+  const isChatActive = pathname === "/chat" || pathname.startsWith("/chat?");
+  const isProposalsActive =
+    pathname === "/proposals" || pathname.startsWith("/proposals?");
+  const isInvoicesActive =
+    pathname === "/invoices" || pathname.startsWith("/invoices?");
+
   return (
     <motion.aside
       initial={{ width: 0, opacity: 0 }}
@@ -180,14 +248,14 @@ export function Sidebar() {
     >
       <div
         className={cn(
-          "border-b border-border flex items-center min-w-0",
+          "border-b border-border flex items-center min-w-0 relative",
           collapsed ? "justify-center p-2" : "gap-2 p-4",
         )}
       >
         {collapsed ? (
           <div className="group relative flex h-9 w-9 shrink-0 cursor-pointer">
             <Link
-              href="/"
+              href="/chat"
               title="Home"
               className="flex h-full w-full items-center justify-center rounded-xl transition-opacity duration-150 group-hover:opacity-0 group-hover:pointer-events-none"
             >
@@ -210,73 +278,75 @@ export function Sidebar() {
           </div>
         ) : (
           <>
-            {!inPackContext ? (
+            <div className="relative flex min-w-0 flex-1" ref={dropdownRef}>
               <Link
                 href="/chat"
-                className="flex min-w-0 flex-1 items-center gap-2"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl overflow-hidden"
                 title="Klarnow AI"
               >
-                <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl overflow-hidden">
-                  <Image
-                    src={logoSrc}
-                    alt="Klarnow AI"
-                    width={36}
-                    height={36}
-                    className="object-contain p-0.5"
-                  />
-                </div>
-                <span className="min-w-0 truncate font-semibold text-lg text-foreground">
-                  Klarnow AI
-                </span>
+                <Image
+                  src={logoSrc}
+                  alt="Klarnow AI"
+                  width={36}
+                  height={36}
+                  className="object-contain p-0.5"
+                />
               </Link>
-            ) : onPacksList ? (
-              <Link
-                href="/chat"
-                className="flex min-w-0 flex-1 items-center gap-2"
-                title="Packs"
+              <button
+                type="button"
+                onClick={() => setPackDropdownOpen((o) => !o)}
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-muted transition-colors"
+                title={currentPack?.name ?? "Select a pack"}
               >
-                <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl overflow-hidden">
-                  <Image
-                    src={logoSrc}
-                    alt="Klarnow AI"
-                    width={36}
-                    height={36}
-                    className="object-contain p-0.5"
-                  />
-                </div>
                 <span className="min-w-0 truncate font-semibold text-lg text-foreground">
-                  Packs
+                  {currentPack?.name ?? "Select a pack"}
                 </span>
-              </Link>
-            ) : (
-              <div
-                className="flex min-w-0 flex-1 items-center gap-2"
-                title={currentPack?.name ?? "Pack"}
-              >
-                <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl overflow-hidden">
-                  <Image
-                    src={logoSrc}
-                    alt="Klarnow AI"
-                    width={36}
-                    height={36}
-                    className="object-contain p-0.5"
-                  />
-                </div>
-                <span className="min-w-0 truncate font-semibold text-lg text-foreground">
-                  {currentPack?.name ?? "Pack"}
-                </span>
-                {/* {currentPack && (
-                  <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                    <PackActionsMenu
-                      pack={currentPack}
-                      onArchive={handleArchive}
-                      onRestore={handleRestore}
-                      onDelete={handleDelete}
-                    />
-                  </div>
-                )} */}
-              </div>
-            )}
+                <ChevronDown
+                  className={cn(
+                    "h-5 w-5 shrink-0 transition-transform",
+                    packDropdownOpen && "rotate-180",
+                  )}
+                />
+              </button>
+              <AnimatePresence>
+                {packDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-xl border border-border bg-card shadow-lg py-1"
+                  >
+                    {packList.map((pack) => (
+                      <Link
+                        key={pack.id}
+                        href={`/packs/${pack.id}`}
+                        onClick={() => setPackDropdownOpen(false)}
+                        className={cn(
+                          "flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors",
+                          currentPack?.id === pack.id
+                            ? "bg-muted text-foreground"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        )}
+                      >
+                        <FolderKanban className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{pack.name}</span>
+                      </Link>
+                    ))}
+                    <div className="border-t border-border mt-1 pt-1">
+                      <Link
+                        href="/packs/new"
+                        onClick={() => setPackDropdownOpen(false)}
+                        className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-primary hover:bg-muted"
+                      >
+                        <Plus className="h-4 w-4 shrink-0" />
+                        New pack
+                      </Link>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
             <button
               type="button"
               onClick={toggleCollapsed}
@@ -294,137 +364,128 @@ export function Sidebar() {
           collapsed ? "p-2" : "p-3",
         )}
       >
-        <AnimatePresence mode="wait">
-          {inPackContext ? (
-            <motion.div
-              key="pack"
-              variants={listVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className="space-y-0.5"
-            >
-              <motion.div variants={itemVariants} custom={1}>
-                <Link
-                  href={onPacksList ? "/chat" : "/packs"}
-                  className={navLinkClass(false, collapsed)}
-                  title={onPacksList ? "Back" : "All packs"}
-                >
-                  <ChevronLeft className="h-5 w-5 shrink-0" />
-                  {!collapsed && (onPacksList ? "Back" : "All packs")}
-                </Link>
-              </motion.div>
-              {onPacksList && (
-                <div className="mt-2 space-y-0.5">
-                  {packList.map((pack, i) => (
-                    <motion.div
-                      key={pack.id}
-                      variants={itemVariants}
-                      custom={i + 2}
-                      initial="hidden"
-                      animate="visible"
-                    >
-                      <Link
-                        href={`/packs/${pack.id}`}
-                        className={navLinkClass(
-                          pathname === `/packs/${pack.id}`,
-                          collapsed,
-                        )}
-                        title={pack.name}
-                      >
-                        <FolderKanban className="h-5 w-5 shrink-0" />
-                        {!collapsed && (
-                          <span className="truncate">{pack.name}</span>
-                        )}
-                      </Link>
-                    </motion.div>
-                  ))}
-                </div>
-              )}
-              {onPackDetail && packId && (
-                <div className="mt-2 space-y-0.5">
-                  {packNavItems.map((item, i) => {
-                    const href = `/packs/${packId}${item.href}`;
-                    const isActive =
-                      pathname === href ||
-                      (item.href !== "" && pathname.startsWith(href));
-                    const Icon = item.icon;
-                    const sectionKey = navToSection[item.href];
-                    const section = sectionKey ? gates?.sections[sectionKey] : undefined;
-                    const locked = section ? !section.unlocked : false;
+        {!collapsed && (
+          <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Build
+          </p>
+        )}
+        <div className="space-y-0.5">
+          {buildItems.map((item) => {
+            const isChat = item.pathMatch === "/chat";
+            const href = isChat ? chatHref : buildHref(item.href);
+            const isActive = isChat
+              ? isChatActive
+              : effectivePackId
+                ? pathname === `/packs/${effectivePackId}${item.href}` ||
+                  pathname.startsWith(`/packs/${effectivePackId}${item.href}/`)
+                : false;
+            const Icon = item.icon;
+            const sectionKey = navToSection[item.href];
+            const section =
+              sectionKey && effectivePackId
+                ? gates?.sections[sectionKey]
+                : undefined;
+            const locked = section ? !section.unlocked : false;
 
-                    return (
-                      <motion.div
-                        key={item.href || "overview"}
-                        variants={itemVariants}
-                        custom={i + 2}
-                        initial="hidden"
-                        animate="visible"
-                      >
-                        {locked ? (
-                          <span
-                            className={cn(
-                              "flex items-center rounded-xl text-sm font-medium transition-all duration-200 cursor-not-allowed opacity-50",
-                              collapsed ? "justify-center gap-0 px-2 py-2.5" : "gap-3 px-3 py-2.5",
-                              "text-muted-foreground",
-                            )}
-                            title={section?.reason ?? `${item.label} is locked`}
-                          >
-                            <Lock className="h-5 w-5 shrink-0" />
-                            {!collapsed && item.label}
-                          </span>
-                        ) : (
-                          <Link
-                            href={href}
-                            className={navLinkClass(isActive, collapsed)}
-                            title={item.label}
-                          >
-                            <Icon className="h-5 w-5 shrink-0" />
-                            {!collapsed && item.label}
-                          </Link>
-                        )}
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              )}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="main"
-              variants={listVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className="space-y-0.5"
-            >
-              {navItems.map((item, i) => {
-                const isActive =
-                  pathname === item.href ||
-                  (item.href !== "/" && pathname.startsWith(item.href));
-                const Icon = item.icon;
-                return (
-                  <motion.div
-                    key={item.href}
-                    variants={itemVariants}
-                    custom={i + 1}
-                    initial="hidden"
-                    animate="visible"
-                  >
-                    <Link
-                      href={item.href}
-                      className={navLinkClass(isActive, collapsed)}
-                      title={item.label}
-                    >
-                      <Icon className="h-5 w-5 shrink-0" />
-                      {!collapsed && item.label}
-                    </Link>
-                  </motion.div>
-                );
-              })}
-            </motion.div>
-          )}
-        </AnimatePresence>
+            if (locked) {
+              return (
+                <span
+                  key={item.href}
+                  className={cn(
+                    "flex items-center rounded-xl text-sm font-medium transition-all duration-200 cursor-not-allowed opacity-50",
+                    collapsed
+                      ? "justify-center gap-0 px-2 py-2.5"
+                      : "gap-3 px-3 py-2.5",
+                    "text-muted-foreground",
+                  )}
+                  title={section?.reason ?? `${item.label} is locked`}
+                >
+                  <Lock className="h-5 w-5 shrink-0" />
+                  {!collapsed && item.label}
+                </span>
+              );
+            }
+            return (
+              <Link
+                key={item.href}
+                href={href}
+                className={navLinkClass(isActive, collapsed)}
+                title={item.label}
+              >
+                <Icon className="h-5 w-5 shrink-0" />
+                {!collapsed && item.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        {!collapsed && (
+          <p className="px-3 py-1.5 pt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Result
+          </p>
+        )}
+        <div className="space-y-0.5">
+          {resultItems.map((item) => {
+            const href =
+              item.pathMatch === "/proposals"
+                ? packForLinks
+                  ? `/proposals?pack=${packForLinks}`
+                  : "/proposals"
+                : item.pathMatch === "/invoices"
+                  ? packForLinks
+                    ? `/invoices?pack=${packForLinks}`
+                    : "/invoices"
+                  : resultHref(item.href);
+            const isActive =
+              item.pathMatch === "/proposals"
+                ? isProposalsActive
+                : item.pathMatch === "/invoices"
+                  ? isInvoicesActive
+                  : effectivePackId
+                    ? pathname === `/packs/${effectivePackId}${item.href}` ||
+                      pathname.startsWith(
+                        `/packs/${effectivePackId}${item.href}`,
+                      )
+                    : false;
+            const Icon = item.icon;
+            const sectionKey = navToSection[item.href];
+            const section =
+              sectionKey && effectivePackId
+                ? gates?.sections[sectionKey]
+                : undefined;
+            const locked = section ? !section.unlocked : false;
+
+            if (locked) {
+              return (
+                <span
+                  key={item.href}
+                  className={cn(
+                    "flex items-center rounded-xl text-sm font-medium transition-all duration-200 cursor-not-allowed opacity-50",
+                    collapsed
+                      ? "justify-center gap-0 px-2 py-2.5"
+                      : "gap-3 px-3 py-2.5",
+                    "text-muted-foreground",
+                  )}
+                  title={section?.reason ?? `${item.label} is locked`}
+                >
+                  <Lock className="h-5 w-5 shrink-0" />
+                  {!collapsed && item.label}
+                </span>
+              );
+            }
+            return (
+              <Link
+                key={item.href}
+                href={href}
+                className={navLinkClass(isActive, collapsed)}
+                title={item.label}
+              >
+                <Icon className="h-5 w-5 shrink-0" />
+                {!collapsed && item.label}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
       <div
         className={cn(
@@ -443,7 +504,10 @@ export function Sidebar() {
           </div>
         )}
         {subscription && collapsed && (
-          <div className="px-2 py-1.5 rounded-lg bg-muted/50 text-xs text-center text-muted-foreground" title={`${subscription.credits_remaining} credits · ${subscription.plan}`}>
+          <div
+            className="px-2 py-1.5 rounded-lg bg-muted/50 text-xs text-center text-muted-foreground"
+            title={`${subscription.credits_remaining} credits · ${subscription.plan}`}
+          >
             {subscription.credits_remaining}
           </div>
         )}

@@ -12,10 +12,10 @@ const Select = React.forwardRef<
     <div className="relative">
       <select
         className={cn(
-          "flex h-11 w-full appearance-none rounded-xl border border-border bg-card px-4 py-2 pr-10 text-sm text-foreground transition-colors",
+          "flex h-[50px] w-full appearance-none rounded-xl border border-border bg-card px-4 py-2 pr-10 text-sm text-foreground transition-colors",
           "focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-foreground/30",
           "disabled:cursor-not-allowed disabled:opacity-50",
-          className
+          className,
         )}
         ref={ref}
         {...props}
@@ -30,13 +30,19 @@ Select.displayName = "Select";
 
 const SelectTrigger = Select;
 const SelectValue: React.FC<{ placeholder?: string }> = () => null;
-const SelectContent: React.FC<{ children: React.ReactNode }> = ({ children }) => <>{children}</>;
+const SelectContent: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => <>{children}</>;
 type SelectItemProps = React.OptionHTMLAttributes<HTMLOptionElement> & {
   value: string;
   children: React.ReactNode;
 };
 
-const SelectItem: React.FC<SelectItemProps> = ({ value, children, ...props }) => (
+const SelectItem: React.FC<SelectItemProps> = ({
+  value,
+  children,
+  ...props
+}) => (
   <option value={value} {...props}>
     {children}
   </option>

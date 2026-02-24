@@ -5,7 +5,7 @@
 @layer base {
   :root {
     /* Black and white palette - dark (default), background lifted so plain bg isn’t too dark */
-    --background: 0 0% 11%;
+    --background: 0 0% 8.6%;
     --foreground: 0 0% 98%;
     --card: 0 0% 14%;
     --card-foreground: 0 0% 98%;
@@ -22,7 +22,7 @@
   }
 
   .light {
-    --background: 0 0% 98%;
+    --background: 0 0% 100%;
     --foreground: 0 0% 9%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 9%;
@@ -63,7 +63,11 @@ html {
 }
 
 ::selection {
-  @apply bg-white/20 text-foreground;
+  @apply bg-white/25 text-foreground;
+}
+
+.light ::selection {
+  @apply bg-primary/25 text-foreground;
 }
 
 /* Custom scrollbar - subtle */

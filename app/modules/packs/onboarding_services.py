@@ -154,7 +154,7 @@ def _call_openai_palette(
         return {"primary": "#2563eb", "secondary": "#64748b", "accent": "#f59e0b"}
 
 
-PLACEHOLDER_LOGO_URL = "/logos/logo_color.svg"
+PLACEHOLDER_LOGO_URL = "/logos/logo_black.svg"
 
 
 @log_service_action()

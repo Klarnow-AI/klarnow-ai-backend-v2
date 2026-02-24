@@ -26,7 +26,7 @@ export function AuthModal({
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [passwordMode, setPasswordMode] = useState<"login" | "register">(
-    "login"
+    "login",
   );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -89,7 +89,9 @@ export function AuthModal({
       setView("password");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Could not check email. Try again."
+        err instanceof Error
+          ? err.message
+          : "Could not check email. Try again.",
       );
     } finally {
       setCheckingEmail(false);
@@ -173,7 +175,7 @@ export function AuthModal({
                       <Button
                         type="button"
                         variant="outline"
-                        className="w-full justify-center gap-3 h-11 rounded-xl border-border bg-muted/30 hover:bg-muted/50 text-foreground"
+                        className="w-full justify-center gap-3 rounded-full border-border bg-muted/30 hover:bg-muted/50 text-foreground"
                         onClick={() => setView("code-email")}
                       >
                         Continue with email sign-in code
@@ -213,12 +215,12 @@ export function AuthModal({
                             onChange={(e) => setEmail(e.target.value)}
                             required
                             autoComplete="email"
-                            className="rounded-xl h-11"
+                            className="rounded-full"
                           />
                         </div>
                         <Button
                           type="submit"
-                          className="w-full h-11 rounded-xl bg-foreground text-background hover:bg-foreground/90"
+                          className="w-full rounded-full bg-foreground text-background hover:bg-foreground/90"
                           disabled={checkingEmail}
                         >
                           {checkingEmail ? (
@@ -268,7 +270,7 @@ export function AuthModal({
                               ? "current-password"
                               : "new-password"
                           }
-                          className="rounded-xl h-11"
+                          className="rounded-full"
                         />
                         {passwordMode === "login" && (
                           <p className="text-right">
@@ -287,7 +289,7 @@ export function AuthModal({
                       </div>
                       <Button
                         type="submit"
-                        className="w-full h-11 rounded-xl bg-foreground text-background hover:bg-foreground/90"
+                        className="w-full rounded-full bg-foreground text-background hover:bg-foreground/90"
                         disabled={loading}
                       >
                         {loading ? (
@@ -326,7 +328,7 @@ export function AuthModal({
                       <Button
                         type="button"
                         variant="outline"
-                        className="w-full justify-center h-11 rounded-xl border-border bg-muted/30 text-foreground"
+                        className="w-full justify-center rounded-full border-border bg-muted/30 text-foreground"
                         onClick={() => {
                           setView("main");
                           setError("");
@@ -353,7 +355,7 @@ export function AuthModal({
                       <Button
                         type="button"
                         variant="outline"
-                        className="w-full justify-center h-11 rounded-xl border-border bg-muted/30 text-foreground"
+                        className="w-full justify-center rounded-full border-border bg-muted/30 text-foreground"
                         onClick={() => {
                           setView("main");
                           setError("");
@@ -373,12 +375,12 @@ export function AuthModal({
                           onChange={(e) => setEmail(e.target.value)}
                           required
                           autoComplete="email"
-                          className="rounded-xl h-11"
+                          className="rounded-full"
                         />
                       </div>
                       <Button
                         type="submit"
-                        className="w-full h-11 rounded-xl bg-foreground text-background hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
+                        className="w-full rounded-full bg-foreground text-background hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
                         disabled={loading}
                       >
                         {loading ? <Spinner className="h-5 w-5" /> : "Continue"}
@@ -418,16 +420,16 @@ export function AuthModal({
                           value={code}
                           onChange={(e) =>
                             setCode(
-                              e.target.value.replace(/\D/g, "").slice(0, 6)
+                              e.target.value.replace(/\D/g, "").slice(0, 6),
                             )
                           }
                           maxLength={6}
-                          className="rounded-xl h-11 text-center text-lg tracking-[0.4em] font-mono"
+                          className="rounded-full text-center text-lg tracking-[0.4em] font-mono"
                         />
                       </div>
                       <Button
                         type="submit"
-                        className="w-full h-11 rounded-xl bg-foreground text-background hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
+                        className="w-full rounded-full bg-foreground text-background hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
                         disabled={loading || code.length !== 6}
                       >
                         {loading ? <Spinner className="h-5 w-5" /> : "Continue"}

@@ -35,13 +35,13 @@ export default function ForgotPasswordPage() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-[380px] space-y-6"
       >
-        <Link
+        {/* <Link
           href="/"
           className="inline-block text-sm text-muted-foreground hover:text-foreground"
         >
           ← Back to Klarnow AI
-        </Link>
-        <h1 className="text-2xl font-bold">Forgot password?</h1>
+        </Link> */}
+        <h1 className="text-2xl font-bold text-center">Forgot password?</h1>
         {sent ? (
           <p className="text-muted-foreground text-sm">
             If an account exists for this email, you&apos;ll receive a link to
@@ -66,24 +66,23 @@ export default function ForgotPasswordPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
-                className="rounded-xl h-11"
+                className="rounded-full"
               />
             </div>
             <Button
               type="submit"
-              className="w-full h-11 rounded-xl bg-foreground text-background hover:bg-foreground/90"
+              className="w-full rounded-full bg-foreground text-background hover:bg-foreground/90"
               disabled={loading}
             >
-              {loading ? (
-                <Spinner className="h-5 w-5" />
-              ) : (
-                "Send reset link"
-              )}
+              {loading ? <Spinner className="h-5 w-5" /> : "Send reset link"}
             </Button>
           </form>
         )}
         <p className="text-center text-sm text-muted-foreground">
-          <Link href="/" className="font-medium text-foreground underline-offset-2 hover:underline">
+          <Link
+            href="/"
+            className="font-medium text-foreground underline-offset-2 hover:underline"
+          >
             Back to log in
           </Link>
         </p>

@@ -75,7 +75,7 @@ const LOGO_STYLE_CHIPS = [
   "abstract",
 ] as const;
 
-const LOGO_COLOR_CHIPS = [
+const logo_black_CHIPS = [
   "blue and white",
   "black and white",
   "neutral and versatile",
@@ -269,9 +269,12 @@ export default function BrandOSPage() {
   const [logoStyleChips, setLogoStyleChips] = useState<string[]>([]);
   const [logoColorChips, setLogoColorChips] = useState<string[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [suggestTypographyLoading, setSuggestTypographyLoading] = useState(false);
+  const [suggestTypographyLoading, setSuggestTypographyLoading] =
+    useState(false);
   const [suggestPaletteLoading, setSuggestPaletteLoading] = useState(false);
-  const [suggestIdentityError, setSuggestIdentityError] = useState<string | null>(null);
+  const [suggestIdentityError, setSuggestIdentityError] = useState<
+    string | null
+  >(null);
   const hasAutoSuggestedPaletteRef = useRef(false);
 
   useEffect(() => {
@@ -433,7 +436,9 @@ export default function BrandOSPage() {
       const updated = await packsApi.get(packId);
       setPack(updated);
     } catch (e) {
-      setSuggestIdentityError(e instanceof Error ? e.message : "Could not suggest typography");
+      setSuggestIdentityError(
+        e instanceof Error ? e.message : "Could not suggest typography",
+      );
     } finally {
       setSuggestTypographyLoading(false);
     }
@@ -445,15 +450,23 @@ export default function BrandOSPage() {
     setSuggestPaletteLoading(true);
     try {
       const currentEntries = [
-        ['primary', palette.primary],
-        ['secondary', palette.secondary],
-        ['accent', palette.accent],
-        ['background', palette.background],
-        ['surface', palette.surface],
-      ].filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].length > 0);
+        ["primary", palette.primary],
+        ["secondary", palette.secondary],
+        ["accent", palette.accent],
+        ["background", palette.background],
+        ["surface", palette.surface],
+      ].filter(
+        (entry): entry is [string, string] =>
+          typeof entry[1] === "string" && entry[1].length > 0,
+      );
       const current: Record<string, string> | undefined =
-        currentEntries.length > 0 ? Object.fromEntries(currentEntries) : undefined;
-      const res = await packsApi.suggestPalette(packId, current ? { current_palette: current } : undefined);
+        currentEntries.length > 0
+          ? Object.fromEntries(currentEntries)
+          : undefined;
+      const res = await packsApi.suggestPalette(
+        packId,
+        current ? { current_palette: current } : undefined,
+      );
       const nextPalette: Record<string, string> = {
         primary: res.primary,
         secondary: res.secondary,
@@ -470,7 +483,9 @@ export default function BrandOSPage() {
       const updated = await packsApi.get(packId);
       setPack(updated);
     } catch (e) {
-      setSuggestIdentityError(e instanceof Error ? e.message : "Could not suggest palette");
+      setSuggestIdentityError(
+        e instanceof Error ? e.message : "Could not suggest palette",
+      );
     } finally {
       setSuggestPaletteLoading(false);
     }
@@ -566,15 +581,28 @@ export default function BrandOSPage() {
     extractedBrand?.logo_url;
   const brandName = extractedBrand?.brand_name ?? onboarding?.brand_name;
   // Display list: palette values first (no role labels in UI), then extracted candidates if any
-  const PALETTE_ORDER = ["primary", "secondary", "accent", "background", "surface"] as const;
+  const PALETTE_ORDER = [
+    "primary",
+    "secondary",
+    "accent",
+    "background",
+    "surface",
+  ] as const;
   const paletteValues = PALETTE_ORDER.map((k) => palette[k]).filter(
     (v): v is string => !!v && typeof v === "string" && v.trim() !== "",
   );
-  const normalizedSet = new Set(paletteValues.map((v) => v.trim().toLowerCase()));
+  const normalizedSet = new Set(
+    paletteValues.map((v) => v.trim().toLowerCase()),
+  );
   const extraFromExtract =
-    colorCandidates.filter(
-      (c) => typeof c === "string" && c.trim() && !normalizedSet.has(c.trim().toLowerCase()),
-    ).slice(0, 8) ?? [];
+    colorCandidates
+      .filter(
+        (c) =>
+          typeof c === "string" &&
+          c.trim() &&
+          !normalizedSet.has(c.trim().toLowerCase()),
+      )
+      .slice(0, 8) ?? [];
   const displayColors =
     paletteValues.length > 0
       ? [...paletteValues, ...extraFromExtract]
@@ -593,11 +621,15 @@ export default function BrandOSPage() {
     const parts: string[] = [];
     if (mv?.mission) parts.push(`Mission: ${mv.mission}`);
     if (mv?.vision) parts.push(`Vision: ${mv.vision}`);
-    if (positioning?.statement) parts.push(`Positioning: ${positioning.statement}`);
-    if (positioning?.unique_advantage) parts.push(`Unique advantage: ${positioning.unique_advantage}`);
+    if (positioning?.statement)
+      parts.push(`Positioning: ${positioning.statement}`);
+    if (positioning?.unique_advantage)
+      parts.push(`Unique advantage: ${positioning.unique_advantage}`);
     if (voice?.archetype) parts.push(`Voice: ${voice.archetype}`);
-    if (messaging?.elevator_pitch) parts.push(`Elevator pitch: ${messaging.elevator_pitch}`);
-    if (style?.design_cues?.length) parts.push(`Design cues: ${style.design_cues.join(", ")}`);
+    if (messaging?.elevator_pitch)
+      parts.push(`Elevator pitch: ${messaging.elevator_pitch}`);
+    if (style?.design_cues?.length)
+      parts.push(`Design cues: ${style.design_cues.join(", ")}`);
     return parts.join(". ");
   })();
 
@@ -615,8 +647,11 @@ export default function BrandOSPage() {
     if (!color?.trim()) return "";
     const c = color.trim();
     if (/^#[0-9A-Fa-f]{3,8}$/.test(c)) return c;
-    if (/^#[0-9A-Fa-f]+$/.test(c)) return c.length >= 7 ? c : `#${c.slice(1).padEnd(6, "0")}`;
-    return c.startsWith("rgb") || c.startsWith("hsl") ? c : `#${c.replace(/^#/, "")}`;
+    if (/^#[0-9A-Fa-f]+$/.test(c))
+      return c.length >= 7 ? c : `#${c.slice(1).padEnd(6, "0")}`;
+    return c.startsWith("rgb") || c.startsWith("hsl")
+      ? c
+      : `#${c.replace(/^#/, "")}`;
   };
   const primaryColor = palette.primary ?? displayColors[0];
   const primaryHex = primaryColor ? toHex(primaryColor) : undefined;
@@ -649,19 +684,29 @@ export default function BrandOSPage() {
             {(brandName || primaryHex || headlineFont) && (
               <div
                 className="rounded-xl border border-border bg-card overflow-hidden"
-                style={primaryHex ? { backgroundColor: `${primaryHex}12` } : undefined}
+                style={
+                  primaryHex
+                    ? { backgroundColor: `${primaryHex}12` }
+                    : undefined
+                }
               >
                 <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                   <span
                     className="font-bold text-foreground truncate"
-                    style={headlineFont ? { fontFamily: `"${headlineFont}", sans-serif` } : undefined}
+                    style={
+                      headlineFont
+                        ? { fontFamily: `"${headlineFont}", sans-serif` }
+                        : undefined
+                    }
                   >
                     {brandName || "Your brand"}
                   </span>
                   {pack?.primary_cta && (
                     <span
                       className="rounded-lg px-3 py-1.5 text-sm font-medium text-white shrink-0"
-                      style={primaryHex ? { backgroundColor: primaryHex } : undefined}
+                      style={
+                        primaryHex ? { backgroundColor: primaryHex } : undefined
+                      }
                     >
                       {pack.primary_cta}
                     </span>
@@ -673,7 +718,9 @@ export default function BrandOSPage() {
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-8 lg:gap-10">
               {/* Left: Visual identity */}
               <div className="space-y-6">
-                <h2 className="text-sm font-semibold text-foreground">Visual identity</h2>
+                <h2 className="text-sm font-semibold text-foreground">
+                  Visual identity
+                </h2>
 
                 {/* Logo */}
                 <div>
@@ -690,7 +737,9 @@ export default function BrandOSPage() {
                       className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
-                      {wordmarkSvgOrUrl && !logoLoadFailed ? "Refine with AI" : "Suggest with AI"}
+                      {wordmarkSvgOrUrl && !logoLoadFailed
+                        ? "Refine with AI"
+                        : "Suggest with AI"}
                     </button>
                   </div>
                   {wordmarkSvgOrUrl && !logoLoadFailed ? (
@@ -716,9 +765,7 @@ export default function BrandOSPage() {
                       )}
                     </button>
                   ) : (
-                    <div
-                      className="w-full rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/20 p-8 flex flex-col items-center justify-center min-h-[140px] gap-3"
-                    >
+                    <div className="w-full rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/20 p-8 flex flex-col items-center justify-center min-h-[140px] gap-3">
                       <p className="text-sm text-muted-foreground text-center">
                         Upload or generate with AI
                       </p>
@@ -768,9 +815,12 @@ export default function BrandOSPage() {
                           onClick={() => hex && copyToClipboard(hex, id)}
                           className={cn(
                             "h-16 w-16 rounded-xl border border-border shadow-sm shrink-0",
-                            hex && "cursor-pointer hover:ring-2 hover:ring-primary/50",
+                            hex &&
+                              "cursor-pointer hover:ring-2 hover:ring-primary/50",
                           )}
-                          style={cssColor ? { backgroundColor: cssColor } : undefined}
+                          style={
+                            cssColor ? { backgroundColor: cssColor } : undefined
+                          }
                           title={hex ? "Copy hex" : undefined}
                         />
                       );
@@ -795,15 +845,22 @@ export default function BrandOSPage() {
                       ) : (
                         <Sparkles className="h-3.5 w-3.5" />
                       )}
-                      {headlineFont || bodyFont ? "Refine with AI" : "Suggest with AI"}
+                      {headlineFont || bodyFont
+                        ? "Refine with AI"
+                        : "Suggest with AI"}
                     </button>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-xl border border-border bg-card p-4">
-                      <span className="text-xs text-muted-foreground block mb-1">Headlines</span>
+                      <span className="text-xs text-muted-foreground block mb-1">
+                        Headlines
+                      </span>
                       <button
                         type="button"
-                        onClick={() => headlineFont && copyToClipboard(headlineFont, "font-headline")}
+                        onClick={() =>
+                          headlineFont &&
+                          copyToClipboard(headlineFont, "font-headline")
+                        }
                         className="text-left w-full"
                       >
                         <p className="text-lg font-bold text-foreground truncate">
@@ -811,16 +868,22 @@ export default function BrandOSPage() {
                         </p>
                         {headlineFont && (
                           <span className="text-[10px] text-muted-foreground">
-                            {copiedId === "font-headline" ? "Copied" : "Click to copy"}
+                            {copiedId === "font-headline"
+                              ? "Copied"
+                              : "Click to copy"}
                           </span>
                         )}
                       </button>
                     </div>
                     <div className="rounded-xl border border-border bg-card p-4">
-                      <span className="text-xs text-muted-foreground block mb-1">Body</span>
+                      <span className="text-xs text-muted-foreground block mb-1">
+                        Body
+                      </span>
                       <button
                         type="button"
-                        onClick={() => bodyFont && copyToClipboard(bodyFont, "font-body")}
+                        onClick={() =>
+                          bodyFont && copyToClipboard(bodyFont, "font-body")
+                        }
                         className="text-left w-full"
                       >
                         <p className="text-lg font-medium text-foreground truncate">
@@ -828,7 +891,9 @@ export default function BrandOSPage() {
                         </p>
                         {bodyFont && (
                           <span className="text-[10px] text-muted-foreground">
-                            {copiedId === "font-body" ? "Copied" : "Click to copy"}
+                            {copiedId === "font-body"
+                              ? "Copied"
+                              : "Click to copy"}
                           </span>
                         )}
                       </button>
@@ -836,14 +901,18 @@ export default function BrandOSPage() {
                   </div>
                 </div>
                 {suggestIdentityError && (
-                  <p className="text-sm text-destructive">{suggestIdentityError}</p>
+                  <p className="text-sm text-destructive">
+                    {suggestIdentityError}
+                  </p>
                 )}
               </div>
 
               {/* Right: Voice & messaging */}
               <div className="space-y-6">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-sm font-semibold text-foreground">Voice & messaging</h2>
+                  <h2 className="text-sm font-semibold text-foreground">
+                    Voice & messaging
+                  </h2>
                   {active?.brand_strategy && (
                     <Button
                       variant="ghost"
@@ -859,7 +928,9 @@ export default function BrandOSPage() {
                 <div className="rounded-xl border border-border bg-card p-5 space-y-4">
                   {mv?.mission && (
                     <div>
-                      <span className="text-xs font-medium text-muted-foreground block mb-1">Mission</span>
+                      <span className="text-xs font-medium text-muted-foreground block mb-1">
+                        Mission
+                      </span>
                       <p className="text-sm text-foreground">{mv.mission}</p>
                       <button
                         type="button"
@@ -872,8 +943,12 @@ export default function BrandOSPage() {
                   )}
                   {messaging?.elevator_pitch && (
                     <div>
-                      <span className="text-xs font-medium text-muted-foreground block mb-1">Elevator pitch</span>
-                      <p className="text-sm text-foreground">{messaging.elevator_pitch}</p>
+                      <span className="text-xs font-medium text-muted-foreground block mb-1">
+                        Elevator pitch
+                      </span>
+                      <p className="text-sm text-foreground">
+                        {messaging.elevator_pitch}
+                      </p>
                       <button
                         type="button"
                         onClick={() => openEdit("messaging")}
@@ -885,8 +960,12 @@ export default function BrandOSPage() {
                   )}
                   {voice?.archetype && (
                     <div>
-                      <span className="text-xs font-medium text-muted-foreground block mb-1">Voice</span>
-                      <p className="text-sm text-foreground">{voice.archetype}</p>
+                      <span className="text-xs font-medium text-muted-foreground block mb-1">
+                        Voice
+                      </span>
+                      <p className="text-sm text-foreground">
+                        {voice.archetype}
+                      </p>
                       <button
                         type="button"
                         onClick={() => openEdit("voice")}
@@ -900,30 +979,46 @@ export default function BrandOSPage() {
                     <div className="pt-2 border-t border-border space-y-3">
                       {pack.primary_cta && (
                         <div>
-                          <span className="text-xs font-medium text-muted-foreground block mb-1">Primary CTA</span>
-                          <p className="text-sm text-foreground">{pack.primary_cta}</p>
+                          <span className="text-xs font-medium text-muted-foreground block mb-1">
+                            Primary CTA
+                          </span>
+                          <p className="text-sm text-foreground">
+                            {pack.primary_cta}
+                          </p>
                         </div>
                       )}
                       {pack.usp_statement && (
                         <div>
-                          <span className="text-xs font-medium text-muted-foreground block mb-1">USP</span>
-                          <p className="text-sm text-foreground">{pack.usp_statement}</p>
+                          <span className="text-xs font-medium text-muted-foreground block mb-1">
+                            USP
+                          </span>
+                          <p className="text-sm text-foreground">
+                            {pack.usp_statement}
+                          </p>
                         </div>
                       )}
                     </div>
                   )}
-                  {!mv?.mission && !messaging?.elevator_pitch && !voice?.archetype && !pack?.primary_cta && !pack?.usp_statement && (
-                    <div className="flex flex-col gap-2">
-                      <p className="text-sm text-muted-foreground">
-                        Add your mission, pitch, and voice in strategy.
-                      </p>
-                      {active?.brand_strategy && (
-                        <Button variant="outline" size="sm" onClick={() => openEdit("mission_vision")}>
-                          Edit voice & messaging
-                        </Button>
-                      )}
-                    </div>
-                  )}
+                  {!mv?.mission &&
+                    !messaging?.elevator_pitch &&
+                    !voice?.archetype &&
+                    !pack?.primary_cta &&
+                    !pack?.usp_statement && (
+                      <div className="flex flex-col gap-2">
+                        <p className="text-sm text-muted-foreground">
+                          Add your mission, pitch, and voice in strategy.
+                        </p>
+                        {active?.brand_strategy && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEdit("mission_vision")}
+                          >
+                            Edit voice & messaging
+                          </Button>
+                        )}
+                      </div>
+                    )}
                 </div>
               </div>
             </div>
@@ -1070,11 +1165,19 @@ export default function BrandOSPage() {
                                 ? logoColorChips.join(", ")
                                 : undefined;
                             const colorPalette =
-                              palette.primary || palette.secondary || palette.accent
+                              palette.primary ||
+                              palette.secondary ||
+                              palette.accent
                                 ? {
-                                    ...(palette.primary && { primary: palette.primary }),
-                                    ...(palette.secondary && { secondary: palette.secondary }),
-                                    ...(palette.accent && { accent: palette.accent }),
+                                    ...(palette.primary && {
+                                      primary: palette.primary,
+                                    }),
+                                    ...(palette.secondary && {
+                                      secondary: palette.secondary,
+                                    }),
+                                    ...(palette.accent && {
+                                      accent: palette.accent,
+                                    }),
                                   }
                                 : undefined;
                             setLogoError(null);
@@ -1085,8 +1188,7 @@ export default function BrandOSPage() {
                                 prompt: styleDescription,
                                 color_scheme: colorScheme,
                                 color_palette: colorPalette ?? undefined,
-                                brand_os_summary:
-                                  brandOsSummary || undefined,
+                                brand_os_summary: brandOsSummary || undefined,
                               });
                               const updated = await packsApi.get(packId);
                               setPack(updated);
@@ -1141,7 +1243,7 @@ export default function BrandOSPage() {
                               Color scheme
                             </p>
                             <div className="flex flex-wrap gap-1.5">
-                              {LOGO_COLOR_CHIPS.map((label) => (
+                              {logo_black_CHIPS.map((label) => (
                                 <button
                                   key={label}
                                   type="button"

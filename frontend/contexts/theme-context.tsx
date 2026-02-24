@@ -13,15 +13,15 @@ export type Theme = "light" | "dark" | "system";
 const STORAGE_KEY = "klarnow-theme";
 
 function getStored(): Theme {
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
   const v = localStorage.getItem(STORAGE_KEY);
   if (v === "light" || v === "dark" || v === "system") return v;
-  return "dark";
+  return "light";
 }
 
 function getResolved(theme: Theme): "light" | "dark" {
   if (theme === "system") {
-    if (typeof window === "undefined") return "dark";
+    if (typeof window === "undefined") return "light";
     return window.matchMedia("(prefers-color-scheme: dark)").matches
       ? "dark"
       : "light";
@@ -39,7 +39,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => getStored());
-  const [resolved, setResolved] = useState<"light" | "dark">("dark");
+  const [resolved, setResolved] = useState<"light" | "dark">("light");
 
   useEffect(() => {
     const r = getResolved(theme);
