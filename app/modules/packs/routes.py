@@ -1,14 +1,17 @@
 """Packs API routes."""
 
+import json
+import threading
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.auth.deps import get_current_user
-from app.core.db.session import get_db
+from app.core.db.session import SessionLocal, get_db
 from app.core.errors import BadRequestError, NotFoundError
-from app.modules.packs.models import User
+from app.modules.packs.models import Pack, User
 from app.core.storage import upload_file as storage_upload_file, get_presigned_url
 from app.modules.packs.schemas import (
     PackCreate,
@@ -28,6 +31,7 @@ from app.modules.packs.schemas import (
     InvoicesSummary,
     OnboardingSubmit,
     OnboardingCompleteResponse,
+    OnboardingCompleteAccepted,
     ExtractBrandBody,
     ExtractBrandResponse,
     GenerateStarterBrandBody,
@@ -403,14 +407,135 @@ def submit_onboarding_route(
     return PackRead.model_validate(submit_onboarding(db, pack, body.answers))
 
 
-@router.post("/{pack_id}/onboarding/complete", response_model=OnboardingCompleteResponse)
+def _run_onboarding_background(pack_id: UUID) -> None:
+    """Run brand generation, orchestrator, and optional logo in a background thread. Sets onboarding_background_completed_at when done."""
+    from app.core.logging import get_logger
+    from app.modules.agents.orchestrator import handle_onboarding_complete
+    from app.modules.brand_os.services import get_active_for_pack, get_summary_fields
+    from app.modules.packs.models import utc_now
+
+    logger = get_logger("klarnow.routes.packs")
+    db = SessionLocal()
+    try:
+        pack = db.get(Pack, pack_id)
+        if not pack:
+            return
+        answers = pack.onboarding_answers or {}
+        is_existing_brand = answers.get("has_existing_brand") == "yes"
+        new_brand_palette = None
+        if not is_existing_brand:
+            brand_name = (answers.get("brand_name") or "").strip()
+            if not brand_name and answers.get("extracted_brand"):
+                try:
+                    extracted = json.loads(answers["extracted_brand"])
+                    if isinstance(extracted, dict):
+                        brand_name = (extracted.get("brand_name") or "").strip()
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            if not brand_name and (pack.brand_name or "").strip():
+                brand_name = (pack.brand_name or "").strip()
+            if not brand_name and pack.name:
+                brand_name = (pack.name or "").strip()
+            if not brand_name:
+                brand_name = (pack.brand_name or pack.name or "My Brand") or "My Brand"
+            raw_vibe = answers.get("vibe_chips")
+            if isinstance(raw_vibe, str):
+                try:
+                    vibe_chips = json.loads(raw_vibe) if raw_vibe else []
+                except (json.JSONDecodeError, TypeError):
+                    vibe_chips = ["professional", "modern"]
+            else:
+                vibe_chips = raw_vibe if isinstance(raw_vibe, list) else ["professional", "modern"]
+            onboarding_context = {}
+            if (pack.offer_one_liner or "").strip():
+                onboarding_context["offer"] = (pack.offer_one_liner or "").strip()
+            if (pack.usp_statement or "").strip():
+                onboarding_context["usp"] = (pack.usp_statement or "").strip()
+            if (pack.target_audience or "").strip():
+                onboarding_context["audience"] = (pack.target_audience or "").strip()
+            if (pack.primary_cta or "").strip():
+                onboarding_context["cta"] = (pack.primary_cta or "").strip()
+            if answers.get("extracted_brand"):
+                try:
+                    ext = json.loads(answers["extracted_brand"])
+                    if isinstance(ext, dict) and (ext.get("industry") or "").strip():
+                        onboarding_context["industry"] = (ext.get("industry") or "").strip()
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            result = generate_starter_brand(
+                brand_name, vibe_chips, onboarding_context or None, pack_id=str(pack_id),
+            )
+            new_brand_palette = result.get("palette")
+            wordmark_to_use = result["wordmark_svg_or_url"]
+            pack = append_suggested_logo(db, pack, wordmark_to_use)
+            pack = merge_onboarding_answers(
+                db,
+                pack,
+                {
+                    "wordmark_svg_or_url": wordmark_to_use,
+                    "palette": result["palette"],
+                },
+            )
+            db.refresh(pack)
+
+        handle_onboarding_complete(pack_id, db)
+        db.refresh(pack)
+        brand_os = get_active_for_pack(db, pack_id)
+        if brand_os:
+            mission, _, _ = get_summary_fields(brand_os)
+            if mission:
+                pack.core_concept = (mission.strip() or "")[:500]
+            db.commit()
+            db.refresh(pack)
+
+        if not is_existing_brand and brand_os and new_brand_palette:
+            mission, vision, _ = get_summary_fields(brand_os)
+            foundation = brand_os.foundation if isinstance(brand_os.foundation, dict) else {}
+            one_line = (foundation.get("one_line_offer") or "").strip()
+            industry = (foundation.get("brand_industry") or "").strip()
+            audience = (foundation.get("main_audience") or "").strip()
+            summary_parts = [p for p in [mission, vision, one_line, industry, audience] if p]
+            brand_os_summary = " ".join(summary_parts)[:1500] if summary_parts else None
+            try:
+                logo_result = generate_logo_with_gemini(
+                    brand_name=(pack.brand_name or pack.name or "My Brand"),
+                    prompt="distinctive, creative logo—professional and memorable, not generic",
+                    pack_id=str(pack_id),
+                    color_scheme="use the provided palette",
+                    brand_os_summary=brand_os_summary,
+                    color_palette=new_brand_palette,
+                )
+                logo_url = logo_result.get("logo_url") or logo_result.get("wordmark_svg_or_url")
+                if logo_url:
+                    pack = append_suggested_logo(db, pack, logo_url)
+                    pack = merge_onboarding_answers(db, pack, {"wordmark_svg_or_url": logo_url})
+                    db.commit()
+                    db.refresh(pack)
+            except Exception as e:
+                logger.warning("Auto logo generation for new brand failed: %s", e, exc_info=True)
+
+        pack = db.get(Pack, pack_id)
+        if pack:
+            pack.onboarding_background_completed_at = utc_now()
+            db.commit()
+    except Exception as e:
+        logger.exception("Onboarding background task failed for pack %s: %s", pack_id, e)
+    finally:
+        db.close()
+
+
+@router.post(
+    "/{pack_id}/onboarding/complete",
+    response_model=OnboardingCompleteResponse,
+    responses={202: {"model": OnboardingCompleteAccepted, "description": "Processing in background; poll GET pack until onboarding_background_completed_at is set."}},
+)
 def complete_onboarding_route(
     pack_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Mark onboarding complete and trigger Orchestrator to generate Brand OS.
-    Requires has_existing_brand in onboarding_answers. Brand name is set in Day 0."""
+    """Mark onboarding complete and trigger Orchestrator to generate Brand OS (in background).
+    Returns 202 immediately; long-running work runs in background. Poll GET pack until onboarding_background_completed_at is set."""
     from app.core.errors import AppError
     pack = get_pack_for_user(db, pack_id, current_user.id)
     if not pack:
@@ -422,112 +547,17 @@ def complete_onboarding_route(
             status_code=400,
         )
     pack = complete_onboarding(db, pack, answers=answers)
+    db.commit()
     db.refresh(pack)
-    answers = pack.onboarding_answers or {}
-    is_existing_brand = answers.get("has_existing_brand") == "yes"
-
-    new_brand_palette = None
-    if not is_existing_brand:
-        import json
-        brand_name = (answers.get("brand_name") or "").strip()
-        if not brand_name and answers.get("extracted_brand"):
-            try:
-                extracted = json.loads(answers["extracted_brand"])
-                if isinstance(extracted, dict):
-                    brand_name = (extracted.get("brand_name") or "").strip()
-            except (json.JSONDecodeError, TypeError):
-                pass
-        if not brand_name and (pack.brand_name or "").strip():
-            brand_name = (pack.brand_name or "").strip()
-        if not brand_name and pack.name:
-            brand_name = (pack.name or "").strip()
-        if not brand_name:
-            brand_name = (pack.brand_name or pack.name or "My Brand") or "My Brand"
-        raw_vibe = answers.get("vibe_chips")
-        if isinstance(raw_vibe, str):
-            try:
-                vibe_chips = json.loads(raw_vibe) if raw_vibe else []
-            except (json.JSONDecodeError, TypeError):
-                vibe_chips = ["professional", "modern"]
-        else:
-            vibe_chips = raw_vibe if isinstance(raw_vibe, list) else ["professional", "modern"]
-        onboarding_context = {}
-        if (pack.offer_one_liner or "").strip():
-            onboarding_context["offer"] = (pack.offer_one_liner or "").strip()
-        if (pack.usp_statement or "").strip():
-            onboarding_context["usp"] = (pack.usp_statement or "").strip()
-        if (pack.target_audience or "").strip():
-            onboarding_context["audience"] = (pack.target_audience or "").strip()
-        if (pack.primary_cta or "").strip():
-            onboarding_context["cta"] = (pack.primary_cta or "").strip()
-        if answers.get("extracted_brand"):
-            try:
-                ext = json.loads(answers["extracted_brand"])
-                if isinstance(ext, dict) and (ext.get("industry") or "").strip():
-                    onboarding_context["industry"] = (ext.get("industry") or "").strip()
-            except (json.JSONDecodeError, TypeError):
-                pass
-        from app.modules.packs.onboarding_services import PLACEHOLDER_LOGO_URL
-        result = generate_starter_brand(
-            brand_name, vibe_chips, onboarding_context or None, pack_id=str(pack_id),
-        )
-        new_brand_palette = result.get("palette")
-        wordmark_to_use = result["wordmark_svg_or_url"]
-        pack = append_suggested_logo(db, pack, wordmark_to_use)
-        pack = merge_onboarding_answers(
-            db,
-            pack,
-            {
-                "wordmark_svg_or_url": wordmark_to_use,
-                "palette": result["palette"],
-            },
-        )
-        db.refresh(pack)
-
-    from app.modules.agents.orchestrator import handle_onboarding_complete
-    handle_onboarding_complete(pack_id, db)
-    db.refresh(pack)
-    from app.modules.brand_os.services import get_active_for_pack, get_summary_fields
-    brand_os = get_active_for_pack(db, pack_id)
-    if brand_os:
-        mission, _, _ = get_summary_fields(brand_os)
-        if mission:
-            pack.core_concept = (mission.strip() or "")[:500]
-        db.commit()
-        db.refresh(pack)
-
-    if not is_existing_brand and brand_os and new_brand_palette:
-        from app.core.logging import get_logger
-        from app.modules.packs.logo_generation import generate_logo_with_gemini
-        logger = get_logger("klarnow.routes.packs")
-        mission, vision, _ = get_summary_fields(brand_os)
-        foundation = brand_os.foundation if isinstance(brand_os.foundation, dict) else {}
-        one_line = (foundation.get("one_line_offer") or "").strip()
-        industry = (foundation.get("brand_industry") or "").strip()
-        audience = (foundation.get("main_audience") or "").strip()
-        summary_parts = [p for p in [mission, vision, one_line, industry, audience] if p]
-        brand_os_summary = " ".join(summary_parts)[:1500] if summary_parts else None
-        try:
-            logo_result = generate_logo_with_gemini(
-                brand_name=(pack.brand_name or pack.name or "My Brand"),
-                prompt="distinctive, creative logo—professional and memorable, not generic",
-                pack_id=str(pack_id),
-                color_scheme="use the provided palette",
-                brand_os_summary=brand_os_summary,
-                color_palette=new_brand_palette,
-            )
-            logo_url = logo_result.get("logo_url") or logo_result.get("wordmark_svg_or_url")
-            if logo_url:
-                pack = append_suggested_logo(db, pack, logo_url)
-                pack = merge_onboarding_answers(db, pack, {"wordmark_svg_or_url": logo_url})
-                db.commit()
-                db.refresh(pack)
-        except Exception as e:
-            logger.warning("Auto logo generation for new brand failed: %s", e, exc_info=True)
-
-    return OnboardingCompleteResponse(
-        pack=PackRead.model_validate(pack),
-        is_existing_brand=is_existing_brand,
+    thread = threading.Thread(
+        target=_run_onboarding_background,
+        args=(pack_id,),
+        daemon=True,
+    )
+    thread.start()
+    return JSONResponse(
+        status_code=status.HTTP_202_ACCEPTED,
+        content={"status": "processing", "pack_id": str(pack_id)},
     )
 
 

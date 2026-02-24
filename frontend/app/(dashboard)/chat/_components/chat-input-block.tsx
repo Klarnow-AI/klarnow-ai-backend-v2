@@ -1,11 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, Paperclip, Send, Stop } from "@/components/icons";
-import { Button } from "@/components/ui/button";
+import { Eye } from "@/components/icons";
 import { Chip } from "@/components/ui/chip";
-import { IconButton } from "@/components/ui/icon-button";
-import { SearchInput } from "@/components/ui/search-input";
+import { ComposeInput } from "@/components/ui/compose-input";
 import type { NextActionChip } from "@/types/api-types";
 
 export type ChatInputBlockProps = {
@@ -41,48 +39,17 @@ export function ChatInputBlock({
           </span>
         </div>
       )}
-      <form onSubmit={onSubmit} className="w-full mb-4">
-        <SearchInput
-          value={input}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="Message Klaro…"
-          disabled={loading}
-          leftAdornment={
-            <IconButton
-              type="button"
-              variant="ghost"
-              size="md"
-              aria-label="Attach file"
-            >
-              <Paperclip className="h-4 w-4" />
-            </IconButton>
-          }
-          rightAdornment={
-            loading ? (
-              <IconButton
-                type="button"
-                variant="solid"
-                size="md"
-                aria-label="Stop"
-                disabled={stopTriggered}
-                onClick={onStop}
-              >
-                <Stop className="h-4 w-4" />
-              </IconButton>
-            ) : (
-              <IconButton
-                type="submit"
-                variant="solid"
-                size="md"
-                aria-label="Send"
-                disabled={!input.trim()}
-              >
-                <Send className="h-4 w-4" />
-              </IconButton>
-            )
-          }
-        />
-      </form>
+      <ComposeInput
+        value={input}
+        onChange={onChange}
+        onSubmit={onSubmit}
+        placeholder="Message Klaro…"
+        disabled={loading}
+        loading={loading}
+        onStop={onStop}
+        stopTriggered={stopTriggered}
+        wrapperClassName="mb-4"
+      />
       <div className="flex flex-wrap items-center justify-center gap-2">
         <Chip
           size="md"

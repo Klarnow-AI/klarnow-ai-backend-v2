@@ -7,8 +7,6 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Sun,
-  Mic,
-  Paperclip,
   ChevronDown,
   FolderPlus,
 } from "@/components/icons";
@@ -18,7 +16,7 @@ import { useLandingContext } from "@/hooks/use-landing-context";
 import { useNextAction } from "@/hooks/use-next-action";
 import { useTheme } from "@/contexts/theme-context";
 import { Button } from "@/components/ui/button";
-import { SearchInput } from "@/components/ui/search-input";
+import { ComposeInput } from "@/components/ui/compose-input";
 import { Chip } from "@/components/ui/chip";
 import { IconButton } from "@/components/ui/icon-button";
 import { ThemeSettingsPopover } from "@/components/theme-settings-popover";
@@ -306,43 +304,30 @@ export default function LandingPage() {
           </div>
 
           {/* Main input */}
-          <form onSubmit={handleSubmit} className="w-full mb-6">
-            <SearchInput
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Describe the offer you want to launch…"
-              leftAdornment={
-                <IconButton variant="ghost" size="md" aria-label="Attach file">
-                  <Paperclip />
-                </IconButton>
+          <ComposeInput
+            value={query}
+            onChange={setQuery}
+            onSubmit={handleSubmit}
+            placeholder="Describe the offer you want to launch…"
+            wrapperClassName="mb-2"
+          />
+          {/* Auto chip - below input */}
+          <div className="flex justify-center mb-4">
+            <Chip
+              size="sm"
+              trailing={
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 transition-transform",
+                    autoOpen && "rotate-180",
+                  )}
+                />
               }
-              rightAdornment={
-                <>
-                  <Chip
-                    size="sm"
-                    trailing={
-                      <ChevronDown
-                        className={cn(
-                          "h-4 w-4 transition-transform",
-                          autoOpen && "rotate-180",
-                        )}
-                      />
-                    }
-                    onClick={() => setAutoOpen(!autoOpen)}
-                  >
-                    Auto
-                  </Chip>
-                  <IconButton
-                    variant="solid"
-                    size="md"
-                    aria-label="Submit or voice"
-                  >
-                    <Mic />
-                  </IconButton>
-                </>
-              }
-            />
-          </form>
+              onClick={() => setAutoOpen(!autoOpen)}
+            >
+              Auto
+            </Chip>
+          </div>
 
           {/* Next Action chips (stateful from API, max 3) */}
           <div className="flex flex-wrap items-center justify-center gap-2">

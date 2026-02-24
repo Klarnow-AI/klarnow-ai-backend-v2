@@ -23,6 +23,7 @@ class PackRead(PackBase):
     pack_type: str = "enquiries"
     onboarding_answers: dict | None = None
     onboarding_completed_at: datetime | None = None
+    onboarding_background_completed_at: datetime | None = None
     core_concept: str | None = None
     created_at: datetime
     updated_at: datetime
@@ -201,6 +202,13 @@ class OnboardingCompleteResponse(BaseModel):
 
     pack: PackRead
     is_existing_brand: bool
+
+
+class OnboardingCompleteAccepted(BaseModel):
+    """202 response when onboarding completion is running in the background. Poll GET pack until onboarding_background_completed_at is set."""
+
+    status: str = "processing"
+    pack_id: str
 
 
 # --- Pack summary (overview from Brand OS → Proof Vault) ---

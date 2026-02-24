@@ -28,6 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 import { useTheme } from "@/contexts/theme-context";
+import { useNewPackModal, PACKS_UPDATED_EVENT_NAME } from "@/contexts/new-pack-modal-context";
 import { packs as packsApi, type Pack } from "@/lib/api";
 import {
   subscriptionApi,
@@ -141,12 +142,25 @@ export function Sidebar() {
       : null);
   const effectivePackId = urlPackId ?? resolvedPackId;
   const { gates } = usePackGates(effectivePackId || null);
+  const { openNewPackModal } = useNewPackModal();
 
   useEffect(() => {
     packsApi
       .list()
       .then((res) => setPackList(res.items))
       .catch(() => setPackList([]));
+  }, []);
+
+  useEffect(() => {
+    function onPacksUpdated() {
+      packsApi
+        .list()
+        .then((res) => setPackList(res.items))
+        .catch(() => setPackList([]));
+    }
+    document.addEventListener(PACKS_UPDATED_EVENT_NAME, onPacksUpdated);
+    return () =>
+      document.removeEventListener(PACKS_UPDATED_EVENT_NAME, onPacksUpdated);
   }, []);
 
   useEffect(() => {
@@ -334,14 +348,17 @@ export function Sidebar() {
                       </Link>
                     ))}
                     <div className="border-t border-border mt-1 pt-1">
-                      <Link
-                        href="/packs/new"
-                        onClick={() => setPackDropdownOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-primary hover:bg-muted"
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPackDropdownOpen(false);
+                          openNewPackModal();
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium text-primary hover:bg-muted"
                       >
                         <Plus className="h-4 w-4 shrink-0" />
                         New pack
-                      </Link>
+                      </button>
                     </div>
                   </motion.div>
                 )}

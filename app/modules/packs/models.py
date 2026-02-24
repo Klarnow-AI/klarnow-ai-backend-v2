@@ -73,6 +73,9 @@ class Pack(Base):
     )  # enquiries | quotes | sales
     onboarding_answers: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # max 6 questions
     onboarding_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    onboarding_background_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )  # set when async onboarding (brand/orchestrator) has finished
     core_concept: Mapped[str | None] = mapped_column(String(500), nullable=True)  # one sentence everything follows
     active_brand_os_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("brand_os.id", ondelete="SET NULL"), nullable=True

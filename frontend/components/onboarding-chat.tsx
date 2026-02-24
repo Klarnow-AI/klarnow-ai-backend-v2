@@ -8,7 +8,7 @@ import { Spinner } from "@/components/ui/page-loader";
 import { BrandPreview } from "@/components/ui/brand-preview";
 import { BrandPreviewModal } from "@/components/brand-preview-modal";
 import { CoreConceptLockModal } from "@/components/core-concept-lock-modal";
-import { packs as packsApi } from "@/api_requests/packs";
+import { packs as packsApi, pollPackUntilOnboardingReady } from "@/api_requests/packs";
 import { me as meApi } from "@/api_requests/me";
 import {
   FIRST_MESSAGE,
@@ -386,7 +386,12 @@ export function useOnboardingChat(options: {
       const nextAnswers = { ...answers, pack_type: packType };
       await packsApi.submitOnboarding(id, nextAnswers);
       const res = await packsApi.completeOnboarding(id);
-      setCompletedPack(res.pack);
+      if ("pack" in res && res.pack) {
+        setCompletedPack(res.pack);
+      } else if ("status" in res && res.status === "processing" && res.pack_id) {
+        const pack = await pollPackUntilOnboardingReady(res.pack_id);
+        setCompletedPack(pack);
+      }
       setShowCoreConceptModal(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");

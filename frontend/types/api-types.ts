@@ -103,6 +103,8 @@ export type Pack = {
   pack_type?: string;
   onboarding_answers?: Record<string, string>;
   onboarding_completed_at?: string | null;
+  /** Set when async onboarding (brand/orchestrator) has finished; poll GET pack until this is set after 202 from complete. */
+  onboarding_background_completed_at?: string | null;
   core_concept?: string | null;
   created_at: string;
   updated_at: string;
@@ -123,10 +125,16 @@ export type Pack = {
   hero_angle?: string | null;
 };
 
-/** Response from POST .../onboarding/complete */
+/** Response from POST .../onboarding/complete (200) */
 export type OnboardingCompleteResponse = {
   pack: Pack;
   is_existing_brand: boolean;
+};
+
+/** Response from POST .../onboarding/complete (202). Poll GET pack until onboarding_background_completed_at is set. */
+export type OnboardingCompleteAccepted = {
+  status: "processing";
+  pack_id: string;
 };
 
 /** Brand OS domain types (match backend domain_schema). */

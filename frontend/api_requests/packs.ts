@@ -5,6 +5,7 @@ import type {
   PackSummaryResponse,
   PackGatesResponse,
   OnboardingCompleteResponse,
+  OnboardingCompleteAccepted,
   ExtractBrandBody,
   ExtractBrandResponse,
   GenerateStarterBrandBody,
@@ -16,6 +17,25 @@ import type {
 } from "@/types/api-types";
 
 const PACKS_PREFIX = "/api/v1/packs";
+
+const ONBOARDING_POLL_INTERVAL_MS = 2000;
+const ONBOARDING_POLL_TIMEOUT_MS = 120000; // 2 min
+
+/** Poll GET pack until onboarding_background_completed_at is set (after 202 from complete). */
+export async function pollPackUntilOnboardingReady(
+  packId: string,
+  options?: { intervalMs?: number; timeoutMs?: number }
+): Promise<Pack> {
+  const intervalMs = options?.intervalMs ?? ONBOARDING_POLL_INTERVAL_MS;
+  const timeoutMs = options?.timeoutMs ?? ONBOARDING_POLL_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const pack = await packs.get(packId);
+    if (pack.onboarding_background_completed_at) return pack;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error("Onboarding is taking longer than expected. Refresh the page to check status.");
+}
 
 export const packs = {
   list: (includeArchived = false) =>
@@ -71,10 +91,12 @@ export const packs = {
       method: "POST",
       body: JSON.stringify({ answers }),
     }),
+  /** Returns 200 with pack + is_existing_brand, or 202 with { status, pack_id }. For 202, use pollPackUntilOnboardingReady(pack_id) then use the pack. */
   completeOnboarding: (packId: string) =>
-    api<OnboardingCompleteResponse>(`${PACKS_PREFIX}/${packId}/onboarding/complete`, {
-      method: "POST",
-    }),
+    api<OnboardingCompleteResponse | OnboardingCompleteAccepted>(
+      `${PACKS_PREFIX}/${packId}/onboarding/complete`,
+      { method: "POST" }
+    ),
   extractBrand: (packId: string, body: ExtractBrandBody) =>
     api<ExtractBrandResponse>(
       `${PACKS_PREFIX}/${packId}/onboarding/extract-brand`,

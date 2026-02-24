@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.logging import log_service_action
@@ -30,11 +31,16 @@ PLAN_CREDITS = {
 def get_user_subscription(db: Session, user_id: UUID) -> Subscription:
     """Get user's subscription. Creates free subscription if none exists."""
     subscription = db.query(Subscription).filter(Subscription.user_id == user_id).first()
-    
+
     if not subscription:
-        # Create free subscription
-        subscription = create_subscription(db, user_id, PLAN_FREE)
-    
+        try:
+            subscription = create_subscription(db, user_id, PLAN_FREE)
+        except IntegrityError:
+            db.rollback()
+            subscription = db.query(Subscription).filter(Subscription.user_id == user_id).first()
+            if subscription is None:
+                raise
+
     return subscription
 
 

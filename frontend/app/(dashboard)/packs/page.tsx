@@ -1,30 +1,32 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Plus } from "@/components/icons";
 import { Spinner } from "@/components/ui/page-loader";
 import { packs as packsApi } from "@/api_requests/packs";
 import { Button } from "@/components/ui/button";
-import { OnboardingModal } from "@/components/onboarding-modal";
+import { useNewPackModal } from "@/contexts/new-pack-modal-context";
 import { useGet } from "@/hooks/use-get";
 
 import { PacksEmptyState, PackCard } from "./_components";
 
 export default function PacksPage() {
   const router = useRouter();
-  const [newPackModalOpen, setNewPackModalOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const { openNewPackModal } = useNewPackModal();
+
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      openNewPackModal();
+      router.replace("/packs", { scroll: false });
+    }
+  }, [searchParams, openNewPackModal, router]);
 
   const fetcher = useCallback(() => packsApi.list(false), []);
   const { data, isLoading: loading, error, refetch } = useGet("packs-list", fetcher);
   const packs = data?.items ?? [];
-
-  function handleOnboardingComplete(packId: string) {
-    setNewPackModalOpen(false);
-    refetch();
-    router.push(`/packs/${packId}`);
-  }
 
   return (
     <div className="p-8 max-w-8xl mx-auto">
@@ -42,18 +44,12 @@ export default function PacksPage() {
         </div>
         <Button
           className="gap-2"
-          onClick={() => setNewPackModalOpen(true)}
+          onClick={() => openNewPackModal()}
         >
           <Plus className="h-4 w-4" />
           Start new Campaign Pack
         </Button>
       </motion.div>
-
-      <OnboardingModal
-        open={newPackModalOpen}
-        onOpenChange={setNewPackModalOpen}
-        onComplete={handleOnboardingComplete}
-      />
 
       {error && (
         <div className="mb-6 rounded-xl border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center justify-between">
@@ -69,7 +65,7 @@ export default function PacksPage() {
           <Spinner className="h-8 w-8" />
         </div>
       ) : packs.length === 0 ? (
-        <PacksEmptyState onCreate={() => setNewPackModalOpen(true)} />
+        <PacksEmptyState onCreate={() => openNewPackModal()} />
       ) : (
         <ul className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {packs.map((pack, i) => (

@@ -2,16 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
-  async rewrites() {
-    return [
-      {
-        source: "/api/proxy/:path*",
-        destination: `${
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-        }/:path*`,
-      },
-    ];
-  },
+  // /api/proxy/* is handled by app/api/proxy/[...path]/route.ts with explicit timeout (504 on timeout)
 };
 
 export default nextConfig;

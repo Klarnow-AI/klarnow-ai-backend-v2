@@ -354,10 +354,17 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
         });
 
         if (!res.ok) {
-          const err = await res.text();
+          const errText = await res.text();
+          let message: string;
+          try {
+            const parsed = JSON.parse(errText) as { error?: string };
+            message = parsed.error ?? errText;
+          } catch {
+            message = errText;
+          }
           setMessages((prev) => [
             ...prev,
-            { role: "assistant", content: `Error: ${err}` },
+            { role: "assistant", content: message },
           ]);
           return;
         }
@@ -431,7 +438,10 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
             ...prev,
             {
               role: "assistant",
-              content: `Error: ${err instanceof Error ? err.message : "Something went wrong"}`,
+              content:
+                err instanceof Error && err.message.includes("pipe")
+                  ? "We're having trouble generating right now. Please try again in a few moments."
+                  : `Error: ${err instanceof Error ? err.message : "Something went wrong"}`,
             },
           ]);
         }

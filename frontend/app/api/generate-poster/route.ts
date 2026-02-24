@@ -217,6 +217,18 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const hasAnthropic = !!process.env.ANTHROPIC_API_KEY?.trim();
+    const hasOpenAI = !!process.env.OPENAI_API_KEY?.trim();
+    if (!hasAnthropic && !hasOpenAI) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "Generate not configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY in the server environment.",
+        }),
+        { status: 503, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     const systemPrompt = buildSystemPrompt(brandContext);
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -254,7 +266,48 @@ export async function POST(req: NextRequest) {
         "Anthropic failed, falling back to OpenAI:",
         anthropicError,
       );
-      readable = streamWithOpenAI(openai, systemPrompt, messages);
+      try {
+        readable = streamWithOpenAI(openai, systemPrompt, messages);
+        const reader = readable.getReader();
+        const firstChunk = await reader.read();
+
+        const passthrough = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            if (firstChunk.value) controller.enqueue(firstChunk.value);
+            if (firstChunk.done) {
+              controller.close();
+              return;
+            }
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                controller.enqueue(value);
+              }
+              controller.close();
+            } catch (err) {
+              controller.error(err);
+            }
+          },
+        });
+
+        readable = passthrough;
+      } catch (openaiError) {
+        console.error(
+          "OpenAI fallback failed (both providers failed):",
+          openaiError,
+        );
+        return new Response(
+          JSON.stringify({
+            error:
+              "We're having trouble generating right now. Please try again in a few moments.",
+          }),
+          {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
     }
 
     return new Response(readable, {

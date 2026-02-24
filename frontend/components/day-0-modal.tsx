@@ -8,7 +8,7 @@ import { SearchInput } from "@/components/ui/search-input";
 import { Spinner } from "@/components/ui/page-loader";
 import { BrandPreviewModal } from "@/components/brand-preview-modal";
 import { OnboardingChoiceButtons } from "@/components/onboarding-chat";
-import { packs } from "@/api_requests/packs";
+import { packs, pollPackUntilOnboardingReady } from "@/api_requests/packs";
 import { sprintApi } from "@/api_requests/sprint";
 import type { Pack, ExtractBrandResponse } from "@/types/api-types";
 
@@ -282,7 +282,10 @@ export function Day0Modal({
           if (sprintId) {
             await sprintApi.completeDay(packId, sprintId, 0);
           }
-          await packs.completeOnboarding(packId);
+          const res = await packs.completeOnboarding(packId);
+          if ("status" in res && res.status === "processing" && res.pack_id) {
+            await pollPackUntilOnboardingReady(res.pack_id);
+          }
           onComplete?.();
         } catch (completeErr) {
           setError(
