@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Sparkles, X } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { packs } from "@/api_requests/packs";
 import { sprintApi } from "@/api_requests/sprint";
@@ -30,11 +31,13 @@ export function Day2Modal({
   const [primaryOutcome, setPrimaryOutcome] = useState("");
   const [refiningPain, setRefiningPain] = useState(false);
   const [refiningOutcome, setRefiningOutcome] = useState(false);
+  const [suggestingInitial, setSuggestingInitial] = useState(false);
 
   useEffect(() => {
     if (!open || !packId) return;
     setError("");
     setLoading(true);
+    setSuggestingInitial(false);
     Promise.all([packs.get(packId), sprintApi.getSprint(packId)])
       .then(([p, s]) => {
         setPack(p ?? null);
@@ -44,10 +47,15 @@ export function Day2Modal({
         setPrimaryPain(pain);
         setPrimaryOutcome(outcome);
         if ((!pain || !outcome) && s?.id) {
-          sprintApi.suggestDayFields(packId, 2).then((res) => {
-            if (res.primary_pain) setPrimaryPain(res.primary_pain);
-            if (res.primary_outcome) setPrimaryOutcome(res.primary_outcome);
-          }).catch(() => {});
+          setSuggestingInitial(true);
+          sprintApi
+            .suggestDayFields(packId, 2)
+            .then((res) => {
+              if (res.primary_pain) setPrimaryPain(res.primary_pain);
+              if (res.primary_outcome) setPrimaryOutcome(res.primary_outcome);
+            })
+            .catch(() => {})
+            .finally(() => setSuggestingInitial(false));
         }
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
@@ -170,10 +178,10 @@ export function Day2Modal({
                     <button
                       type="button"
                       onClick={handleRefinePain}
-                      disabled={refiningPain || saving}
+                      disabled={suggestingInitial || refiningPain || saving}
                       className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                     >
-                      {refiningPain ? (
+                      {refiningPain || suggestingInitial ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <Sparkles className="h-3.5 w-3.5" />
@@ -181,16 +189,20 @@ export function Day2Modal({
                       Refine with AI
                     </button>
                   </div>
-                  <Textarea
-                    id="day2-pain"
-                    value={primaryPain}
-                    onChange={(e) => setPrimaryPain(e.target.value)}
-                    placeholder="What is the main problem or frustration your target audience experiences?"
-                    rows={3}
-                    required
-                    disabled={saving}
-                    className="resize-none"
-                  />
+                  {suggestingInitial || refiningPain ? (
+                    <Skeleton className="h-[4.5rem] w-full" />
+                  ) : (
+                    <Textarea
+                      id="day2-pain"
+                      value={primaryPain}
+                      onChange={(e) => setPrimaryPain(e.target.value)}
+                      placeholder="What is the main problem or frustration your target audience experiences?"
+                      rows={3}
+                      required
+                      disabled={saving}
+                      className="resize-none"
+                    />
+                  )}
                   <p className="text-xs text-muted-foreground">
                     Example: &quot;Struggling to generate consistent leads for their business&quot;
                   </p>
@@ -203,10 +215,10 @@ export function Day2Modal({
                     <button
                       type="button"
                       onClick={handleRefineOutcome}
-                      disabled={refiningOutcome || saving}
+                      disabled={suggestingInitial || refiningOutcome || saving}
                       className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                     >
-                      {refiningOutcome ? (
+                      {refiningOutcome || suggestingInitial ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <Sparkles className="h-3.5 w-3.5" />
@@ -214,16 +226,20 @@ export function Day2Modal({
                       Refine with AI
                     </button>
                   </div>
-                  <Textarea
-                    id="day2-outcome"
-                    value={primaryOutcome}
-                    onChange={(e) => setPrimaryOutcome(e.target.value)}
-                    placeholder="What is the desired result or transformation they want to achieve?"
-                    rows={3}
-                    required
-                    disabled={saving}
-                    className="resize-none"
-                  />
+                  {suggestingInitial || refiningOutcome ? (
+                    <Skeleton className="h-[4.5rem] w-full" />
+                  ) : (
+                    <Textarea
+                      id="day2-outcome"
+                      value={primaryOutcome}
+                      onChange={(e) => setPrimaryOutcome(e.target.value)}
+                      placeholder="What is the desired result or transformation they want to achieve?"
+                      rows={3}
+                      required
+                      disabled={saving}
+                      className="resize-none"
+                    />
+                  )}
                   <p className="text-xs text-muted-foreground">
                     Example: &quot;A steady stream of qualified leads without paid ads&quot;
                   </p>

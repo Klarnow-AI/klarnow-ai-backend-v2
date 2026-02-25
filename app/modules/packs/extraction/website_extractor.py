@@ -62,7 +62,7 @@ class WebsiteExtractorService:
             "Website signals:\n"
             f"Title: {meta.get('title')}\n"
             f"Meta description: {meta.get('meta_description')}\n"
-            f"Logo candidates: og_image={meta.get('og_image')} icon={meta.get('icon')}\n"
+            f"Logo URL: {meta.get('logo_url') or meta.get('og_image') or meta.get('icon')}\n"
             f"Known social links: {meta.get('social_links')}\n"
             f"Found emails: {meta.get('emails')}\n"
             f"Found phones: {meta.get('phones')}\n\n"

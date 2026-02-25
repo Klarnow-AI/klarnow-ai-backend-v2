@@ -8,17 +8,19 @@ import type { ExtractBrandResponse } from "@/types/api-types";
 interface BrandPreviewModalProps {
   open: boolean;
   data: ExtractBrandResponse | null;
-  onConfirm: () => void;
+  onConfirm: (data: ExtractBrandResponse) => void;
   onClose?: () => void;
+  onUploadLogo?: (file: File) => Promise<string | null>;
   loading?: boolean;
 }
 
-export function BrandPreviewModal({ 
-  open, 
-  data, 
-  onConfirm, 
+export function BrandPreviewModal({
+  open,
+  data,
+  onConfirm,
   onClose,
-  loading 
+  onUploadLogo,
+  loading,
 }: BrandPreviewModalProps) {
   if (!open || !data) return null;
 
@@ -67,6 +69,7 @@ export function BrandPreviewModal({
             <BrandPreview
               data={data}
               onConfirm={onConfirm}
+              onUploadLogo={onUploadLogo}
               loading={loading}
             />
           </div>

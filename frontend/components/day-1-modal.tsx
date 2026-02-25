@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Sparkles, X } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { packs } from "@/api_requests/packs";
 import { sprintApi } from "@/api_requests/sprint";
@@ -28,11 +29,13 @@ export function Day1Modal({
   const [error, setError] = useState("");
   const [offerOneLiner, setOfferOneLiner] = useState("");
   const [refiningOffer, setRefiningOffer] = useState(false);
+  const [suggestingInitial, setSuggestingInitial] = useState(false);
 
   useEffect(() => {
     if (!open || !packId) return;
     setError("");
     setLoading(true);
+    setSuggestingInitial(false);
     Promise.all([packs.get(packId), sprintApi.getSprint(packId)])
       .then(([p, s]) => {
         setPack(p ?? null);
@@ -40,9 +43,14 @@ export function Day1Modal({
         const current = (p?.offer_one_liner ?? "").trim();
         setOfferOneLiner(current);
         if (!current && s?.id) {
-          sprintApi.suggestDayFields(packId, 1).then((res) => {
-            if (res.offer_one_liner) setOfferOneLiner(res.offer_one_liner);
-          }).catch(() => {});
+          setSuggestingInitial(true);
+          sprintApi
+            .suggestDayFields(packId, 1)
+            .then((res) => {
+              if (res.offer_one_liner) setOfferOneLiner(res.offer_one_liner);
+            })
+            .catch(() => {})
+            .finally(() => setSuggestingInitial(false));
         }
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
@@ -145,10 +153,10 @@ export function Day1Modal({
                     <button
                       type="button"
                       onClick={handleRefineOffer}
-                      disabled={refiningOffer || saving}
+                      disabled={suggestingInitial || refiningOffer || saving}
                       className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                     >
-                      {refiningOffer ? (
+                      {refiningOffer || suggestingInitial ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <Sparkles className="h-3.5 w-3.5" />
@@ -156,16 +164,20 @@ export function Day1Modal({
                       Refine with AI
                     </button>
                   </div>
-                  <Textarea
-                    id="day1-offer"
-                    value={offerOneLiner}
-                    onChange={(e) => setOfferOneLiner(e.target.value)}
-                    placeholder="e.g. We help busy founders get a steady stream of qualified leads without paid ads."
-                    rows={4}
-                    required
-                    disabled={saving}
-                    className="resize-none"
-                  />
+                  {suggestingInitial || refiningOffer ? (
+                    <Skeleton className="h-[5rem] w-full" />
+                  ) : (
+                    <Textarea
+                      id="day1-offer"
+                      value={offerOneLiner}
+                      onChange={(e) => setOfferOneLiner(e.target.value)}
+                      placeholder="e.g. We help busy founders get a steady stream of qualified leads without paid ads."
+                      rows={4}
+                      required
+                      disabled={saving}
+                      className="resize-none"
+                    />
+                  )}
                   <p className="text-xs text-muted-foreground">
                     What exactly are you selling? One sentence someone can say yes or no to.
                   </p>

@@ -3,15 +3,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, FileText, X, Lock } from "@/components/icons";
+import { Check, FileCheck, Sparkles, Target, X, Lock } from "@/components/icons";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { sprintApi } from "@/api_requests/sprint";
 import type { SprintDayDetail } from "@/types/api-types";
-import { DayGuideModal } from "@/app/(dashboard)/packs/[packId]/plan-tracker/day/[dayNumber]/_components/DayGuideModal";
-import { OutreachLogger } from "@/components/outreach-logger";
-import { OutputShippedLogger } from "@/components/output-shipped-logger";
-import { ProofLogger } from "@/components/proof-logger";
+import { getDayGuide } from "@/app/(dashboard)/packs/[packId]/plan-tracker/day/[dayNumber]/_data/dayGuides";
 import { ResponseRulesEditor } from "@/components/response-rules-editor";
 
 const DAY_LABELS: Record<number, string> = {
@@ -72,7 +69,7 @@ export function DayDetailModal({
   const [completing, setCompleting] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
   const [error, setError] = useState("");
-  const [showGuideModal, setShowGuideModal] = useState(false);
+  const [checkedTasks, setCheckedTasks] = useState<Set<number>>(new Set());
 
   const isValidDay =
     Number.isInteger(dayNumber) && dayNumber >= 4 && dayNumber <= 14;
@@ -94,6 +91,21 @@ export function DayDetailModal({
       })
       .finally(() => setLoading(false));
   }, [isOpen, packId, dayNumber, isValidDay]);
+
+  useEffect(() => {
+    setCheckedTasks(new Set());
+  }, [dayNumber]);
+
+  const guide = getDayGuide(dayNumber);
+
+  const toggleTask = (index: number) => {
+    setCheckedTasks((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
 
   const handleComplete = async () => {
     if (!sprint) return;
@@ -131,53 +143,9 @@ export function DayDetailModal({
       .catch(() => {});
   };
 
-  const handleLogOutreach = async (increment = 1) => {
-    if (!sprint) return;
-    try {
-      await sprintApi.logOutreach(sprint.id, dayNumber, increment);
-      refetchDay();
-    } catch {
-      setError("Failed to log outreach");
-    }
-  };
-  const handleLogFollowup = async () => {
-    if (!sprint) return;
-    try {
-      await sprintApi.logFollowup(sprint.id, dayNumber, 1);
-      refetchDay();
-    } catch {
-      setError("Failed to log follow-up");
-    }
-  };
-  const handleLogProof = async () => {
-    if (!sprint) return;
-    try {
-      await sprintApi.logProof(sprint.id, dayNumber);
-      refetchDay();
-    } catch {
-      setError("Failed to log proof");
-    }
-  };
-  const handleMarkOutputShipped = async () => {
-    if (!sprint) return;
-    try {
-      await sprintApi.markOutputShipped(sprint.id, dayNumber);
-      refetchDay();
-    } catch {
-      setError("Failed to mark output shipped");
-    }
-  };
-
   const canComplete =
     sprint && !detail?.completed_at && detail?.unlocked !== false;
   const isDay14 = dayNumber === 14;
-  const showDailyProgress =
-    detail &&
-    sprint &&
-    dayNumber >= 4 &&
-    dayNumber <= 13 &&
-    !detail.completed_at &&
-    detail.unlocked !== false;
 
   if (!isOpen) return null;
 
@@ -239,18 +207,9 @@ export function DayDetailModal({
                   </Card>
                 )}
                 {detail && (
-                  <Card
-                    className="mb-4 cursor-pointer hover:border-primary/50 transition-colors"
-                    onClick={() => setShowGuideModal(true)}
-                  >
-                    <CardHeader className="py-4">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">Details</CardTitle>
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-2 pt-0">
-                      <p className="text-sm font-medium text-muted-foreground">
+                  <div className="mb-4 space-y-4">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground mb-1">
                         Definition of done
                       </p>
                       <p className="text-sm">
@@ -258,21 +217,98 @@ export function DayDetailModal({
                           DEFAULT_DEFINITION_OF_DONE[dayNumber] ??
                           `Complete the tasks for Day ${dayNumber}.`}
                       </p>
-                      <p className="text-sm text-primary font-medium">
-                        Click to view tasks and guide →
+                    </div>
+                    {detail.completed_at && (
+                      <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm">
+                        <Check className="h-4 w-4" /> Completed
+                      </div>
+                    )}
+                    {error && (
+                      <p className="text-sm text-red-600 dark:text-red-400">
+                        {error}
                       </p>
-                      {detail.completed_at && (
-                        <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm">
-                          <Check className="h-4 w-4" /> Completed
+                    )}
+                    {guide && (
+                      <div className="space-y-6">
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <FileCheck className="h-5 w-5 text-primary" />
+                            <h3 className="font-semibold text-foreground">Tasks</h3>
+                            {checkedTasks.size === guide.tasks.length && guide.tasks.length > 0 && (
+                              <span className="ml-auto text-xs text-green-600 dark:text-green-400 font-medium">
+                                All complete!
+                              </span>
+                            )}
+                          </div>
+                          <ul className="space-y-2">
+                            {guide.tasks.map((task, index) => {
+                              const isChecked = checkedTasks.has(index);
+                              return (
+                                <li key={index} className="flex items-start gap-3 group">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleTask(index)}
+                                    className="mt-0.5 flex-shrink-0"
+                                  >
+                                    <div
+                                      className={`h-5 w-5 rounded border-2 flex items-center justify-center transition-all ${
+                                        isChecked
+                                          ? "bg-primary border-primary"
+                                          : "border-muted-foreground/30 group-hover:border-primary/50"
+                                      }`}
+                                    >
+                                      {isChecked && (
+                                        <Check className="h-3 w-3 text-primary-foreground" />
+                                      )}
+                                    </div>
+                                  </button>
+                                  <span
+                                    className={`text-sm leading-relaxed ${
+                                      isChecked
+                                        ? "text-muted-foreground line-through"
+                                        : "text-foreground"
+                                    }`}
+                                  >
+                                    {task}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ul>
                         </div>
-                      )}
-                      {error && (
-                        <p className="text-sm text-red-600 dark:text-red-400">
-                          {error}
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
+                        <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                            <h3 className="font-semibold text-amber-900 dark:text-amber-100">
+                              Tips
+                            </h3>
+                          </div>
+                          <ul className="space-y-1.5">
+                            {guide.tips.map((tip, index) => (
+                              <li
+                                key={index}
+                                className="text-sm text-amber-800 dark:text-amber-200 flex items-start gap-2"
+                              >
+                                <span className="text-amber-600 dark:text-amber-400 mt-0.5">•</span>
+                                <span>{tip}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/30">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Target className="h-5 w-5 text-green-600 dark:text-green-400" />
+                            <h3 className="font-semibold text-green-900 dark:text-green-100">
+                              Expected Outcome
+                            </h3>
+                          </div>
+                          <p className="text-sm text-green-800 dark:text-green-200">
+                            {guide.expectedOutcome}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
                 {dayNumber === 4 && (
                   <div className="mb-4">
@@ -315,104 +351,6 @@ export function DayDetailModal({
                     <ResponseRulesEditor packId={packId} onLock={refetchDay} />
                   </div>
                 )}
-                {showDailyProgress && detail && sprint && (
-                  <Card className="mb-4">
-                    <CardHeader className="py-4">
-                      <CardTitle className="text-base">
-                        Daily progress
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        Complete these to enable &quot;Mark complete&quot;.
-                      </p>
-                    </CardHeader>
-                    <CardContent className="pt-0 space-y-0">
-                      <div className="flex flex-col divide-y divide-border">
-                        <div className="py-3">
-                          <OutputShippedLogger
-                            shipped={!!detail.output_shipped}
-                            onMarkShipped={handleMarkOutputShipped}
-                          />
-                        </div>
-                        <div className="py-3 flex flex-col gap-2">
-                          <OutreachLogger
-                            count={detail.outreach_count ?? 0}
-                            target={detail.outreach_target ?? 10}
-                            onLog={handleLogOutreach}
-                          />
-                          <div
-                            className="h-1.5 w-full rounded-full bg-muted overflow-hidden"
-                            role="progressbar"
-                            aria-valuenow={detail.outreach_count ?? 0}
-                            aria-valuemin={0}
-                            aria-valuemax={detail.outreach_target ?? 10}
-                          >
-                            <div
-                              className="h-full bg-primary transition-all duration-300"
-                              style={{
-                                width: `${Math.min(
-                                  100,
-                                  ((detail.outreach_count ?? 0) /
-                                    (detail.outreach_target ?? 10)) *
-                                    100
-                                )}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                        <div className="py-3 flex flex-col gap-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm text-muted-foreground">
-                              Follow-ups:
-                            </span>
-                            <span className="text-sm font-medium">
-                              {detail.followup_count ?? 0} /{" "}
-                              {detail.followup_target ?? 5}
-                            </span>
-                            {(detail.followup_count ?? 0) >=
-                            (detail.followup_target ?? 5) ? (
-                              <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
-                                <Check className="h-4 w-4" /> Done
-                              </span>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={handleLogFollowup}
-                              >
-                                +1
-                              </Button>
-                            )}
-                          </div>
-                          <div
-                            className="h-1.5 w-full rounded-full bg-muted overflow-hidden"
-                            role="progressbar"
-                            aria-valuenow={detail.followup_count ?? 0}
-                            aria-valuemin={0}
-                            aria-valuemax={detail.followup_target ?? 5}
-                          >
-                            <div
-                              className="h-full bg-primary transition-all duration-300"
-                              style={{
-                                width: `${Math.min(
-                                  100,
-                                  ((detail.followup_count ?? 0) /
-                                    (detail.followup_target ?? 5)) *
-                                    100
-                                )}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                        <div className="py-3">
-                          <ProofLogger
-                            logged={!!detail.proof_logged}
-                            onLog={handleLogProof}
-                          />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
                 {canComplete && (
                   <div className="pt-2">
                     {isDay14 ? (
@@ -441,13 +379,6 @@ export function DayDetailModal({
           </div>
         </motion.div>
       </div>
-
-      <DayGuideModal
-        key="day-guide-modal"
-        dayNumber={dayNumber}
-        open={showGuideModal}
-        onOpenChange={setShowGuideModal}
-      />
     </AnimatePresence>
   );
 }

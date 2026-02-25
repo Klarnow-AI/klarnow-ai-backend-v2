@@ -50,7 +50,7 @@ export type OnboardingChatState = {
   handleChoice: (value: string) => Promise<void>;
   handlePathAInputType: (type: "url" | "paste" | "logo") => void;
   handlePathBVibeToggle: (vibe: string) => void;
-  handleBrandPreviewConfirm: () => void;
+  handleBrandPreviewConfirm: (finalData: import("@/types/api-types").ExtractBrandResponse) => void;
   handlePreviewModalClose: () => void;
   handlePackTypeChoice: (packType: string) => Promise<void>;
   handleCoreConceptConfirm: (coreConcept: string) => Promise<void>;
@@ -421,9 +421,13 @@ export function useOnboardingChat(options: {
     }
   };
 
-  const handleBrandPreviewConfirm = () => {
+  const handleBrandPreviewConfirm = (finalData: import("@/types/api-types").ExtractBrandResponse) => {
     setError("");
-    // Close preview modal and move to blockers
+    setExtractedBrandData(finalData);
+    setAnswers((prev) => ({
+      ...prev,
+      extracted_brand: JSON.stringify(finalData),
+    }));
     setShowPreviewModal(false);
     setStep(STEP_BLOCKERS_START);
   };
@@ -514,8 +518,8 @@ export function OnboardingPathAInputType({
   return (
     <form onSubmit={onSubmit}>
       <SearchInput
-        type="url"
-        placeholder="https://..."
+        type="text"
+        placeholder="e.g. example.com"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         disabled={loading}
@@ -988,6 +992,12 @@ export function OnboardingChat({
         data={state.extractedBrandData}
         onConfirm={state.handleBrandPreviewConfirm}
         onClose={state.handlePreviewModalClose}
+        onUploadLogo={
+          state.packId
+            ? (file) =>
+                packsApi.uploadLogo(state.packId!, file).then((r) => r.logo_url)
+            : undefined
+        }
         loading={state.loading}
       />
 

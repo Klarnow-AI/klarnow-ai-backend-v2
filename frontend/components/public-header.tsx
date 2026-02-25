@@ -60,11 +60,14 @@ export function PublicHeader({
           <Image
             src={logoSrc}
             alt="Klarnow AI"
-            width={36}
-            height={36}
+            width={28}
+            height={28}
             className="object-contain"
           />
         </div>
+        <span className="font-semibold text-lg text-foreground whitespace-nowrap">
+          Klarnow.ai
+        </span>
       </Link>
       {showInstallAbout && !isLoading && (
         <nav

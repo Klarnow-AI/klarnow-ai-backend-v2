@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Sparkles, X } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { sprintApi } from "@/api_requests/sprint";
 
@@ -26,19 +27,26 @@ export function Day3Modal({
   const [pitchScript, setPitchScript] = useState("");
   const [voiceNotesSent, setVoiceNotesSent] = useState(false);
   const [refiningPitch, setRefiningPitch] = useState(false);
+  const [suggestingInitial, setSuggestingInitial] = useState(false);
 
   useEffect(() => {
     if (!open || !packId) return;
     setError("");
     setLoading(true);
+    setSuggestingInitial(false);
     sprintApi
       .getSprint(packId)
       .then((s) => {
         setSprintId(s?.id ?? null);
         if (s?.id) {
-          sprintApi.suggestDayFields(packId, 3).then((res) => {
-            if (res.pitch_script) setPitchScript(res.pitch_script);
-          }).catch(() => {});
+          setSuggestingInitial(true);
+          sprintApi
+            .suggestDayFields(packId, 3)
+            .then((res) => {
+              if (res.pitch_script) setPitchScript(res.pitch_script);
+            })
+            .catch(() => {})
+            .finally(() => setSuggestingInitial(false));
         }
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
@@ -140,10 +148,10 @@ export function Day3Modal({
                     <button
                       type="button"
                       onClick={handleRefinePitch}
-                      disabled={refiningPitch || saving}
+                      disabled={suggestingInitial || refiningPitch || saving}
                       className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                     >
-                      {refiningPitch ? (
+                      {refiningPitch || suggestingInitial ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <Sparkles className="h-3.5 w-3.5" />
@@ -151,15 +159,19 @@ export function Day3Modal({
                       Refine with AI
                     </button>
                   </div>
-                  <Textarea
-                    id="day3-pitch"
-                    value={pitchScript}
-                    onChange={(e) => setPitchScript(e.target.value)}
-                    placeholder="Hi [Name], I help [who] with [problem]. Most people struggle with [pain], but we [solution]. Interested in [CTA]?"
-                    rows={4}
-                    disabled={saving}
-                    className="resize-none"
-                  />
+                  {suggestingInitial || refiningPitch ? (
+                    <Skeleton className="h-[5rem] w-full" />
+                  ) : (
+                    <Textarea
+                      id="day3-pitch"
+                      value={pitchScript}
+                      onChange={(e) => setPitchScript(e.target.value)}
+                      placeholder="Hi [Name], I help [who] with [problem]. Most people struggle with [pain], but we [solution]. Interested in [CTA]?"
+                      rows={4}
+                      disabled={saving}
+                      className="resize-none"
+                    />
+                  )}
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input

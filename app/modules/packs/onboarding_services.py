@@ -23,6 +23,14 @@ def _extract_offer_cues_from_profile(profile: dict) -> list[str]:
     return cues
 
 
+def _normalize_website_url(url: str) -> str:
+    """Ensure URL has a scheme so httpx and urljoin work. Prepend https:// if missing."""
+    u = url.strip()
+    if u and not (u.startswith("http://") or u.startswith("https://")):
+        u = "https://" + u
+    return u
+
+
 @log_service_action()
 async def extract_brand(
     input_type: str,
@@ -36,10 +44,11 @@ async def extract_brand(
     Returns a rich brand profile with name, description, colors, contacts, etc.
     """
     if input_type == "url" and url:
-        # Use advanced website extraction
+        # Use advanced website extraction; normalize URL so scheme-less input works
+        normalized_url = _normalize_website_url(url)
         llm = get_llm()
         try:
-            profile, color_candidates = await extract_brand_from_website(url, llm)
+            profile, color_candidates = await extract_brand_from_website(normalized_url, llm)
             profile_dict = profile.model_dump()
             
             # Extract offer cues from the profile
@@ -55,14 +64,14 @@ async def extract_brand(
                 "social_links": profile_dict.get("social_links", []),
                 "logo_url": profile_dict.get("logo_url"),
                 "color_candidates": [c.hex if hasattr(c, 'hex') else c for c in color_candidates],
-                "raw_extract": {"source": "url", "url": url},
+                "raw_extract": {"source": "url", "url": normalized_url},
             }
         except Exception as e:
             # Fallback to basic extraction on error
             return {
                 "brand_name": "My Brand",
                 "offer_cues": [],
-                "raw_extract": {"url": url, "error": str(e), "source": "url"},
+                "raw_extract": {"url": normalized_url, "error": str(e), "source": "url"},
             }
     
     if input_type == "paste" and pasted_text:

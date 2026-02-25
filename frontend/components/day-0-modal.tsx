@@ -179,13 +179,27 @@ export function Day0Modal({
     setStep(1);
   };
 
-  const handlePreviewConfirm = () => {
-    setShowPreviewModal(false);
+  const handlePreviewConfirm = async (editedData: ExtractBrandResponse) => {
+    setExtractedBrandData(editedData);
     setValues((prev) => ({
       ...prev,
-      brand_name: extractedBrandData?.brand_name ?? prev.brand_name,
+      brand_name: editedData.brand_name?.trim() || prev.brand_name,
     }));
-    setStep((s) => s + 1);
+    setSaving(true);
+    try {
+      await packs.patch(packId, {
+        onboarding_answers: {
+          ...(values.brand_url && { brand_url: values.brand_url }),
+          extracted_brand: JSON.stringify(editedData),
+        },
+      });
+      setShowPreviewModal(false);
+      setStep((s) => s + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save edits");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -430,8 +444,8 @@ export function Day0Modal({
                           )}
                           {currentStep.type === "url" && currentStep.key === "brand_url" && (
                             <SearchInput
-                              type="url"
-                              placeholder="https://..."
+                              type="text"
+                              placeholder="e.g. example.com"
                               value={input}
                               onChange={(e) => setInput(e.target.value)}
                               disabled={saving}
@@ -561,6 +575,9 @@ export function Day0Modal({
         data={extractedBrandData}
         onConfirm={handlePreviewConfirm}
         onClose={() => setShowPreviewModal(false)}
+        onUploadLogo={(file) =>
+          packs.uploadLogo(packId, file).then((r) => r.logo_url)
+        }
         loading={saving}
       />
     </>
