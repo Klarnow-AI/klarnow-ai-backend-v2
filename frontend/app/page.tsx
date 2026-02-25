@@ -2,24 +2,17 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Sun, FolderPlus } from "@/components/icons";
+import { FolderPlus } from "@/components/icons";
 import { PageLoader } from "@/components/ui/page-loader";
 import { useAuth } from "@/contexts/auth-context";
 import { useLandingContext } from "@/hooks/use-landing-context";
 import { useNextAction } from "@/hooks/use-next-action";
-import { useTheme } from "@/contexts/theme-context";
-import { Button } from "@/components/ui/button";
 import { ComposeInput } from "@/components/ui/compose-input";
 import { Chip } from "@/components/ui/chip";
-import { IconButton } from "@/components/ui/icon-button";
-import { ThemeSettingsPopover } from "@/components/theme-settings-popover";
-import { ProfileDropdown } from "@/components/profile-dropdown";
-import { ProfileAvatar } from "@/components/profile-avatar";
 import { AuthModal } from "@/components/auth-modal";
-import { OnboardingModal } from "@/components/onboarding-modal";
+import { PublicHeader } from "@/components/public-header";
 import { cn } from "@/lib/utils";
 
 function getHeadline(
@@ -64,25 +57,16 @@ export default function LandingPage() {
   const { context, isLoading: landingLoading } = useLandingContext();
   const { nextAction } = useNextAction(!!isAuthenticated, context?.pack?.id);
   const hasPacks = context?.pack != null;
-  const { resolved: themeResolved } = useTheme();
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [onboardingModalOpen, setOnboardingModalOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     if (isLoading || landingLoading) return;
     if (isAuthenticated && context && context.stage === "no_pack") {
-      setOnboardingModalOpen(true);
+      router.replace("/packs/new");
     }
-  }, [isAuthenticated, isLoading, landingLoading, context]);
-
-  const logoSrc =
-    themeResolved === "dark"
-      ? "/logos/logo_white.svg"
-      : "/logos/logo_black.svg";
+  }, [isAuthenticated, isLoading, landingLoading, context, router]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,18 +85,13 @@ export default function LandingPage() {
     } else if (landingLoading) {
       return;
     } else {
-      setOnboardingModalOpen(true);
+      router.push("/packs/new");
     }
-  }
-
-  function handleOnboardingComplete(id: string) {
-    setOnboardingModalOpen(false);
-    router.push(`/packs/${id}`);
   }
 
   function handleRegisterSuccess() {
     setAuthModalOpen(false);
-    setOnboardingModalOpen(true);
+    router.push("/packs/new");
   }
 
   const headline = getHeadline(
@@ -148,105 +127,11 @@ export default function LandingPage() {
         onOpenChange={setAuthModalOpen}
         onRegisterSuccess={handleRegisterSuccess}
       />
-      <OnboardingModal
-        open={onboardingModalOpen}
-        onOpenChange={setOnboardingModalOpen}
-        onComplete={handleOnboardingComplete}
+      <PublicHeader
+        onDashboardClick={handleDashboardClick}
+        onAuthClick={() => setAuthModalOpen(true)}
+        showInstallAbout={!isAuthenticated}
       />
-      {/* Header */}
-      <motion.header
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="relative flex items-center justify-between px-6 py-4"
-      >
-        <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-          <div className="relative flex h-9 w-9 items-center justify-center rounded-full overflow-hidden">
-            <Image
-              src={logoSrc}
-              alt="Klarnow AI"
-              width={36}
-              height={36}
-              className="object-contain"
-            />
-          </div>
-        </Link>
-        {!isLoading && !isAuthenticated && (
-          <nav
-            className="absolute left-1/2 -translate-x-1/2 flex items-center gap-6"
-            aria-label="Main"
-          >
-            <Link
-              href="/install"
-              className="text-sm text-foreground/70 no-underline hover:text-foreground transition-colors"
-            >
-              Install
-            </Link>
-            <Link
-              href="/about"
-              className="text-sm text-foreground/70 no-underline hover:text-foreground transition-colors"
-            >
-              About
-            </Link>
-          </nav>
-        )}
-        <nav className="flex items-center gap-2 flex-shrink-0">
-          {!isLoading && (
-            <>
-              {isAuthenticated ? (
-                <div className="flex items-center gap-4">
-                  <button
-                    type="button"
-                    onClick={handleDashboardClick}
-                    className="text-sm text-foreground/50 no-underline hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors rounded-lg px-2 py-1 -mx-2 -my-1"
-                  >
-                    Dashboard
-                  </button>
-                  <ProfileDropdown
-                    open={profileOpen}
-                    onOpenChange={setProfileOpen}
-                    className="flex h-11 w-11 items-center justify-center rounded-full border-[0.2px] border-border bg-card overflow-hidden"
-                  >
-                    <ProfileAvatar className="h-full w-full" />
-                  </ProfileDropdown>
-                </div>
-              ) : (
-                <>
-                  <ThemeSettingsPopover
-                    open={settingsOpen}
-                    onOpenChange={setSettingsOpen}
-                    trigger={
-                      <IconButton
-                        variant="ghost"
-                        size="md"
-                        className="rounded-lg"
-                        aria-label="Theme"
-                      >
-                        <Sun className="h-5 w-5" />
-                      </IconButton>
-                    }
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-border bg-card"
-                    onClick={() => setAuthModalOpen(true)}
-                  >
-                    Sign in
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-foreground text-background hover:bg-foreground/90"
-                    onClick={() => setAuthModalOpen(true)}
-                  >
-                    Sign up
-                  </Button>
-                </>
-              )}
-            </>
-          )}
-        </nav>
-      </motion.header>
 
       {/* Main */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
@@ -347,7 +232,7 @@ export default function LandingPage() {
                     <Chip
                       size="md"
                       icon={<FolderPlus />}
-                      onClick={() => setOnboardingModalOpen(true)}
+                      onClick={() => router.push("/packs/new")}
                     >
                       {chip.label}
                     </Chip>

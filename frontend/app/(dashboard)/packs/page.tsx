@@ -7,7 +7,6 @@ import { Plus } from "@/components/icons";
 import { Spinner } from "@/components/ui/page-loader";
 import { packs as packsApi } from "@/api_requests/packs";
 import { Button } from "@/components/ui/button";
-import { useNewPackModal } from "@/contexts/new-pack-modal-context";
 import { useGet } from "@/hooks/use-get";
 
 import { PacksEmptyState, PackCard } from "./_components";
@@ -15,14 +14,12 @@ import { PacksEmptyState, PackCard } from "./_components";
 export default function PacksPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { openNewPackModal } = useNewPackModal();
 
   useEffect(() => {
     if (searchParams.get("new") === "1") {
-      openNewPackModal();
-      router.replace("/packs", { scroll: false });
+      router.replace("/packs/new", { scroll: false });
     }
-  }, [searchParams, openNewPackModal, router]);
+  }, [searchParams, router]);
 
   const fetcher = useCallback(() => packsApi.list(false), []);
   const { data, isLoading: loading, error, refetch } = useGet("packs-list", fetcher);
@@ -44,7 +41,7 @@ export default function PacksPage() {
         </div>
         <Button
           className="gap-2"
-          onClick={() => openNewPackModal()}
+          onClick={() => router.push("/packs/new")}
         >
           <Plus className="h-4 w-4" />
           Start new Campaign Pack
@@ -65,7 +62,7 @@ export default function PacksPage() {
           <Spinner className="h-8 w-8" />
         </div>
       ) : packs.length === 0 ? (
-        <PacksEmptyState onCreate={() => openNewPackModal()} />
+        <PacksEmptyState onCreate={() => router.push("/packs/new")} />
       ) : (
         <ul className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {packs.map((pack, i) => (

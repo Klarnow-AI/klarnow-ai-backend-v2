@@ -20,6 +20,7 @@ export type PosterWithMeta = PosterAsset & {
   id?: string;
   chat_messages?: { role: "user" | "assistant"; content: string }[];
 };
+import { toast } from "sonner";
 import { Spinner } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
 import type { Pack, BrandOS } from "@/types/api-types";
@@ -184,7 +185,7 @@ export default function PostersPage() {
         const [pack, brand, assetsRes] = await Promise.all([
           packsApi.get(packId!),
           brandOsApi.getActive(packId!).catch(() => null),
-          creativeApi.listAssets(packId!).catch(() => ({ items: [], total: 0 })),
+          creativeApi.listAssets(packId!),
         ]);
 
         if (!cancelled) {
@@ -218,12 +219,48 @@ export default function PostersPage() {
     return () => { cancelled = true; };
   }, [packId]);
 
+  useEffect(() => {
+    if (!packId || typeof document === "undefined") return;
+
+    function onVisibilityChange() {
+      if (document.visibilityState !== "visible") return;
+      creativeApi
+        .listAssets(packId!)
+        .then((res) => {
+          const savedPosters: PosterWithMeta[] = res.items
+            .filter(
+              (a) =>
+                (a.type === "poster" || a.type === "flyer") && a.source_code
+            )
+            .map((a) => ({
+              name: a.name ?? `/${a.type}_${a.id}.tsx`,
+              code: a.source_code!,
+              id: a.id,
+              chat_messages: a.chat_messages ?? undefined,
+            }));
+          setPosters(savedPosters);
+          if (savedPosters.length > 0)
+            setSelectedPosterIndex(savedPosters.length - 1);
+          setError(null);
+        })
+        .catch(() => {
+          // Keep current state; don't overwrite with empty or show error on refetch
+        });
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [packId]);
+
   const handleFilesGenerated = useCallback(
     async (
       files: Record<string, string>,
       messages: { role: "user" | "assistant"; content: string }[]
     ) => {
       const newPosters: PosterWithMeta[] = [];
+      let saveFailCount = 0;
+      let lastSaveError: Error | null = null;
       for (const [name, code] of Object.entries(files)) {
         const poster: PosterWithMeta = { name, code };
         newPosters.push(poster);
@@ -239,10 +276,20 @@ export default function PostersPage() {
             });
             poster.id = created.id;
             poster.chat_messages = created.chat_messages ?? undefined;
-          } catch {
-            // Keep in UI even if save fails
+          } catch (e) {
+            saveFailCount += 1;
+            lastSaveError = e instanceof Error ? e : new Error(String(e));
           }
         }
+      }
+      if (saveFailCount > 0) {
+        const message =
+          saveFailCount === 1
+            ? "Poster couldn't be saved. Try again."
+            : `${saveFailCount} posters couldn't be saved. Try again.`;
+        toast.error(message, {
+          description: lastSaveError?.message,
+        });
       }
       setPosters((prev) => [...prev, ...newPosters]);
       if (newPosters.length > 0)

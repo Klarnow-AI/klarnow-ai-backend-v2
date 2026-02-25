@@ -1,41 +1,35 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { useHasPacks } from "@/hooks/use-has-packs";
-import { NewPackModalProvider, useNewPackModal, dispatchPacksUpdated } from "@/contexts/new-pack-modal-context";
 import { Sidebar } from "@/components/layout/sidebar";
-import { OnboardingModal } from "@/components/onboarding-modal";
 import { PageLoader } from "@/components/ui/page-loader";
 import { ErrorBoundary } from "@/components/error-boundary";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const { open, closeNewPackModal } = useNewPackModal();
+  const pathname = usePathname();
 
-  function handleNewPackComplete(packId: string) {
-    closeNewPackModal();
-    dispatchPacksUpdated();
-    router.push(`/packs/${packId}`);
+  if (pathname === "/packs/new") {
+    return (
+      <div className="min-h-screen bg-background">
+        <ErrorBoundary fallbackTitle="This page encountered an error">
+          {children}
+        </ErrorBoundary>
+      </div>
+    );
   }
 
   return (
-    <>
-      <div className="flex h-screen overflow-hidden bg-background">
-        <Sidebar />
-        <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <ErrorBoundary fallbackTitle="This page encountered an error">
-            {children}
-          </ErrorBoundary>
-        </main>
-      </div>
-      <OnboardingModal
-        open={open}
-        onOpenChange={(isOpen) => !isOpen && closeNewPackModal()}
-        onComplete={handleNewPackComplete}
-      />
-    </>
+    <div className="flex h-screen overflow-hidden bg-background">
+      <Sidebar />
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <ErrorBoundary fallbackTitle="This page encountered an error">
+          {children}
+        </ErrorBoundary>
+      </main>
+    </div>
   );
 }
 
@@ -47,6 +41,7 @@ export default function DashboardLayout({
   const { isAuthenticated, isLoading } = useAuth();
   const { hasPacks, isLoading: packsLoading } = useHasPacks();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (isLoading) return;
@@ -54,10 +49,10 @@ export default function DashboardLayout({
       router.replace("/");
       return;
     }
-    if (!packsLoading && !hasPacks) {
+    if (!packsLoading && !hasPacks && pathname !== "/packs/new") {
       router.replace("/");
     }
-  }, [isAuthenticated, isLoading, hasPacks, packsLoading, router]);
+  }, [isAuthenticated, isLoading, hasPacks, packsLoading, pathname, router]);
 
   if (isLoading) {
     return <PageLoader variant="screen" />;
@@ -71,13 +66,9 @@ export default function DashboardLayout({
     return <PageLoader variant="screen" />;
   }
 
-  if (!hasPacks) {
+  if (!hasPacks && pathname !== "/packs/new") {
     return null;
   }
 
-  return (
-    <NewPackModalProvider>
-      <DashboardContent>{children}</DashboardContent>
-    </NewPackModalProvider>
-  );
+  return <DashboardContent>{children}</DashboardContent>;
 }

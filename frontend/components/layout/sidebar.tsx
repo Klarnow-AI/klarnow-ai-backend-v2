@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useParams } from "next/navigation";
+import { usePathname, useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageSquare,
@@ -28,7 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 import { useTheme } from "@/contexts/theme-context";
-import { useNewPackModal, PACKS_UPDATED_EVENT_NAME } from "@/contexts/new-pack-modal-context";
+import { PACKS_UPDATED_EVENT_NAME } from "@/contexts/new-pack-modal-context";
 import { packs as packsApi, type Pack } from "@/lib/api";
 import {
   subscriptionApi,
@@ -142,7 +142,7 @@ export function Sidebar() {
       : null);
   const effectivePackId = urlPackId ?? resolvedPackId;
   const { gates } = usePackGates(effectivePackId || null);
-  const { openNewPackModal } = useNewPackModal();
+  const router = useRouter();
 
   useEffect(() => {
     packsApi
@@ -352,7 +352,7 @@ export function Sidebar() {
                         type="button"
                         onClick={() => {
                           setPackDropdownOpen(false);
-                          openNewPackModal();
+                          router.push("/packs/new");
                         }}
                         className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium text-primary hover:bg-muted"
                       >
