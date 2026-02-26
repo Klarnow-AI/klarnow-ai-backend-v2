@@ -135,7 +135,7 @@ def publish_project(
     db=Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Publish a builder project. When sites_domain is set, uses subdomain (pack name slug); else /p/{project_id}."""
+    """Publish a builder project. When sites_domain is set, uses subdomain (brand name slug, fallback pack name); else /p/{project_id}."""
     project = get_by_id(db, project_id, current_user.id)
     if not project:
         raise NotFoundError("Builder project not found")
@@ -144,7 +144,8 @@ def publish_project(
         pack = get_pack_for_user(db, project.pack_id, current_user.id)
         if not pack:
             raise NotFoundError("Pack not found")
-        base_slug = slug_from_name(pack.name)
+        display_name = (pack.brand_name or pack.name or "").strip() or "site"
+        base_slug = slug_from_name(display_name)
         project.subdomain_slug = ensure_unique_subdomain_slug(db, base_slug, project.id)
         live_url = f"https://{project.subdomain_slug}.{settings.sites_domain.strip()}"
     else:
