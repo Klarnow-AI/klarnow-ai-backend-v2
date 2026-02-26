@@ -39,7 +39,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
       <Wrapper
         className={cn(
           "relative flex items-center gap-3 w-full rounded-full border border-border bg-card px-5 py-4",
-          "focus-within:border-foreground/30 focus-within:ring-2 focus-within:ring-ring/30 transition-all",
+          "focus-within:border-foreground/30 focus-within:scale-[1.02] transition-all",
           wrapperClassName,
         )}
         {...wrapperProps}

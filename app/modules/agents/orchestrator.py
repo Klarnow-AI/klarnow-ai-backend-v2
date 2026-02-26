@@ -13,8 +13,11 @@ from app.modules.packs.models import Pack
 CHAT_CONTEXT_LAST_N_MESSAGES = 20
 
 
-def assemble_context(pack_id: UUID, db: Session) -> dict:
-    """Load pack, onboarding, active Brand OS, Campaign, conversion page status, plan horizon."""
+def assemble_context(
+    pack_id: UUID, db: Session, day_context: int | None = None
+) -> dict:
+    """Load pack, onboarding, active Brand OS, Campaign, conversion page status, plan horizon.
+    When day_context is 0-3, include day playbook, tasks, win_condition for the Day 0-3 flow."""
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
         return {}
@@ -33,12 +36,16 @@ def assemble_context(pack_id: UUID, db: Session) -> dict:
         conversion_page_status = "none"
 
     plan_horizon = None
+    mode = "build"
     from app.modules.sprint.services import get_active_sprint_for_pack
+    from app.modules.sprint.day_definitions import get_day_definition, get_day_content, get_day_conversation_steps
+
     active_sprint = get_active_sprint_for_pack(db, pack_id)
     if active_sprint:
         plan_horizon = "14"
+        mode = active_sprint.mode or "build"
 
-    return {
+    ctx: dict = {
         "pack_id": str(pack_id),
         "pack_name": pack.name,
         "onboarding_answers": pack.onboarding_answers,
@@ -50,6 +57,21 @@ def assemble_context(pack_id: UUID, db: Session) -> dict:
         "conversion_page_status": conversion_page_status,
         "plan_horizon": plan_horizon,
     }
+
+    if day_context is not None and 0 <= day_context <= 3:
+        try:
+            day_def = get_day_definition(day_context)
+            day_content = get_day_content(day_context, mode)
+            ctx["day_context"] = day_context
+            ctx["day_title"] = day_def["title"]
+            ctx["day_playbook"] = day_content["playbook"]
+            ctx["day_tasks"] = day_content["tasks"]
+            ctx["day_win_condition"] = day_def["win_condition"]
+            ctx["day_conversation_steps"] = get_day_conversation_steps(day_context)
+        except ValueError:
+            pass
+
+    return ctx
 
 
 def run_tool_chain(

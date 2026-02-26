@@ -46,7 +46,7 @@ export function StylePicker() {
                 "relative flex flex-col gap-2 rounded-xl border p-3 text-left transition-all",
                 "hover:border-foreground/30",
                 isSelected
-                  ? "border-primary ring-2 ring-primary/50"
+                  ? "border-primary/50 scale-105"
                   : "border-border",
               )}
             >
@@ -58,7 +58,12 @@ export function StylePicker() {
               />
               <div className="flex items-center gap-2">
                 <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", system.dot)} />
-                <span className="text-xs font-medium text-foreground truncate">
+                <span
+                  className={cn(
+                    "text-xs truncate",
+                    isSelected ? "font-bold text-primary" : "font-medium text-foreground",
+                  )}
+                >
                   {system.name}
                 </span>
               </div>

@@ -53,6 +53,11 @@ class ResetPasswordBody(BaseModel):
     new_password: str
 
 
+class ChangePasswordBody(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class CheckEmailResponse(BaseModel):
     registered: bool
 
@@ -241,6 +246,21 @@ def reset_password(
         raise AppError("Invalid or expired reset link", status_code=status.HTTP_400_BAD_REQUEST)
     user.hashed_password = hash_password(body.new_password)
     db.delete(row)
+    db.commit()
+    return None
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(
+    body: ChangePasswordBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Change password for the authenticated user."""
+    if not verify_password(body.current_password, current_user.hashed_password):
+        raise UnauthorizedError("Current password is incorrect")
+    current_user.hashed_password = hash_password(body.new_password)
+    db.add(current_user)
     db.commit()
     return None
 

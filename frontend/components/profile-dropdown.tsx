@@ -53,7 +53,7 @@ export function ProfileDropdown({
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
-        className={cn(className, "transition-colors hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black")}
+        className={cn(className, "transition-all hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black focus-visible:outline-none focus-visible:ring-0 hover:scale-105")}
         aria-label="Profile menu"
         aria-expanded={open}
       >
@@ -78,10 +78,10 @@ export function ProfileDropdown({
                     type="button"
                     onClick={() => setTheme(opt.value)}
                     className={cn(
-                      "flex h-9 w-9 items-center justify-center rounded-lg border transition-colors",
+                      "flex h-9 w-9 items-center justify-center rounded-lg border transition-all focus-visible:outline-none focus-visible:ring-0",
                       isSelected
-                        ? "bg-muted border-border text-foreground"
-                        : "border-transparent text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
+                        ? "font-bold text-primary scale-105 border-transparent"
+                        : "border-transparent text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black hover:scale-105"
                     )}
                     title={opt.label}
                     aria-label={opt.label}
@@ -93,7 +93,7 @@ export function ProfileDropdown({
             </div>
             <Link
               href="/settings"
-              className="flex items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-white/5 transition-colors"
+              className="flex items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-white/5 hover:scale-[1.02] transition-all focus-visible:outline-none focus-visible:ring-0"
               onClick={() => onOpenChange(false)}
             >
               <User className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -101,7 +101,7 @@ export function ProfileDropdown({
             </Link>
             <Link
               href="/help"
-              className="flex items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-white/5 transition-colors"
+              className="flex items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-white/5 hover:scale-[1.02] transition-all focus-visible:outline-none focus-visible:ring-0"
               onClick={() => onOpenChange(false)}
             >
               <HelpCircle className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -113,7 +113,7 @@ export function ProfileDropdown({
                 logout();
                 onOpenChange(false);
               }}
-              className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors text-left"
+              className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all text-left focus-visible:outline-none focus-visible:ring-0 hover:scale-[1.02]"
             >
               <LogOut className="h-4 w-4 shrink-0 text-muted-foreground" />
               Sign out

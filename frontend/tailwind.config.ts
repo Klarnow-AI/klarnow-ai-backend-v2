@@ -37,6 +37,7 @@ const config: Config = {
         "fade-in": "fadeIn 0.4s ease-out",
         "slide-up": "slideUp 0.4s ease-out",
         "slide-in-right": "slideInRight 0.3s ease-out",
+        "wave-bar": "waveBar 0.6s ease-in-out infinite",
       },
       keyframes: {
         fadeIn: {
@@ -50,6 +51,10 @@ const config: Config = {
         slideInRight: {
           "0%": { opacity: "0", transform: "translateX(12px)" },
           "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        waveBar: {
+          "0%, 100%": { transform: "scaleY(0.4)" },
+          "50%": { transform: "scaleY(1)" },
         },
       },
     },

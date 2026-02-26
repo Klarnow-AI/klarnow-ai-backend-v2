@@ -55,7 +55,8 @@ function buildBrandSection(brand: BrandContext): string {
   const identity: string[] = [];
   if (brand.brandName) identity.push(`Brand name: ${brand.brandName}`);
   if (brand.industry) identity.push(`Industry: ${brand.industry}`);
-  if (brand.logoUrl) identity.push(`Logo URL (use in an <img> tag): ${brand.logoUrl}`);
+  if (brand.logoUrl)
+    identity.push(`Logo URL (use in an <img> tag): ${brand.logoUrl}`);
   if (brand.colorPalette) {
     const colors = Object.entries(brand.colorPalette)
       .filter(([, v]) => v)
@@ -63,30 +64,36 @@ function buildBrandSection(brand: BrandContext): string {
       .join(", ");
     if (colors) identity.push(`Brand colors: ${colors}`);
   }
-  if (brand.fonts?.length) identity.push(`Preferred fonts: ${brand.fonts.join(", ")}`);
+  if (brand.fonts?.length)
+    identity.push(`Preferred fonts: ${brand.fonts.join(", ")}`);
   if (identity.length) sections.push(`BRAND IDENTITY:\n${identity.join("\n")}`);
 
   const messaging: string[] = [];
   if (brand.coreOffer) messaging.push(`Core offer: ${brand.coreOffer}`);
   if (brand.primaryCta) messaging.push(`Primary CTA text: ${brand.primaryCta}`);
-  if (brand.elevatorPitch) messaging.push(`Elevator pitch: ${brand.elevatorPitch}`);
+  if (brand.elevatorPitch)
+    messaging.push(`Elevator pitch: ${brand.elevatorPitch}`);
   if (brand.uspStatement) messaging.push(`USP: ${brand.uspStatement}`);
   if (brand.uspProof) messaging.push(`USP proof: ${brand.uspProof}`);
-  if (brand.primaryPain) messaging.push(`Customer pain point: ${brand.primaryPain}`);
-  if (brand.primaryOutcome) messaging.push(`Desired outcome: ${brand.primaryOutcome}`);
+  if (brand.primaryPain)
+    messaging.push(`Customer pain point: ${brand.primaryPain}`);
+  if (brand.primaryOutcome)
+    messaging.push(`Desired outcome: ${brand.primaryOutcome}`);
   if (brand.heroAngle) messaging.push(`Hero angle: ${brand.heroAngle}`);
   if (brand.mission) messaging.push(`Mission: ${brand.mission}`);
   if (brand.vision) messaging.push(`Vision: ${brand.vision}`);
   if (brand.proofPoints?.length)
     messaging.push(`Proof points:\n- ${brand.proofPoints.join("\n- ")}`);
-  if (messaging.length) sections.push(`MESSAGING & COPY:\n${messaging.join("\n")}`);
+  if (messaging.length)
+    sections.push(`MESSAGING & COPY:\n${messaging.join("\n")}`);
 
   if (brand.audiencePersonas?.length) {
     const personas = brand.audiencePersonas
       .map((p) => {
         const parts = [`Persona: ${p.persona}`];
         if (p.needs.length) parts.push(`  Needs: ${p.needs.join(", ")}`);
-        if (p.painPoints.length) parts.push(`  Pain points: ${p.painPoints.join(", ")}`);
+        if (p.painPoints.length)
+          parts.push(`  Pain points: ${p.painPoints.join(", ")}`);
         return parts.join("\n");
       })
       .join("\n");
@@ -94,8 +101,10 @@ function buildBrandSection(brand: BrandContext): string {
   }
 
   const style: string[] = [];
-  if (brand.voiceArchetype) style.push(`Voice archetype: ${brand.voiceArchetype}`);
-  if (brand.designCues?.length) style.push(`Design cues: ${brand.designCues.join(", ")}`);
+  if (brand.voiceArchetype)
+    style.push(`Voice archetype: ${brand.voiceArchetype}`);
+  if (brand.designCues?.length)
+    style.push(`Design cues: ${brand.designCues.join(", ")}`);
   if (style.length) sections.push(`VOICE & STYLE:\n${style.join("\n")}`);
 
   return sections.length > 0
@@ -125,7 +134,9 @@ function buildIndustryTemplate(brand: BrandContext): string {
   const offer = brand.coreOffer?.toLowerCase() ?? "";
   const combined = `${industry} ${offer}`;
 
-  if (/fitness|gym|health|wellness|yoga|nutrition|personal.?train/.test(combined)) {
+  if (
+    /fitness|gym|health|wellness|yoga|nutrition|personal.?train/.test(combined)
+  ) {
     return `
 INDUSTRY TEMPLATE — FITNESS/WELLNESS:
 Recommended sections in order:
@@ -142,7 +153,9 @@ Recommended sections in order:
 COPY TONE: Energetic, empowering, results-focused. Use action verbs. Address excuses.`;
   }
 
-  if (/saas|software|app|platform|api|tool|dashboard|b2b|crm|erp/.test(combined)) {
+  if (
+    /saas|software|app|platform|api|tool|dashboard|b2b|crm|erp/.test(combined)
+  ) {
     return `
 INDUSTRY TEMPLATE — SAAS/TECH:
 Recommended sections in order:
@@ -174,7 +187,11 @@ Recommended sections in order:
 COPY TONE: Warm, inviting, sensory. Use food descriptors. Evoke atmosphere.`;
   }
 
-  if (/agency|marketing|design|creative|consulting|freelance|studio/.test(combined)) {
+  if (
+    /agency|marketing|design|creative|consulting|freelance|studio/.test(
+      combined,
+    )
+  ) {
     return `
 INDUSTRY TEMPLATE — AGENCY/SERVICES:
 Recommended sections in order:
@@ -207,7 +224,9 @@ Recommended sections in order:
 COPY TONE: Aspirational, visual, lifestyle-focused. Create desire and urgency.`;
   }
 
-  if (/coach|coaching|mentor|course|training|learn|education|tutor/.test(combined)) {
+  if (
+    /coach|coaching|mentor|course|training|learn|education|tutor/.test(combined)
+  ) {
     return `
 INDUSTRY TEMPLATE — COACHING/EDUCATION:
 Recommended sections in order:
@@ -772,7 +791,9 @@ If the user reports an error, read the error carefully, find the exact line caus
 
 ═══ YOUR TWO MODES ═══
 
-${firstTime ? `=== MODE 1: DISCOVERY (default starter files detected) ===
+${
+  firstTime
+    ? `=== MODE 1: DISCOVERY (default starter files detected) ===
 >>> YOU ARE IN DISCOVERY MODE <<<
 
 ${
@@ -790,12 +811,14 @@ Ask 2-3 targeted questions using the <q> tag format:
 </questions>
 
 EXCEPTION: If user says "just build it" / "generate it now" / gives detailed instructions → skip questions and BUILD immediately.
-Do NOT include any <file> tags in discovery mode.` : `=== MODE 2: BUILDING ===
+Do NOT include any <file> tags in discovery mode.`
+    : `=== MODE 2: BUILDING ===
 >>> YOU ARE IN BUILDING MODE <<<
 
 Build or modify based on the user's request. Read the current files carefully before making changes.
 If request is "fix this error": find the bug, fix it, return the complete corrected file.
-If request is vague ("make it better"): make smart, visible improvements — don't ask, just improve.`}
+If request is vague ("make it better"): make smart, visible improvements — don't ask, just improve.`
+}
 
 VAGUE EDIT HANDLING: If request is truly ambiguous (multiple valid interpretations), ask ONE focused question:
 <summary>To make sure I get this right for you.</summary>
@@ -931,7 +954,9 @@ function streamWithAnthropic(
   return new ReadableStream({
     async start(controller) {
       const model = isGeneration ? GENERATION_MODEL : EDIT_MODEL;
-      const thinkingBudget = isGeneration ? THINKING_BUDGET_GEN : THINKING_BUDGET_EDIT;
+      const thinkingBudget = isGeneration
+        ? THINKING_BUDGET_GEN
+        : THINKING_BUDGET_EDIT;
 
       let inThinkingBlock = false;
       let thinkingEmitted = false;
@@ -958,7 +983,11 @@ function streamWithAnthropic(
           if (inThinkingBlock && !thinkingEmitted) {
             thinkingEmitted = true;
             // Emit thinking indicator so the UI can show "Reasoning…"
-            controller.enqueue(encoder.encode("<thinking>Reasoning about your website…</thinking>"));
+            controller.enqueue(
+              encoder.encode(
+                "<thinking>Reasoning about your website…</thinking>",
+              ),
+            );
           }
         } else if (event.type === "content_block_delta") {
           if (!inThinkingBlock && event.delta.type === "text_delta") {
@@ -1044,7 +1073,12 @@ export async function POST(req: NextRequest) {
     let readable: ReadableStream<Uint8Array>;
 
     try {
-      readable = streamWithAnthropic(anthropic, systemPrompt, messages, isGeneration);
+      readable = streamWithAnthropic(
+        anthropic,
+        systemPrompt,
+        messages,
+        isGeneration,
+      );
 
       // Read the first chunk to verify Anthropic is working
       const reader = readable.getReader();
@@ -1072,7 +1106,10 @@ export async function POST(req: NextRequest) {
 
       readable = passthrough;
     } catch (anthropicError) {
-      console.error("Anthropic failed, falling back to OpenAI:", anthropicError);
+      console.error(
+        "Anthropic failed, falling back to OpenAI:",
+        anthropicError,
+      );
       try {
         readable = streamWithOpenAI(openai, systemPrompt, messages);
         const reader = readable.getReader();

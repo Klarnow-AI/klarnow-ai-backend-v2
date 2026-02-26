@@ -5,19 +5,19 @@
 @layer base {
   :root {
     /* Black and white palette - dark (default), background lifted so plain bg isn’t too dark */
-    --background: 0 0% 8.6%;
+    --background: 0 0% 5%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 14%;
+    --card: 0 0% 10%;
     --card-foreground: 0 0% 98%;
     --primary: 0 0% 98%;
     --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14%;
+    --secondary: 0 0% 10%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 12%;
+    --muted: 0 0% 9%;
     --muted-foreground: 0 0% 55%;
-    --accent: 0 0% 18%;
+    --accent: 0 0% 14%;
     --accent-foreground: 0 0% 98%;
-    --border: 0 0% 18%;
+    --border: 0 0% 14%;
     --ring: 0 0% 70%;
   }
 
@@ -59,6 +59,7 @@
 
 /* Smooth scroll and selection */
 html {
+  font-size: 15px; /* ~93.75% scale - moderate scale-up from 14px */
   scroll-behavior: smooth;
 }
 

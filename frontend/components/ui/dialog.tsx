@@ -50,14 +50,18 @@ interface DialogContentProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
 }
 
-export function DialogContent({ className, children, ...props }: DialogContentProps) {
+export function DialogContent({
+  className,
+  children,
+  ...props
+}: DialogContentProps) {
   return (
     <div
       className={cn(
         "relative z-50 w-full max-w-2xl max-h-[90vh] overflow-hidden",
         "bg-card rounded-2xl border border-border shadow-2xl",
         "animate-in fade-in-0 zoom-in-95 duration-200",
-        className
+        className,
       )}
       onClick={(e) => e.stopPropagation()}
       {...props}
@@ -71,12 +75,16 @@ interface DialogHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
 }
 
-export function DialogHeader({ className, children, ...props }: DialogHeaderProps) {
+export function DialogHeader({
+  className,
+  children,
+  ...props
+}: DialogHeaderProps) {
   return (
     <div
       className={cn(
         "flex items-start justify-between p-6 pb-4 border-b border-border",
-        className
+        className,
       )}
       {...props}
     >
@@ -89,10 +97,17 @@ interface DialogTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {
   children: React.ReactNode;
 }
 
-export function DialogTitle({ className, children, ...props }: DialogTitleProps) {
+export function DialogTitle({
+  className,
+  children,
+  ...props
+}: DialogTitleProps) {
   return (
     <h2
-      className={cn("text-xl font-semibold tracking-tight text-foreground", className)}
+      className={cn(
+        "text-xl font-semibold tracking-tight text-foreground",
+        className,
+      )}
       {...props}
     >
       {children}
@@ -104,7 +119,11 @@ interface DialogDescriptionProps extends React.HTMLAttributes<HTMLParagraphEleme
   children: React.ReactNode;
 }
 
-export function DialogDescription({ className, children, ...props }: DialogDescriptionProps) {
+export function DialogDescription({
+  className,
+  children,
+  ...props
+}: DialogDescriptionProps) {
   return (
     <p
       className={cn("text-sm text-muted-foreground mt-1.5", className)}

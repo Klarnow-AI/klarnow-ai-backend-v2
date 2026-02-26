@@ -8,14 +8,15 @@ import type { Message } from "@/types/api-types";
 import {
   buildChatUrl,
   buildNewChatUrl,
+  getQuestionContextFromMessage,
   isStreamingPlaceholder,
   streamingPlaceholderId,
 } from "./helpers";
+import { dayGuides } from "@/app/(dashboard)/packs/[packId]/plan-tracker/day/[dayNumber]/_data/dayGuides";
 import {
   ChatMessageList,
   ChatInputBlock,
   ChatHistoryModal,
-  ChatHistoryBar,
   ChatFab,
   NextActionBanner,
 } from "./_components";
@@ -32,6 +33,18 @@ export default function ChatPage() {
   const searchParams = useSearchParams();
   const cFromUrl = searchParams.get("c");
   const packId = searchParams.get("pack") ?? undefined;
+  const dayParam = searchParams.get("day");
+  const dayContext: { day: number; title: string } | undefined =
+    dayParam !== null
+      ? (() => {
+          const d = parseInt(dayParam, 10);
+          if (Number.isInteger(d) && d >= 0 && d <= 3) {
+            const guide = dayGuides[d as 0 | 1 | 2 | 3];
+            return guide ? { day: d, title: guide.title } : undefined;
+          }
+          return undefined;
+        })()
+      : undefined;
   const [historyModalOpenState, setHistoryModalOpenState] = useState(false);
   const [nextAction, setNextAction] = useState<NextAction | null>(null);
   const [
@@ -79,7 +92,7 @@ export default function ChatPage() {
       s.setLoading,
       s.setStopTriggered,
       s.resetForNewChat,
-    ])
+    ]),
   );
   const containerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -101,17 +114,19 @@ export default function ChatPage() {
   }, [cFromUrl, setConversationId]);
 
   useEffect(() => {
-    me
-      .getNextAction(packId ?? null)
+    me.getNextAction(packId ?? null)
       .then(setNextAction)
       .catch(() => setNextAction(null));
   }, [packId]);
 
   async function ensureConversation() {
     if (conversationId) return conversationId;
-    const conv = await chatApi.createConversation(packId);
+    const dayNum = dayParam !== null ? parseInt(dayParam, 10) : NaN;
+    const dayCtx =
+      Number.isInteger(dayNum) && dayNum >= 0 && dayNum <= 3 ? dayNum : undefined;
+    const conv = await chatApi.createConversation(packId, dayCtx);
     setConversationId(conv.id);
-    router.replace(buildChatUrl(conv.id, packId));
+    router.replace(buildChatUrl(conv.id, packId, dayCtx));
     return conv.id;
   }
 
@@ -121,7 +136,7 @@ export default function ChatPage() {
       if (
         res.items.length === 0 &&
         prev.some(
-          (m) => isStreamingPlaceholder(m.id) || m.id.startsWith("user-")
+          (m) => isStreamingPlaceholder(m.id) || m.id.startsWith("user-"),
         )
       )
         return prev;
@@ -136,11 +151,16 @@ export default function ChatPage() {
     loadMessages(conversationId);
   }, [conversationId]);
 
-  async function send(mode: SendMode, applyToId?: string | null) {
+  async function send(
+    mode: SendMode,
+    applyToId?: string | null,
+    contentOverride?: string,
+  ) {
     const cid = await ensureConversation();
     if (!cid) return;
     const content =
-      mode === "apply" && !input.trim() ? "Apply the changes." : input;
+      contentOverride ??
+      (mode === "apply" && !input.trim() ? "Apply the changes." : input);
     if (mode !== "apply" && !content.trim()) return;
 
     setStopTriggered(false);
@@ -159,7 +179,7 @@ export default function ChatPage() {
       created_at: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMsg]);
-    setInput("");
+    if (!contentOverride) setInput("");
     setLoading(true);
     setStreamingContent("");
 
@@ -184,12 +204,12 @@ export default function ChatPage() {
           apply_to_message_id: applyToId ?? undefined,
         },
         true,
-        controller.signal
+        controller.signal,
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(
-          (err as { detail?: string }).detail || "Failed to send"
+          (err as { detail?: string }).detail || "Failed to send",
         );
       }
       const reader = res.body?.getReader();
@@ -245,8 +265,8 @@ export default function ChatPage() {
                         tool_results: payload.tool_results ?? null,
                         is_preview: payload.preview ?? false,
                       }
-                    : m
-                )
+                    : m,
+                ),
               );
               setStreamingContent("");
               if (
@@ -260,9 +280,11 @@ export default function ChatPage() {
               }
             } catch (e) {
               console.error(e);
-              toast.error(e instanceof Error ? e.message : "Something went wrong");
+              toast.error(
+                e instanceof Error ? e.message : "Something went wrong",
+              );
               setMessages((prev) =>
-                prev.filter((m) => !isStreamingPlaceholder(m.id))
+                prev.filter((m) => !isStreamingPlaceholder(m.id)),
               );
               setStreamingContent("");
             }
@@ -276,7 +298,7 @@ export default function ChatPage() {
               console.error(e);
               toast.error(e instanceof Error ? e.message : "Stream error");
               setMessages((prev) =>
-                prev.filter((m) => !isStreamingPlaceholder(m.id))
+                prev.filter((m) => !isStreamingPlaceholder(m.id)),
               );
               setStreamingContent("");
             }
@@ -296,15 +318,15 @@ export default function ChatPage() {
                   id: `stopped-${m.id}`,
                   content: finalContent,
                 }
-              : m
-          )
+              : m,
+          ),
         );
         setStreamingContent("");
       } else {
         console.error(e);
         toast.error(e instanceof Error ? e.message : "Something went wrong");
         setMessages((prev) =>
-          prev.filter((m) => !isStreamingPlaceholder(m.id))
+          prev.filter((m) => !isStreamingPlaceholder(m.id)),
         );
         setStreamingContent("");
       }
@@ -333,6 +355,11 @@ export default function ChatPage() {
     }
   }
 
+  function handleDay0Choice(message: string) {
+    if (loading) return;
+    send("use", undefined, message);
+  }
+
   function startNewChat() {
     router.replace(buildNewChatUrl(packId));
     resetForNewChat();
@@ -349,8 +376,22 @@ export default function ChatPage() {
   }
 
   const hasCompletedAssistant = messages.some(
-    (m) => m.role === "assistant" && !isStreamingPlaceholder(m.id)
+    (m) => m.role === "assistant" && !isStreamingPlaceholder(m.id),
   );
+
+  const hasAnsweredBrandChoice = messages.some(
+    (m) =>
+      m.role === "user" &&
+      (m.content === "Yes, I have a brand" || m.content === "No, new brand"),
+  );
+
+  const lastAssistantMessage = [...messages]
+    .reverse()
+    .find((m) => m.role === "assistant" && !isStreamingPlaceholder(m.id));
+  const questionContext =
+    dayContext && lastAssistantMessage
+      ? getQuestionContextFromMessage(lastAssistantMessage)
+      : null;
 
   if (!hasCompletedAssistant) {
     return (
@@ -359,15 +400,12 @@ export default function ChatPage() {
         className="flex-1 flex flex-col min-h-0 overflow-y-auto"
       >
         <NextActionBanner nextAction={nextAction} />
-        <ChatHistoryBar onOpenHistory={() => setHistoryModalOpenState(true)} />
         <div className="flex-1 flex flex-col min-h-0 justify-center items-center px-4 py-12">
           <div className="max-w-4xl w-full flex flex-col items-center text-center">
             {messages.length === 0 && !loading && (
-              <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
-                Ask Klaro to generate or change your Brand OS
-                or other pack content. Use <strong>Preview</strong> to see
-                proposed changes before applying.
-              </p>
+              <h2 className="text-4xl font-bold text-foreground max-w-lg mx-auto mb-6">
+                What are we shipping today?
+              </h2>
             )}
             {messages.length > 0 && (
               <div className="w-full max-w-4xl mx-auto flex flex-col items-start text-left mb-6">
@@ -389,6 +427,15 @@ export default function ChatPage() {
               stopTriggered={stopTriggered}
               applyTargetId={applyTargetId}
               suggestionChips={nextAction?.actionChips}
+              dayContext={dayContext}
+              onDay0Choice={dayContext?.day === 0 ? handleDay0Choice : undefined}
+              showDay0ChoiceChips={!hasAnsweredBrandChoice}
+              questionContext={questionContext}
+              onQuestionChipClick={(value) => send("use", undefined, value)}
+              onResuggest={() =>
+                send("use", undefined, "Give me different suggestions")
+              }
+              onOpenHistory={() => setHistoryModalOpenState(true)}
             />
           </div>
         </div>
@@ -409,7 +456,6 @@ export default function ChatPage() {
   return (
     <div ref={containerRef} className="flex-1 flex flex-col min-h-0 w-full">
       <NextActionBanner nextAction={nextAction} />
-      <ChatHistoryBar onOpenHistory={() => setHistoryModalOpenState(true)} />
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-6">
         <div className="w-full max-w-4xl mx-auto flex flex-col items-start text-left">
           <ChatMessageList
@@ -431,6 +477,15 @@ export default function ChatPage() {
           stopTriggered={stopTriggered}
           applyTargetId={applyTargetId}
           suggestionChips={nextAction?.actionChips}
+          dayContext={dayContext}
+          onDay0Choice={dayContext?.day === 0 ? handleDay0Choice : undefined}
+          showDay0ChoiceChips={!hasAnsweredBrandChoice}
+          questionContext={questionContext}
+          onQuestionChipClick={(value) => send("use", undefined, value)}
+          onResuggest={() =>
+            send("use", undefined, "Give me different suggestions")
+          }
+          onOpenHistory={() => setHistoryModalOpenState(true)}
         />
       </div>
       <ChatFab onNewChat={startNewChat} />

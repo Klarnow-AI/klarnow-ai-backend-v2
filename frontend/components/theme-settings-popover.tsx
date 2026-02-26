@@ -61,10 +61,10 @@ export function ThemeSettingsPopover({
                     type="button"
                     onClick={() => setTheme(opt.value)}
                     className={cn(
-                      "flex h-9 w-9 items-center justify-center rounded-lg border transition-colors",
+                      "flex h-9 w-9 items-center justify-center rounded-lg border transition-all focus-visible:outline-none focus-visible:ring-0",
                       isSelected
-                        ? "bg-muted border-border text-foreground"
-                        : "border-transparent text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
+                        ? "font-bold text-primary scale-105 border-transparent"
+                        : "border-transparent text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black hover:scale-105"
                     )}
                     title={opt.label}
                     aria-label={opt.label}

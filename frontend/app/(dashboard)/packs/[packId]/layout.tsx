@@ -20,13 +20,12 @@ export default function PackLayout({
   const popoverRef = useRef<HTMLDivElement>(null);
   const fabRef = useRef<HTMLButtonElement>(null);
 
-  const isPackOverview =
-    !!packId && pathname === `/packs/${packId}`;
+  const isPackOverview = !!packId && pathname === `/packs/${packId}`;
   const showFab = !!packId && !isPackOverview;
 
   const layoutContextValue = useMemo(
     () => ({ openChatPopover: () => setChatPopoverOpen(true) }),
-    []
+    [],
   );
 
   useEffect(() => {
@@ -41,8 +40,7 @@ export default function PackLayout({
       setChatPopoverOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [chatPopoverOpen]);
 
   useEffect(() => {
@@ -66,7 +64,7 @@ export default function PackLayout({
             type="button"
             onClick={() => setChatPopoverOpen((open) => !open)}
             aria-label="Chat with Klaro"
-            className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-black/10 transition-shadow hover:shadow-xl hover:shadow-black/15 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-black/10 transition-all hover:shadow-xl hover:shadow-black/15 hover:scale-105 focus:outline-none focus:scale-105"
           >
             <MessageSquare className="h-6 w-6" />
           </button>
@@ -89,7 +87,7 @@ export default function PackLayout({
                   </motion.div>
                 )}
               </AnimatePresence>,
-              document.body
+              document.body,
             )}
         </>
       )}

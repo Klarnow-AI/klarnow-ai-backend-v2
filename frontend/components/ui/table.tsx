@@ -43,10 +43,7 @@ const TableRow = forwardRef<
 >(({ className, ...props }, ref) => (
   <tr
     ref={ref}
-    className={cn(
-      "border-b border-border transition-colors hover:bg-muted/50",
-      className
-    )}
+    className={cn("border-b border-border transition-colors hover:bg-muted/50", className)}
     {...props}
   />
 ));
@@ -60,7 +57,7 @@ const TableHead = forwardRef<
     ref={ref}
     className={cn(
       "h-10 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
-      className
+      className,
     )}
     {...props}
   />

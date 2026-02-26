@@ -1,23 +1,31 @@
 "use client";
 
-import { forwardRef } from "react";
+import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import {
   Plus,
   Paperclip,
-  MessageSquare,
-  Feedback,
   Mic,
   Send,
   Stop,
+  Image,
+  Lightbulb,
+  Search,
+  ShoppingBag,
+  MoreVertical,
+  ChevronRight,
+  Clock,
 } from "@/components/icons";
+import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
 import { IconButton } from "@/components/ui/icon-button";
+import { VoiceWaveIndicator } from "@/components/ui/voice-wave-indicator";
 import { cn } from "@/lib/utils";
 
-export interface ComposeInputProps
-  extends Omit<
-    React.TextareaHTMLAttributes<HTMLTextAreaElement>,
-    "value" | "onChange"
-  > {
+export interface ComposeInputProps extends Omit<
+  React.TextareaHTMLAttributes<HTMLTextAreaElement>,
+  "value" | "onChange"
+> {
   value: string;
   onChange: (value: string) => void;
   onSubmit: (e: React.FormEvent) => void;
@@ -28,10 +36,26 @@ export interface ComposeInputProps
   onStop?: () => void;
   /** When true, disable the Stop button (chat use) */
   stopTriggered?: boolean;
-  /** Optional override for left toolbar (default: Plus, Paperclip, MessageSquare) */
+  /** Optional override for left toolbar (default: Plus opens popover) */
   leftButtons?: React.ReactNode;
-  /** Optional override for right icons before submit (default: Feedback, Mic) */
+  /** Called when user attaches files via the popover */
+  onAttachFiles?: (files: FileList) => void;
+  /** Called when user selects "Create image" */
+  onCreateImage?: () => void;
+  /** Called when user selects "Thinking" */
+  onThinking?: () => void;
+  /** Called when user selects "Deep Research" */
+  onDeepResearch?: () => void;
+  /** Called when user selects "Shopping research" */
+  onShoppingResearch?: () => void;
+  /** Called when user selects "More" */
+  onMore?: () => void;
+  /** Optional override for right icons before submit (default: Mic) */
   rightIconsBeforeSubmit?: React.ReactNode;
+  /** When provided, renders a History button (Clock icon) before the mic */
+  onOpenHistory?: () => void;
+  /** When false, Mic is non-interactive (default: true) */
+  voiceRecordingEnabled?: boolean;
   wrapperClassName?: string;
 }
 
@@ -48,6 +72,14 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
       stopTriggered = false,
       leftButtons,
       rightIconsBeforeSubmit,
+      onOpenHistory,
+      voiceRecordingEnabled = true,
+      onAttachFiles,
+      onCreateImage,
+      onThinking,
+      onDeepResearch,
+      onShoppingResearch,
+      onMore,
       wrapperClassName,
       className,
       ...textareaProps
@@ -55,54 +87,192 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
     ref,
   ) => {
     const showStop = loading && onStop != null;
+    const valueRef = useRef(value);
+    valueRef.current = value;
+    const [popoverOpen, setPopoverOpen] = useState(false);
+    const popoverRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+      const handler = (e: MouseEvent) => {
+        if (
+          popoverRef.current &&
+          !popoverRef.current.contains(e.target as Node)
+        )
+          setPopoverOpen(false);
+      };
+      if (popoverOpen) {
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+      }
+    }, [popoverOpen]);
+
+    const handleAttachClick = useCallback(() => {
+      setPopoverOpen(false);
+      fileInputRef.current?.click();
+    }, []);
+
+    const handleFileChange = useCallback(
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (files && files.length > 0 && onAttachFiles) {
+          onAttachFiles(files);
+        }
+        e.target.value = "";
+      },
+      [onAttachFiles],
+    );
+
+    const handleTranscription = useCallback(
+      (transcript: string) => {
+        const current = valueRef.current;
+        onChange(current ? `${current} ${transcript}` : transcript);
+      },
+      [onChange],
+    );
+
+    const { isRecording, toggle, supported } = useVoiceRecorder({
+      onTranscription: handleTranscription,
+      onError: (msg) => toast.error(msg),
+    });
+
+    const micDisabled =
+      disabled || loading || !supported || !voiceRecordingEnabled;
+
+    const handleMenuAction = useCallback((callback?: () => void) => {
+      setPopoverOpen(false);
+      if (callback) {
+        callback();
+      } else {
+        toast.info("Coming soon");
+      }
+    }, []);
+
     const defaultLeft = (
-      <>
+      <div ref={popoverRef} className="relative shrink-0">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*,video/*,.pdf,.doc,.docx"
+          className="hidden"
+          onChange={handleFileChange}
+        />
         <IconButton
           type="button"
           variant="outline"
           size="md"
           aria-label="Add"
+          aria-expanded={popoverOpen}
           className="border"
+          onClick={() => setPopoverOpen((o) => !o)}
         >
           <Plus className="h-4 w-4" />
         </IconButton>
-        <IconButton
-          type="button"
-          variant="outline"
-          size="md"
-          aria-label="Attach file"
-          className="border"
-        >
-          <Paperclip className="h-4 w-4" />
-        </IconButton>
-        <IconButton
-          type="button"
-          variant="outline"
-          size="md"
-          aria-label="Extensions"
-          className="border"
-        >
-          <MessageSquare className="h-4 w-4" />
-        </IconButton>
-      </>
+        <AnimatePresence>
+          {popoverOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.15 }}
+              className="absolute left-0 top-full mt-2 z-50 w-56 rounded-xl border border-border bg-card p-2 shadow shadow-black/10"
+            >
+              <button
+                type="button"
+                onClick={handleAttachClick}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground   transition-colors"
+              >
+                <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span>Attach photo, video, docx</span>
+              </button>
+              <div className="my-2 border-t border-border" />
+              <button
+                type="button"
+                onClick={() => handleMenuAction(onCreateImage)}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground   transition-colors"
+              >
+                <Image className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span>Create image</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMenuAction(onThinking)}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground   transition-colors"
+              >
+                <Lightbulb className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span>Thinking</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMenuAction(onDeepResearch)}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground   transition-colors"
+              >
+                <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span>Deep Research</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMenuAction(onShoppingResearch)}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground   transition-colors"
+              >
+                <ShoppingBag className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span>Shopping research</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMenuAction(onMore)}
+                className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground   transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <MoreVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span>More</span>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     );
-    const defaultRightIcons = (
-      <>
-        <span className="text-muted-foreground" aria-hidden>
-          <Feedback className="h-5 w-5" />
-        </span>
-        <span className="text-muted-foreground" aria-hidden>
-          <Mic className="h-5 w-5" />
-        </span>
-      </>
+    const defaultRightIcons = isRecording ? (
+      <div className="flex items-center gap-1.5">
+        <VoiceWaveIndicator className="h-4 text-destructive" />
+        <IconButton
+          type="button"
+          variant="ghost"
+          size="md"
+          aria-label="Stop voice input"
+          onClick={toggle}
+          title="Stop recording"
+          className="text-destructive"
+        >
+          <Stop className="h-5 w-5" />
+        </IconButton>
+      </div>
+    ) : (
+      <IconButton
+        type="button"
+        variant="ghost"
+        size="md"
+        aria-label="Start voice input"
+        onClick={toggle}
+        disabled={micDisabled}
+        title={
+          !supported ? "Voice input not supported in this browser" : undefined
+        }
+        className="text-muted-foreground"
+      >
+        <Mic className="h-5 w-5" />
+      </IconButton>
     );
 
     return (
       <form onSubmit={onSubmit} className={cn("w-full", wrapperClassName)}>
         <div
           className={cn(
-            "relative flex flex-col w-full rounded-xl border border-border bg-card",
-            "focus-within:border-foreground/30 focus-within:ring-2 focus-within:ring-ring/30 transition-all",
+            "relative flex flex-col w-full rounded-3xl border border-border bg-card",
+            "focus-within:border-foreground/30 focus-within:scale-[1.02] transition-all",
           )}
         >
           <textarea
@@ -113,7 +283,7 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
             disabled={disabled}
             rows={1}
             className={cn(
-              "flex-1 min-w-0 w-full bg-transparent text-foreground placeholder:text-muted-foreground text-base outline-none resize-none min-h-[44px] max-h-[128px] overflow-y-auto leading-relaxed px-4 pt-3 pb-1",
+              "flex-1 min-w-0 w-full bg-transparent text-foreground placeholder:text-muted-foreground text-base outline-none resize-none min-h-[56px] max-h-[200px] overflow-y-auto leading-relaxed px-4 pt-3 pb-1",
               className,
             )}
             {...textareaProps}
@@ -123,6 +293,19 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
               {leftButtons ?? defaultLeft}
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              {onOpenHistory && (
+                <IconButton
+                  type="button"
+                  variant="ghost"
+                  size="md"
+                  aria-label="History"
+                  onClick={onOpenHistory}
+                  disabled={disabled || loading}
+                  className="text-muted-foreground"
+                >
+                  <Clock className="h-5 w-5" />
+                </IconButton>
+              )}
               {rightIconsBeforeSubmit ?? defaultRightIcons}
               {showStop ? (
                 <IconButton

@@ -101,6 +101,8 @@ export type Pack = {
   name: string;
   status: string;
   pack_type?: string;
+  /** Whether the pack's campaign is active (list responses only). null = no campaign. */
+  campaign_is_active?: boolean | null;
   onboarding_answers?: Record<string, string>;
   onboarding_completed_at?: string | null;
   /** Set when async onboarding (brand/orchestrator) has finished; poll GET pack until this is set after 202 from complete. */
@@ -386,10 +388,19 @@ export type Conversation = {
   id: string;
   user_id: string;
   pack_id: string | null;
+  day_context?: number | null;
   created_at: string;
   updated_at: string;
   /** First message content (truncated), when returned by list endpoint. */
   title?: string | null;
+};
+
+export type DayQuestionContext = {
+  field_key: string;
+  input_placeholder?: string;
+  input_type?: "input" | "textarea" | "choice";
+  suggestion_chips: { label: string; value: string }[];
+  show_resuggest: boolean;
 };
 
 export type Message = {

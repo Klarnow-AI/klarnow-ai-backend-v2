@@ -814,9 +814,8 @@ export default function BrandOSPage() {
                           type="button"
                           onClick={() => hex && copyToClipboard(hex, id)}
                           className={cn(
-                            "h-16 w-16 rounded-xl border border-border shadow-sm shrink-0",
-                            hex &&
-                              "cursor-pointer hover:ring-2 hover:ring-primary/50",
+                            "h-16 w-16 rounded-xl border border-border shadow-sm shrink-0 transition-transform",
+                            hex && "cursor-pointer hover:scale-105",
                           )}
                           style={
                             cssColor ? { backgroundColor: cssColor } : undefined
@@ -1072,7 +1071,7 @@ export default function BrandOSPage() {
                 animate={{ x: 0 }}
                 exit={{ x: "100%" }}
                 transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
-                className="pointer-events-auto w-full max-w-[400px] m-10 rounded-2xl border border-border bg-card/95 backdrop-blur-2xl shadow shadow-black/5 dark:shadow-black/15 ring-1 ring-border/50 flex flex-col overflow-hidden"
+                className="pointer-events-auto w-full max-w-[400px] m-10 rounded-2xl border border-border bg-card/95 backdrop-blur-2xl shadow shadow-black/5 dark:shadow-black/15 flex flex-col overflow-hidden"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="edit-drawer-title"

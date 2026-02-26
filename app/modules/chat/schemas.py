@@ -8,12 +8,14 @@ from pydantic import BaseModel
 
 class ConversationCreate(BaseModel):
     pack_id: UUID | None = None
+    day_context: int | None = None  # 0-3 for Day 0-3 conversational flow
 
 
 class ConversationRead(BaseModel):
     id: UUID
     user_id: UUID
     pack_id: UUID | None = None
+    day_context: int | None = None
     created_at: datetime
     updated_at: datetime
 

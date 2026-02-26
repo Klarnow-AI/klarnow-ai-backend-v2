@@ -1,22 +1,51 @@
 "use client";
 
+import Link from "next/link";
 import type { NextAction } from "@/types/api-types";
-import { ChevronRight } from "@/components/icons";
+import { Target } from "@/components/icons";
+import { Button } from "@/components/ui/button";
 
-export function NextActionBanner({ nextAction }: { nextAction: NextAction | null }) {
+export function NextActionBanner({
+  nextAction,
+}: {
+  nextAction: NextAction | null;
+}) {
   if (!nextAction) return null;
 
+  const primaryChip = nextAction.actionChips.find((c) => c.href);
+  const secondaryText = nextAction.blockerMessage ?? nextAction.whyItMatters;
+  const isBlocker = !!nextAction.blockerMessage;
+
   return (
-    <div className="shrink-0 px-4 py-2 bg-muted/50 border-b border-border">
-      <div className="max-w-4xl mx-auto flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium text-foreground">Next:</span>
-        <span className="text-sm text-muted-foreground">{nextAction.actionText}</span>
-        {nextAction.blockerMessage && (
-          <span className="text-xs text-amber-600 dark:text-amber-400">
-            {nextAction.blockerMessage}
-          </span>
+    <div className="shrink-0 px-4 py-10">
+      <div className="max-w-4xl mx-auto rounded-2xl border border-border bg-card px-4 py-3 flex items-center gap-4">
+        <div className="rounded-full border border-border bg-muted/50 p-2 shrink-0">
+          <Target className="h-4 w-4 text-muted-foreground" size={16} />
+        </div>
+        <div className="flex-1 min-w-0 space-y-0.5">
+          <p className="text-sm font-medium text-foreground truncate">
+            {nextAction.actionText}
+          </p>
+          {secondaryText && (
+            <p
+              className={`text-xs truncate ${
+                isBlocker
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-muted-foreground"
+              }`}
+              role={isBlocker ? "alert" : undefined}
+            >
+              {secondaryText}
+            </p>
+          )}
+        </div>
+        {primaryChip && (
+          <Link href={primaryChip.href!} className="shrink-0">
+            <Button variant="secondary" size="sm" className="rounded-full">
+              {primaryChip.label}
+            </Button>
+          </Link>
         )}
-        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
       </div>
     </div>
   );

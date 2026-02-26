@@ -18,7 +18,11 @@ type QuestionFormProps = {
   disabled?: boolean;
 };
 
-export function QuestionForm({ questions, onSubmit, disabled }: QuestionFormProps) {
+export function QuestionForm({
+  questions,
+  onSubmit,
+  disabled,
+}: QuestionFormProps) {
   const [answers, setAnswers] = useState<Record<number, string | string[]>>(
     () => {
       const initial: Record<number, string | string[]> = {};
@@ -44,7 +48,9 @@ export function QuestionForm({ questions, onSubmit, disabled }: QuestionFormProp
   };
 
   const hasAnyAnswer = Object.entries(answers).some(([, v]) =>
-    Array.isArray(v) ? v.length > 0 : typeof v === "string" && v.trim().length > 0,
+    Array.isArray(v)
+      ? v.length > 0
+      : typeof v === "string" && v.trim().length > 0,
   );
 
   const handleSubmit = () => {
@@ -105,7 +111,7 @@ export function QuestionForm({ questions, onSubmit, disabled }: QuestionFormProp
                   handleSubmit();
                 }
               }}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-all focus:outline-none focus:scale-[1.02]"
             />
           )}
         </div>

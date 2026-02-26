@@ -63,7 +63,12 @@ def create_conversation_route(
 ):
     """Create a new conversation (global or pack-scoped)."""
     try:
-        conv = create_conversation(db, current_user.id, pack_id=body.pack_id)
+        conv = create_conversation(
+            db,
+            current_user.id,
+            pack_id=body.pack_id,
+            day_context=body.day_context,
+        )
     except ValueError as e:
         raise NotFoundError(str(e))
     return ConversationRead.model_validate(conv)

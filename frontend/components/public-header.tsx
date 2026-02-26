@@ -76,13 +76,13 @@ export function PublicHeader({
         >
           <Link
             href="/install"
-            className="text-sm text-foreground/70 no-underline hover:text-foreground transition-colors"
+            className="text-sm text-foreground/70 no-underline hover:text-foreground hover:scale-105 transition-all focus-visible:outline-none focus-visible:ring-0"
           >
             Install
           </Link>
           <Link
             href="/about"
-            className="text-sm text-foreground/70 no-underline hover:text-foreground transition-colors"
+            className="text-sm text-foreground/70 no-underline hover:text-foreground hover:scale-105 transition-all focus-visible:outline-none focus-visible:ring-0"
           >
             About
           </Link>
@@ -96,7 +96,7 @@ export function PublicHeader({
                 <button
                   type="button"
                   onClick={handleDashboardClick}
-                  className="text-sm text-foreground/50 no-underline hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors rounded-lg px-2 py-1 -mx-2 -my-1"
+                  className="text-sm text-foreground/50 no-underline hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all rounded-lg px-2 py-1 -mx-2 -my-1 focus-visible:outline-none focus-visible:ring-0 hover:scale-105"
                 >
                   Dashboard
                 </button>

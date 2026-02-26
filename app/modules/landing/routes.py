@@ -12,11 +12,26 @@ from app.modules.landing.schemas import (
     NextAction,
     LandingCompleteBody,
     LandingCompleteResponse,
+    ProfileResponse,
 )
 from app.modules.landing.services import get_landing_context, landing_complete
 from app.modules.packs.models import User
 
 router = APIRouter()
+
+
+@router.get("/profile", response_model=ProfileResponse)
+def get_profile(current_user: User = Depends(get_current_user)):
+    """Return current user profile (email, created_at, last_activity_at)."""
+    return ProfileResponse(
+        email=current_user.email,
+        created_at=current_user.created_at.isoformat() if current_user.created_at else "",
+        last_activity_at=(
+            current_user.last_activity_at.isoformat()
+            if current_user.last_activity_at
+            else None
+        ),
+    )
 
 
 @router.get("/landing-context", response_model=LandingContext)

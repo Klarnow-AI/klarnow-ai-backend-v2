@@ -171,7 +171,7 @@ export function SprintCalendar({ sprint, onDayClick }: SprintCalendarProps) {
                         isLocked && "cursor-not-allowed opacity-60",
                         !isSprintDay && "cursor-default hover:shadow-none",
                         !isSameMonthFn(date, currentMonth) && "opacity-50",
-                        isToday && "ring-2 ring-primary",
+                        isToday && "scale-105",
                         isCurrent && "bg-primary/5 border-primary",
                         isCompleted && "bg-green-50 dark:bg-green-950/20",
                       )}

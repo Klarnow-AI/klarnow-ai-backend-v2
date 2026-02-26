@@ -1,5 +1,7 @@
 """Next Action engine: one next action. Priority: blockers, revenue leaks, sprint day, optimisation, check-in."""
 
+from datetime import timedelta, timezone
+from datetime import datetime as dt
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -25,6 +27,8 @@ from app.modules.sprint.services import (
 )
 from app.modules.sprint.outreach_targets import get_daily_outreach_target, get_daily_followup_target
 from app.modules.tasks.services import get_overdue_tasks
+from app.modules.subscription.services import check_credits
+from app.modules.packs.models import User
 
 
 def _chip(label: str, href: str | None = None) -> NextActionChip:
@@ -66,6 +70,35 @@ def get_next_action(
         }
 
     pack_path = f"/packs/{pack.id}"
+    chat_day = lambda n: f"/chat?pack={pack.id}&day={n}"
+
+    # --- 0. Inactivity recovery (spec section 10) ---
+    user = db.query(User).filter(User.id == user_id).first()
+    if user and user.last_activity_at:
+        now = dt.now(timezone.utc)
+        inactive_hours = (now - user.last_activity_at).total_seconds() / 3600
+        if inactive_hours >= 72:
+            return {
+                "action_text": "Simplify your offer",
+                "action_chips": [_chip("Day 1", chat_day(1)), _chip("Day 0", chat_day(0))],
+                "stage": "inactivity",
+                "can_proceed": True,
+                "blocker_message": None,
+                "why_it_matters": "You've been away. A simpler offer helps you get back on track.",
+                "time_estimate": "5 mins",
+                "progress_counters": None,
+            }
+        if inactive_hours >= 24:
+            return {
+                "action_text": "Restart in 5 minutes",
+                "action_chips": [_chip("Plan tracker", f"{pack_path}/plan-tracker"), _chip("Leads", f"{pack_path}/leads")],
+                "stage": "inactivity",
+                "can_proceed": True,
+                "blocker_message": None,
+                "why_it_matters": "Quick win to rebuild momentum.",
+                "time_estimate": "5 mins",
+                "progress_counters": None,
+            }
 
     # --- 1. Hard blockers (paywall, pack gate, day 7, day 8) ---
     active_sprint = get_active_sprint_for_pack(db, pack.id)
@@ -88,7 +121,7 @@ def get_next_action(
     if not can_pack:
         return {
             "action_text": "Complete pack basics",
-            "action_chips": [_chip("Day 0 / Offer", f"{pack_path}"), _chip("Set CTA", f"{pack_path}/day-0")],
+            "action_chips": [_chip("Day 0 / Offer", chat_day(0)), _chip("Set CTA", chat_day(0))],
             "stage": "blocked",
             "can_proceed": False,
             "blocker_message": pack_msg,
@@ -126,6 +159,7 @@ def get_next_action(
             }
 
     # --- 2. Revenue leaks (overdue follow-ups) ---
+    credits = check_credits(db, user_id)
     overdue = get_overdue_tasks(db, pack.id)
     if overdue:
         return {
@@ -213,10 +247,43 @@ def get_next_action(
                     "progress_counters": progress_counters,
                 }
 
-        # Default: work on current day
+            # Day complete: optimisation actions (never replace revenue)
+            if can_daily:
+                chips = [_chip("Mark day complete", day_path), _chip("Improve hook", chat_day(1)), _chip("Add proof", f"{pack_path}")]
+                if credits == 0:
+                    chips.append(_chip("Buy credits", "/settings"))
+                return {
+                    "action_text": "Day complete — improve your offer",
+                    "action_chips": chips,
+                    "stage": "sprint_day",
+                    "can_proceed": True,
+                    "blocker_message": None,
+                    "why_it_matters": "Polish your hook or add proof before the next day.",
+                    "time_estimate": "5 mins",
+                    "progress_counters": progress_counters,
+                }
+
+        # Day 14: check-in state
+        if day_num == 14 and card and not card.completed_at:
+            return {
+                "action_text": "Complete weekly check-in",
+                "action_chips": [_chip("Day 14 check-in", day_path), _chip("Plan tracker", sprint_path)],
+                "stage": "checkin",
+                "can_proceed": True,
+                "blocker_message": None,
+                "why_it_matters": "Wrap up this sprint and start Sprint 2.",
+                "time_estimate": "5 mins",
+                "progress_counters": None,
+            }
+
+        # Default: work on current day (Days 0-3 go to chat; 4+ to plan-tracker)
+        day_href = chat_day(day_num) if 0 <= day_num <= 3 else day_path
+        chips = [_chip(f"Day {day_num}", day_href), _chip("Sprint", sprint_path)]
+        if credits == 0 and day_num >= 4:
+            chips.append(_chip("Buy credits", "/settings"))
         return {
             "action_text": f"Day {day_num}: work on today's tasks",
-            "action_chips": [_chip(f"Day {day_num}", day_path), _chip("Sprint", sprint_path)],
+            "action_chips": chips,
             "stage": "sprint",
             "can_proceed": True,
             "blocker_message": None,
@@ -275,7 +342,7 @@ def get_next_action(
     if not day_0_done or not has_basics:
         return {
             "action_text": "Complete Day 0 setup",
-            "action_chips": [_chip("Day 0", f"{pack_path}/day-0"), _chip("Set CTA & USP", f"{pack_path}/day-0")],
+            "action_chips": [_chip("Day 0", chat_day(0)), _chip("Set CTA & USP", chat_day(0))],
             "stage": "brand_os_done",
             "can_proceed": True,
             "blocker_message": None,

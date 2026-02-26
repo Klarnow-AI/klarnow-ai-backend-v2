@@ -8,7 +8,10 @@ import { Spinner } from "@/components/ui/page-loader";
 import { BrandPreview } from "@/components/ui/brand-preview";
 import { BrandPreviewModal } from "@/components/brand-preview-modal";
 import { CoreConceptLockModal } from "@/components/core-concept-lock-modal";
-import { packs as packsApi, pollPackUntilOnboardingReady } from "@/api_requests/packs";
+import {
+  packs as packsApi,
+  pollPackUntilOnboardingReady,
+} from "@/api_requests/packs";
 import { me as meApi } from "@/api_requests/me";
 import {
   FIRST_MESSAGE,
@@ -50,7 +53,9 @@ export type OnboardingChatState = {
   handleChoice: (value: string) => Promise<void>;
   handlePathAInputType: (type: "url" | "paste" | "logo") => void;
   handlePathBVibeToggle: (vibe: string) => void;
-  handleBrandPreviewConfirm: (finalData: import("@/types/api-types").ExtractBrandResponse) => void;
+  handleBrandPreviewConfirm: (
+    finalData: import("@/types/api-types").ExtractBrandResponse,
+  ) => void;
   handlePreviewModalClose: () => void;
   handlePackTypeChoice: (packType: string) => Promise<void>;
   handleCoreConceptConfirm: (coreConcept: string) => Promise<void>;
@@ -388,7 +393,11 @@ export function useOnboardingChat(options: {
       const res = await packsApi.completeOnboarding(id);
       if ("pack" in res && res.pack) {
         setCompletedPack(res.pack);
-      } else if ("status" in res && res.status === "processing" && res.pack_id) {
+      } else if (
+        "status" in res &&
+        res.status === "processing" &&
+        res.pack_id
+      ) {
         const pack = await pollPackUntilOnboardingReady(res.pack_id);
         setCompletedPack(pack);
       }
@@ -421,7 +430,9 @@ export function useOnboardingChat(options: {
     }
   };
 
-  const handleBrandPreviewConfirm = (finalData: import("@/types/api-types").ExtractBrandResponse) => {
+  const handleBrandPreviewConfirm = (
+    finalData: import("@/types/api-types").ExtractBrandResponse,
+  ) => {
     setError("");
     setExtractedBrandData(finalData);
     setAnswers((prev) => ({
@@ -860,9 +871,7 @@ export function OnboardingSlideView({
                     disabled={isDisabled}
                     className={cn(
                       "text-left p-4 rounded-xl border border-border bg-background transition-colors",
-                      isSubmitting
-                        ? "border-primary/50 bg-muted/30"
-                        : "hover:bg-muted/50",
+                      isSubmitting ? "border-primary/50 bg-muted/30" : "hover:bg-muted/50",
                     )}
                     aria-busy={isSubmitting}
                   >

@@ -52,14 +52,15 @@ export function KanbanColumn({
       ref={setNodeRef}
       className={cn(
         "flex w-72 shrink-0 flex-col rounded-xl border border-border bg-muted/30",
-        isOver && "ring-2 ring-primary/30 bg-muted/50"
+        isOver && "ring-2 ring-primary/30 bg-muted/50",
       )}
     >
       <div className="flex items-center justify-between gap-2 p-3 border-b border-border">
         <div className="min-w-0">
           <h3 className="font-semibold text-foreground">{label}</h3>
           <p className="text-xs text-muted-foreground">
-            {leads.length} Lead{leads.length === 1 ? "" : "s"} • {valueFormatted} Total
+            {leads.length} Lead{leads.length === 1 ? "" : "s"} •{" "}
+            {valueFormatted} Total
           </p>
         </div>
         <button

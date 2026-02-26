@@ -162,11 +162,13 @@ def complete_day(db: Session, sprint: Sprint, day_number: int, user_selections: 
             if "offer_one_liner" in user_selections:
                 pack.offer_one_liner = (user_selections["offer_one_liner"] or "").strip() or None
         elif day_number == 2:
-            # Day 2: USP + Audience - set pain and outcome
+            # Day 2: USP + Audience - set pain, outcome, target_audience
             if "primary_pain" in user_selections:
-                pack.primary_pain = user_selections["primary_pain"]
+                pack.primary_pain = (user_selections["primary_pain"] or "").strip() or None
             if "primary_outcome" in user_selections:
-                pack.primary_outcome = user_selections["primary_outcome"]
+                pack.primary_outcome = (user_selections["primary_outcome"] or "").strip() or None
+            if "target_audience" in user_selections:
+                pack.target_audience = (user_selections["target_audience"] or "").strip() or None
     
     db.commit()
     db.refresh(sprint)

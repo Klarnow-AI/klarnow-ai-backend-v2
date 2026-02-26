@@ -47,7 +47,7 @@ class PackRead(PackBase):
 
 
 class PackPatch(BaseModel):
-    """Partial update: name, client_id, pack_type, core_concept; Day 0: brand_name, primary_cta, USP, proof; optional onboarding_answers merge (e.g. has_existing_brand)."""
+    """Partial update: name, client_id, pack_type, core_concept; Day 0: brand_name, primary_cta, USP, proof; Day 1-3: offer_one_liner, target_audience, primary_pain, primary_outcome, hero_angle."""
 
     name: str | None = None
     client_id: UUID | None = None
@@ -61,13 +61,24 @@ class PackPatch(BaseModel):
     usp_locked_line: str | None = None
     proof_types: list[str] | None = None
     proof_text: str | None = None
+    offer_one_liner: str | None = None
+    target_audience: str | None = None
+    primary_pain: str | None = None
+    primary_outcome: str | None = None
+    hero_angle: str | None = None
     onboarding_answers: dict | None = None
 
     model_config = {"extra": "forbid"}
 
 
+class PackListItem(PackRead):
+    """Pack with campaign status for list views."""
+
+    campaign_is_active: bool | None = None
+
+
 class PackList(BaseModel):
-    items: list[PackRead]
+    items: list[PackListItem]
     total: int
 
 

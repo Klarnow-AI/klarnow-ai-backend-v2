@@ -108,8 +108,8 @@ def create_lead_route(
         assigned_user_id=body.assigned_user_id,
     )
     try:
-        from app.modules.tasks.services import create_lead_contact_task
-        create_lead_contact_task(db, pack_id=body.pack_id, lead_id=lead.id, lead_name=lead.name or "Lead")
+        from app.modules.tasks.services import create_new_lead_followup_tasks
+        create_new_lead_followup_tasks(db, pack_id=body.pack_id, lead_id=lead.id, lead_name=lead.name or "Lead")
     except Exception:
         pass  # Don't fail lead creation if task creation fails
     return LeadRead.model_validate(lead)
@@ -144,6 +144,14 @@ def update_lead_route(
             raise NotFoundError("Client not found")
     data = body.model_dump(exclude_unset=True)
     lead = update_lead(db, lead, **data)
+    # Auto-close pending follow-up tasks when lead becomes booked/won/lost
+    from app.modules.clients.models import LEAD_STATUS_CONVERTED, LEAD_STATUS_DISQUALIFIED, PIPELINE_STAGE_CLOSED
+    from app.modules.tasks.services import close_pending_tasks_for_lead
+    if lead.status in (LEAD_STATUS_CONVERTED, LEAD_STATUS_DISQUALIFIED) or lead.pipeline_stage == PIPELINE_STAGE_CLOSED:
+        try:
+            close_pending_tasks_for_lead(db, lead.id)
+        except Exception:
+            pass
     return LeadRead.model_validate(lead)
 
 

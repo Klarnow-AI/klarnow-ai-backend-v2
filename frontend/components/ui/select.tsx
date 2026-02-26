@@ -12,8 +12,8 @@ const Select = React.forwardRef<
     <div className="relative">
       <select
         className={cn(
-          "flex h-[50px] w-full appearance-none rounded-xl border border-border bg-card px-4 py-2 pr-10 text-sm text-foreground transition-colors",
-          "focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-foreground/30",
+          "flex h-[50px] w-full appearance-none rounded-xl border border-border bg-card px-4 py-2 pr-10 text-sm text-foreground transition-all",
+          "focus:outline-none focus:scale-[1.02] focus:border-foreground/30",
           "disabled:cursor-not-allowed disabled:opacity-50",
           className,
         )}

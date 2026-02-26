@@ -139,7 +139,7 @@ export default function LandingPage() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
-          className="w-full max-w-2xl flex flex-col items-center text-center"
+          className="w-full max-w-4xl flex flex-col items-center text-center"
         >
           {/* Top strip: Pack name, Day X of 14, date (Command Centre) */}
           {showStrip && context?.pack && (

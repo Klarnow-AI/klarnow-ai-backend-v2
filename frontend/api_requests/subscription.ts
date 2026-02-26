@@ -13,4 +13,9 @@ export const subscriptionApi = {
   get: () => api<SubscriptionRead>("/api/v1/subscription"),
   getCredits: () =>
     api<{ credits_remaining: number }>("/api/v1/subscription/credits"),
+  upgradePlan: (newPlan: string) =>
+    api<SubscriptionRead>("/api/v1/subscription/upgrade", {
+      method: "POST",
+      body: JSON.stringify({ new_plan: newPlan }),
+    }),
 };

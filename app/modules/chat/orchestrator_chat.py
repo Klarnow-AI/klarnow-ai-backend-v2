@@ -71,6 +71,34 @@ def build_system_message(pack_context: dict | None) -> str:
             "When the user asks to generate or change something, use the appropriate tool (e.g. generate_brand_os). "
             "Tools create new versions (e.g. Version B); they never overwrite existing versions."
         )
+        if "day_context" in pack_context and pack_context.get("day_context") is not None:
+            day_n = pack_context["day_context"]
+            day_title = pack_context.get("day_title", "Day")
+            day_win = pack_context.get("day_win_condition", "")
+            base += (
+                f"\n\n--- Day {day_n} Conversational Flow ---\n"
+                f"You are guiding the user through Day {day_n}: {day_title}. "
+                f"Win condition: {day_win}.\n"
+                "Follow these steps in order. Ask ONE question at a time. "
+                "When asking a question, ALWAYS call ask_day_question with field_key and day_context so the user gets input guidance and suggestion chips. "
+                "After the user answers, move to the next step. "
+                "When the user asks for different suggestions (e.g. 'suggest more', 'other options', 'different ideas'), call ask_day_question with re_suggest=true and previous_chips=[labels they already saw]. "
+                "When the user has provided the required information, call update_pack to save it.\n"
+            )
+            steps = pack_context.get("day_conversation_steps", [])
+            if steps:
+                base += "Steps (ask one at a time):\n"
+                for s in steps:
+                    if s.get("if_has_brand"):
+                        base += f"  - {s['key']}: {s['label']} (only if has_existing_brand is Yes)\n"
+                    else:
+                        base += f"  - {s['key']}: {s['label']}\n"
+            base += (
+                "\nWhen the win condition is met and data is saved, call complete_sprint_day to mark the day complete. "
+                "After calling complete_sprint_day: PAUSE. Tell the user they've completed the day, congratulate them, "
+                "and ask if they want to proceed to the next day. Wait for their confirmation (e.g. 'Yes', 'Let's go') "
+                "before offering to start the next day."
+            )
     else:
         base += (
             "\nNo pack is selected. You can answer general marketing questions. "
@@ -162,7 +190,11 @@ def run_chat_turn(
     db.commit()
     db.refresh(user_msg)
 
-    pack_context = assemble_context(pack_id, db) if pack_id else None
+    pack_context = (
+        assemble_context(pack_id, db, day_context=conv.day_context)
+        if pack_id
+        else None
+    )
     system_content = build_system_message(pack_context)
     openai_tools = get_openai_tools()
     settings = get_settings()
@@ -379,7 +411,11 @@ def run_chat_turn_stream(
     db.commit()
     db.refresh(user_msg)
 
-    pack_context = assemble_context(pack_id, db) if pack_id else None
+    pack_context = (
+        assemble_context(pack_id, db, day_context=conv.day_context)
+        if pack_id
+        else None
+    )
     system_content = build_system_message(pack_context)
     openai_tools = get_openai_tools()
     settings = get_settings()

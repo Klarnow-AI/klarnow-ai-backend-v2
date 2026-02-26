@@ -404,6 +404,7 @@ def update_invoice_route(
                 db, pack_id=invoice.pack_id,
                 lead_id=lead.id if lead else None,
                 lead_name=name,
+                invoice_due_date=invoice.due_date,
             )
         except Exception:
             pass

@@ -16,6 +16,7 @@ from app.core.storage import upload_file as storage_upload_file, get_presigned_u
 from app.modules.packs.schemas import (
     PackCreate,
     PackList,
+    PackListItem,
     PackPatch,
     PackRead,
     PackSummaryResponse,
@@ -100,12 +101,40 @@ def list_my_packs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List packs for the authenticated user."""
+    """List packs for the authenticated user with campaign status."""
+    from app.modules.campaign.models import Campaign
+
     packs = list_packs_for_user(db, current_user.id, include_archived=include_archived)
-    return PackList(
-        items=[PackRead.model_validate(p) for p in packs],
-        total=len(packs),
-    )
+    pack_ids = [p.id for p in packs]
+    active_pack_ids = set()
+    packs_with_campaign = set()
+    if pack_ids:
+        active_rows = (
+            db.query(Campaign.pack_id)
+            .filter(
+                Campaign.pack_id.in_(pack_ids),
+                Campaign.is_active.is_(True),
+            )
+            .all()
+        )
+        active_pack_ids = {r[0] for r in active_rows}
+        any_rows = (
+            db.query(Campaign.pack_id)
+            .filter(Campaign.pack_id.in_(pack_ids))
+            .distinct()
+            .all()
+        )
+        packs_with_campaign = {r[0] for r in any_rows}
+    items = []
+    for p in packs:
+        data = PackRead.model_validate(p).model_dump()
+        campaign_is_active: bool | None
+        if p.id not in packs_with_campaign:
+            campaign_is_active = None
+        else:
+            campaign_is_active = p.id in active_pack_ids
+        items.append(PackListItem(**data, campaign_is_active=campaign_is_active))
+    return PackList(items=items, total=len(packs))
 
 
 @router.post("", response_model=PackRead, status_code=status.HTTP_201_CREATED)
@@ -302,7 +331,8 @@ def patch_pack(
     if "core_concept" in data:
         pack.core_concept = data["core_concept"] if data["core_concept"] else None
     day0_fields = ("brand_name", "primary_cta", "usp_category", "usp_statement", "usp_proof", "usp_locked_line", "proof_types", "proof_text")
-    for key in day0_fields:
+    day13_fields = ("offer_one_liner", "target_audience", "primary_pain", "primary_outcome", "hero_angle")
+    for key in day0_fields + day13_fields:
         if key in data:
             setattr(pack, key, data[key])
 

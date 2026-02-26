@@ -8,7 +8,7 @@ declare global {
   interface Window {
     html2canvas: (
       element: HTMLElement,
-      options?: Record<string, unknown>
+      options?: Record<string, unknown>,
     ) => Promise<HTMLCanvasElement>;
   }
 }
@@ -104,7 +104,10 @@ function isHtmlAsset(name: string): boolean {
 
 function posterLabel(name: string, fallback: string): string {
   return (
-    name.split("/").pop()?.replace(/\.(tsx|jsx|html)$/, "") ?? fallback
+    name
+      .split("/")
+      .pop()
+      ?.replace(/\.(tsx|jsx|html)$/, "") ?? fallback
   );
 }
 
@@ -137,7 +140,10 @@ export function PosterPreviewPanel({
 
   // Load html2canvas from CDN once on mount — do NOT install via npm
   useEffect(() => {
-    if (typeof window === "undefined" || typeof window.html2canvas === "function") {
+    if (
+      typeof window === "undefined" ||
+      typeof window.html2canvas === "function"
+    ) {
       return;
     }
     const script = document.createElement("script");
@@ -189,12 +195,12 @@ export function PosterPreviewPanel({
           if (blob) {
             downloadBlob(
               blob,
-              `${posterLabel(currentPoster.name, "poster")}.png`
+              `${posterLabel(currentPoster.name, "poster")}.png`,
             );
           }
         },
         "image/png",
-        1
+        1,
       );
     } catch (e) {
       console.error("PNG download failed:", e);
@@ -217,8 +223,8 @@ export function PosterPreviewPanel({
               No posters yet
             </p>
             <p className="max-w-[280px] text-sm leading-relaxed text-muted-foreground">
-              Describe the poster or flyer you&apos;d like to create in the
-              chat and it will appear here.
+              Describe the poster or flyer you&apos;d like to create in the chat
+              and it will appear here.
             </p>
           </div>
         </div>
@@ -259,7 +265,7 @@ export function PosterPreviewPanel({
                       e.stopPropagation();
                       onDeletePoster(i);
                     }}
-                    className="p-1.5 rounded-r-lg hover:bg-black/10 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-white/50"
+                    className="p-1.5 rounded-r-lg transition-transform hover:bg-black/10 hover:scale-105 focus:outline-none focus:scale-105"
                     title="Delete flyer"
                     aria-label="Delete flyer"
                   >
@@ -323,7 +329,10 @@ export function PosterPreviewPanel({
           <iframe
             srcDoc={buildLegacySrcDoc(
               currentPoster.code,
-              currentPoster.name.split("/").pop()?.replace(/\.(tsx|jsx)$/, "")
+              currentPoster.name
+                .split("/")
+                .pop()
+                ?.replace(/\.(tsx|jsx)$/, ""),
             )}
             style={{
               width: 600,

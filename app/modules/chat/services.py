@@ -80,12 +80,13 @@ def create_conversation(
     db: Session,
     user_id: UUID,
     pack_id: UUID | None = None,
+    day_context: int | None = None,
 ) -> Conversation:
     if pack_id:
         pack = get_pack_for_user(db, pack_id, user_id)
         if not pack:
             raise ValueError("Pack not found or access denied")
-    conv = Conversation(user_id=user_id, pack_id=pack_id)
+    conv = Conversation(user_id=user_id, pack_id=pack_id, day_context=day_context)
     db.add(conv)
     db.commit()
     db.refresh(conv)

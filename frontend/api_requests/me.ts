@@ -8,7 +8,14 @@ import type {
 
 const ME_PREFIX = "/api/v1/me";
 
+export type ProfileResponse = {
+  email: string;
+  created_at: string;
+  last_activity_at: string | null;
+};
+
 export const me = {
+  getProfile: () => api<ProfileResponse>(`${ME_PREFIX}/profile`),
   landingContext: () => api<LandingContext>(`${ME_PREFIX}/landing-context`),
   getNextAction: (packId?: string | null) =>
     api<NextAction>(

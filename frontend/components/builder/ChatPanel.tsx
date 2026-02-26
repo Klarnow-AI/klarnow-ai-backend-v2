@@ -12,13 +12,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useProjectStore } from "@/store/useProjectStore";
 import {
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Settings,
-  Pencil,
-  Star,
-  HelpCircle,
   Send,
   Stop,
   RotateCcw,
@@ -28,7 +23,10 @@ import {
 } from "@/components/icons";
 import { builder } from "@/api_requests/builder";
 import { StylePicker } from "@/components/builder/StylePicker";
-import { QuestionForm, type ParsedQuestion } from "@/components/builder/QuestionForm";
+import {
+  QuestionForm,
+  type ParsedQuestion,
+} from "@/components/builder/QuestionForm";
 import { cn } from "@/lib/utils";
 import type { BrandContext } from "@/app/api/generate/route";
 
@@ -44,60 +42,84 @@ type GenStage = "idle" | "thinking" | "planning" | "coding";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STAGE_CONFIG: Record<GenStage, { label: string; emoji: string }> = {
-  idle:     { label: "",                  emoji: ""   },
-  thinking: { label: "Reasoning…",        emoji: "🧠" },
-  planning: { label: "Planning layout…",  emoji: "📐" },
-  coding:   { label: "Writing code…",     emoji: "⌨️" },
+  idle: { label: "", emoji: "" },
+  thinking: { label: "Reasoning…", emoji: "🧠" },
+  planning: { label: "Planning layout…", emoji: "📐" },
+  coding: { label: "Writing code…", emoji: "⌨️" },
 };
 
 const QUICK_ACTIONS = [
   {
-    emoji: "🏷️", label: "Pricing",
-    prompt: "Add a pricing section with 3 tiers — Starter, Pro (highlighted as most popular), and Enterprise. Include a feature list for each tier.",
+    emoji: "🏷️",
+    label: "Pricing",
+    prompt:
+      "Add a pricing section with 3 tiers — Starter, Pro (highlighted as most popular), and Enterprise. Include a feature list for each tier.",
   },
   {
-    emoji: "💬", label: "Testimonials",
-    prompt: "Add a testimonials section with 3 specific, credible customer quotes. Include each person's name, role, and a measurable result.",
+    emoji: "💬",
+    label: "Testimonials",
+    prompt:
+      "Add a testimonials section with 3 specific, credible customer quotes. Include each person's name, role, and a measurable result.",
   },
   {
-    emoji: "❓", label: "FAQ",
-    prompt: "Add an FAQ section with 6 common questions and clear, detailed answers that address buyer objections.",
+    emoji: "❓",
+    label: "FAQ",
+    prompt:
+      "Add an FAQ section with 6 common questions and clear, detailed answers that address buyer objections.",
   },
   {
-    emoji: "📞", label: "Contact",
-    prompt: "Add a contact/inquiry section with a lead capture form that collects name, email, phone, and a short message.",
+    emoji: "📞",
+    label: "Contact",
+    prompt:
+      "Add a contact/inquiry section with a lead capture form that collects name, email, phone, and a short message.",
   },
   {
-    emoji: "⚡", label: "Features",
-    prompt: "Add a features section — a 3-column grid of 6 benefit-focused items with emoji icons. Focus on outcomes, not mechanics.",
+    emoji: "⚡",
+    label: "Features",
+    prompt:
+      "Add a features section — a 3-column grid of 6 benefit-focused items with emoji icons. Focus on outcomes, not mechanics.",
   },
   {
-    emoji: "🔢", label: "Stats",
-    prompt: "Add a stats bar with 4 credibility-building numbers (e.g. clients served, satisfaction rate, results delivered, years in business).",
+    emoji: "🔢",
+    label: "Stats",
+    prompt:
+      "Add a stats bar with 4 credibility-building numbers (e.g. clients served, satisfaction rate, results delivered, years in business).",
   },
   {
-    emoji: "🙋", label: "About",
-    prompt: "Add an About section with a brand/founder story and 3–4 trust signals (credentials, press, certifications).",
+    emoji: "🙋",
+    label: "About",
+    prompt:
+      "Add an About section with a brand/founder story and 3–4 trust signals (credentials, press, certifications).",
   },
   {
-    emoji: "📋", label: "How it works",
-    prompt: "Add a 'How it works' section with 3–4 numbered steps explaining the process from start to result.",
+    emoji: "📋",
+    label: "How it works",
+    prompt:
+      "Add a 'How it works' section with 3–4 numbered steps explaining the process from start to result.",
   },
   {
-    emoji: "✨", label: "More minimal",
-    prompt: "Simplify the design — increase whitespace, tighten the type scale, and remove any visual noise or decorative excess.",
+    emoji: "✨",
+    label: "More minimal",
+    prompt:
+      "Simplify the design — increase whitespace, tighten the type scale, and remove any visual noise or decorative excess.",
   },
   {
-    emoji: "🔥", label: "Make bolder",
-    prompt: "Make the design bolder — stronger type hierarchy, higher contrast, more visual energy. Don't hold back.",
+    emoji: "🔥",
+    label: "Make bolder",
+    prompt:
+      "Make the design bolder — stronger type hierarchy, higher contrast, more visual energy. Don't hold back.",
   },
   {
-    emoji: "📱", label: "Fix mobile",
-    prompt: "Audit and fix the mobile responsive layout so every section looks great on small screens.",
+    emoji: "📱",
+    label: "Fix mobile",
+    prompt:
+      "Audit and fix the mobile responsive layout so every section looks great on small screens.",
   },
   {
-    emoji: "✍️", label: "Improve copy",
-    prompt: "Rewrite all copy to be more specific, conversion-focused, and compelling. Use concrete numbers. Cut all vague adjectives.",
+    emoji: "✍️",
+    label: "Improve copy",
+    prompt:
+      "Rewrite all copy to be more specific, conversion-focused, and compelling. Use concrete numbers. Cut all vague adjectives.",
   },
 ];
 
@@ -132,7 +154,10 @@ function parseQuestions(text: string): ParsedQuestion[] {
 
   while ((qMatch = qTagRegex.exec(match[1])) !== null) {
     const type = qMatch[1] as "select" | "text";
-    const options = qMatch[2]?.split(",").map((o) => o.trim()).filter(Boolean);
+    const options = qMatch[2]
+      ?.split(",")
+      .map((o) => o.trim())
+      .filter(Boolean);
     const placeholder = qMatch[3];
     const questionText = qMatch[4].trim();
     questions.push({
@@ -149,7 +174,11 @@ function parseQuestions(text: string): ParsedQuestion[] {
     .split("\n")
     .map((l) => l.replace(/^[\s-]*/, "").trim())
     .filter(Boolean)
-    .map((text) => ({ type: "text" as const, text, placeholder: "Type your answer…" }));
+    .map((text) => ({
+      type: "text" as const,
+      text,
+      placeholder: "Type your answer…",
+    }));
 }
 
 function getStageFromStream(text: string): GenStage {
@@ -176,7 +205,12 @@ function getContextActions(files: Record<string, string>) {
   if (code.match(/about|story|mission|founder/)) present.add("About");
   if (code.match(/how.it.works|steps?|process/)) present.add("How it works");
 
-  const tweakLabels = new Set(["More minimal", "Make bolder", "Fix mobile", "Improve copy"]);
+  const tweakLabels = new Set([
+    "More minimal",
+    "Make bolder",
+    "Fix mobile",
+    "Improve copy",
+  ]);
   const missing = QUICK_ACTIONS.filter(
     (a) => !tweakLabels.has(a.label) && !present.has(a.label),
   );
@@ -213,7 +247,8 @@ function buildAutoKickoff(brand: BrandContext, style: string): string {
   lines.push(`Include sections: ${sections.join(", ")}.`);
 
   if (brand.heroAngle) lines.push(`Hero angle: \u201c${brand.heroAngle}\u201d`);
-  if (brand.primaryCta) lines.push(`Primary CTA: \u201c${brand.primaryCta}\u201d`);
+  if (brand.primaryCta)
+    lines.push(`Primary CTA: \u201c${brand.primaryCta}\u201d`);
 
   lines.push(
     "Use all brand context available. Build it now \u2014 no questions needed. Make it visually stunning and production-ready.",
@@ -241,7 +276,6 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [genStage, setGenStage] = useState<GenStage>("idle");
-  const [popoverOpen, setPopoverOpen] = useState(false);
   const [activeQuestions, setActiveQuestions] = useState<ParsedQuestion[]>([]);
   const [actionsExpanded, setActionsExpanded] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
@@ -254,7 +288,6 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const hasAutoGenerated = useRef(false);
   const hasHydrated = useRef(false);
@@ -287,17 +320,6 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
       hasAutoGenerated.current = true;
     }
   }, [storeMessages]);
-
-  // ── Click outside popover ─────────────────────────────────────────────────
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node))
-        setPopoverOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
 
   // ── Auto scroll ───────────────────────────────────────────────────────────
 
@@ -348,7 +370,8 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
             messages: currentMessages,
             files: currentFiles,
             brandContext: brandContext ?? undefined,
-            selectedStyle: useProjectStore.getState().selectedStyle ?? undefined,
+            selectedStyle:
+              useProjectStore.getState().selectedStyle ?? undefined,
           }),
           signal: controller.signal,
         });
@@ -404,7 +427,8 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
         }
 
         if (questions.length > 0) {
-          const displayMsg = summary || "I have a few questions before I start:";
+          const displayMsg =
+            summary || "I have a few questions before I start:";
           setMessages((prev) => [
             ...prev,
             { role: "assistant", content: displayMsg },
@@ -603,57 +627,26 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
   // Page is ready to publish once it has real content (not the default placeholder)
   const isPageReady =
     projectId !== null &&
-    !Object.values(files).join("").includes("Describe your website to get started");
+    !Object.values(files)
+      .join("")
+      .includes("Describe your website to get started");
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="relative flex flex-col h-full overflow-hidden bg-card border-r border-border">
       {/* ── Header ── */}
-      <div ref={popoverRef} className="relative shrink-0 border-b border-border">
-        <button
-          onClick={() => setPopoverOpen(!popoverOpen)}
-          className="flex items-center gap-2 px-3 py-3 w-full hover:bg-accent/50 transition"
+      <div className="flex items-center gap-2 px-3 py-3 shrink-0 border-b border-border">
+        <Link
+          href={packId ? `/packs/${packId}` : "/dashboard"}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          aria-label="Back to pack overview"
         >
-          <div className="w-6 h-6 rounded bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
-            {projectName[0]}
-          </div>
-          <span className="text-sm font-medium text-foreground truncate">
-            {projectName}
-          </span>
-          <ChevronDown className="w-4 h-4 text-muted-foreground ml-auto shrink-0" />
-        </button>
-
-        {popoverOpen && (
-          <div className="absolute top-full left-2 w-56 bg-card border border-border rounded-xl shadow-xl z-50 py-1">
-            <Link
-              href={packId ? `/packs/${packId}` : "/dashboard"}
-              className="flex items-center gap-3 px-4 py-2 text-sm text-card-foreground hover:bg-accent"
-              onClick={() => setPopoverOpen(false)}
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Back to Pack Overview
-            </Link>
-            <div className="border-t border-border my-1" />
-            <button className="flex items-center gap-3 px-4 py-2 text-sm text-card-foreground hover:bg-accent w-full text-left">
-              <Settings className="w-4 h-4" />
-              Settings
-            </button>
-            <button className="flex items-center gap-3 px-4 py-2 text-sm text-card-foreground hover:bg-accent w-full text-left">
-              <Pencil className="w-4 h-4" />
-              Rename project
-            </button>
-            <button className="flex items-center gap-3 px-4 py-2 text-sm text-card-foreground hover:bg-accent w-full text-left">
-              <Star className="w-4 h-4" />
-              Star project
-            </button>
-            <div className="border-t border-border my-1" />
-            <button className="flex items-center gap-3 px-4 py-2 text-sm text-card-foreground hover:bg-accent w-full text-left">
-              <HelpCircle className="w-4 h-4" />
-              Help
-            </button>
-          </div>
-        )}
+          <ChevronLeft className="h-5 w-5" />
+        </Link>
+        <span className="text-sm font-medium text-foreground truncate">
+          {projectName}
+        </span>
       </div>
 
       {/* ── Messages ── */}
@@ -785,40 +778,41 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
 
       {/* ── Bottom area ── */}
       <div className="shrink-0 px-3 pb-3 pt-2 space-y-2">
-
         {/* Quick action chips */}
-        {!isStreaming && activeQuestions.length === 0 && contextActions.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {displayActions.map((action) => (
-              <button
-                key={action.label}
-                type="button"
-                onClick={() => handleActionChip(action.prompt)}
-                className="inline-flex items-center gap-1 text-xs font-medium text-foreground/75 bg-accent hover:bg-accent/60 border border-border/50 rounded-full px-2.5 py-1 transition-all hover:border-foreground/25 hover:text-foreground active:scale-95"
-              >
-                <span className="select-none">{action.emoji}</span>
-                <span>{action.label}</span>
-              </button>
-            ))}
-            {hasMoreActions && (
-              <button
-                type="button"
-                onClick={() => setActionsExpanded(!actionsExpanded)}
-                className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground bg-transparent hover:bg-accent border border-dashed border-border/50 rounded-full px-2.5 py-1 transition-all"
-              >
-                {actionsExpanded
-                  ? "Less"
-                  : `+${contextActions.length - ACTIONS_COLLAPSED_COUNT} more`}
-                <ChevronRight
-                  className={cn(
-                    "w-3 h-3 transition-transform",
-                    actionsExpanded && "rotate-90",
-                  )}
-                />
-              </button>
-            )}
-          </div>
-        )}
+        {!isStreaming &&
+          activeQuestions.length === 0 &&
+          contextActions.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {displayActions.map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={() => handleActionChip(action.prompt)}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-foreground/75 bg-accent hover:bg-accent/60 border border-border/50 rounded-full px-2.5 py-1 transition-all hover:border-foreground/25 hover:text-foreground active:scale-95"
+                >
+                  <span className="select-none">{action.emoji}</span>
+                  <span>{action.label}</span>
+                </button>
+              ))}
+              {hasMoreActions && (
+                <button
+                  type="button"
+                  onClick={() => setActionsExpanded(!actionsExpanded)}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground bg-transparent hover:bg-accent border border-dashed border-border/50 rounded-full px-2.5 py-1 transition-all"
+                >
+                  {actionsExpanded
+                    ? "Less"
+                    : `+${contextActions.length - ACTIONS_COLLAPSED_COUNT} more`}
+                  <ChevronRight
+                    className={cn(
+                      "w-3 h-3 transition-transform",
+                      actionsExpanded && "rotate-90",
+                    )}
+                  />
+                </button>
+              )}
+            </div>
+          )}
 
         {/* Publish section */}
         {isPageReady && (
@@ -891,7 +885,7 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
           <div
             className={cn(
               "rounded-xl border bg-background transition-all",
-              "border-border focus-within:border-foreground/30 focus-within:ring-2 focus-within:ring-foreground/8",
+              "border-border focus-within:border-foreground/30 focus-within:scale-[1.02]",
             )}
           >
             <textarea

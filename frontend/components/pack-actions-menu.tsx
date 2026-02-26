@@ -20,7 +20,9 @@ export function PackActionsMenu({
 }: PackActionsMenuProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalType, setModalType] = useState<"archive" | "restore" | "delete">("archive");
+  const [modalType, setModalType] = useState<"archive" | "restore" | "delete">(
+    "archive",
+  );
 
   const isArchived = pack.status === "archived";
 

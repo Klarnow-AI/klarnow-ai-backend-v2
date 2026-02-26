@@ -124,6 +124,7 @@ def update_campaign(
     goal: dict | None = None,
     angles: list | None = None,
     active_angle_id: str | None = None,
+    is_active: bool | None = None,
 ) -> Campaign:
     new_cta = primary_cta if primary_cta is not None else campaign.primary_cta
     new_angles = angles if angles is not None else campaign.angles
@@ -142,6 +143,49 @@ def update_campaign(
         campaign.angles = angles
     if active_angle_id is not None:
         campaign.active_angle_id = active_angle_id
+    if is_active is not None:
+        campaign.is_active = is_active
+        if is_active:
+            db.query(Campaign).filter(
+                Campaign.pack_id == campaign.pack_id,
+                Campaign.id != campaign.id,
+                Campaign.is_active.is_(True),
+            ).update({"is_active": False})
     db.commit()
     db.refresh(campaign)
     return campaign
+
+
+@log_service_action()
+def set_campaign_active_for_pack(db: Session, pack_id: UUID, active: bool) -> Campaign | None:
+    """Toggle campaign on/off for a pack. Returns the affected campaign or None if none exists."""
+    from app.modules.packs.models import Pack
+
+    if active:
+        pack = db.query(Pack).filter(Pack.id == pack_id).first()
+        if not pack:
+            return None
+        target = None
+        if pack.active_campaign_id:
+            target = get_by_id_and_pack(db, pack.active_campaign_id, pack_id)
+        if not target:
+            versions = list_versions_for_pack(db, pack_id)
+            target = versions[0] if versions else None
+        if not target:
+            return None
+        db.query(Campaign).filter(
+            Campaign.pack_id == pack_id,
+            Campaign.is_active.is_(True),
+        ).update({"is_active": False})
+        target.is_active = True
+        db.commit()
+        db.refresh(target)
+        return target
+    else:
+        current = get_active_for_pack(db, pack_id)
+        if not current:
+            return None
+        current.is_active = False
+        db.commit()
+        db.refresh(current)
+        return current

@@ -92,16 +92,16 @@ const navToSection: Record<string, string> = {
   "/leads": "leads",
 };
 
-const SIDEBAR_WIDTH_EXPANDED = 280;
-const SIDEBAR_WIDTH_COLLAPSED = 72;
+const SIDEBAR_WIDTH_EXPANDED = 256;
+const SIDEBAR_WIDTH_COLLAPSED = 63;
 
 const navLinkClass = (isActive: boolean, collapsed?: boolean) =>
   cn(
-    "flex items-center rounded-xl text-sm font-medium transition-all duration-200",
+    "flex items-center rounded-xl text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-0 hover:scale-[1.02]",
     collapsed ? "justify-center gap-0 px-2 py-2.5" : "gap-3 px-3 py-2.5",
     isActive
-      ? "font-semibold text-foreground bg-muted"
-      : "text-muted-foreground hover:text-foreground hover:bg-muted",
+      ? "font-bold text-primary scale-[1.02]"
+      : "text-muted-foreground hover:text-foreground hover:font-bold",
   );
 
 const STORAGE_KEY_SIDEBAR = "sidebar-collapsed";
@@ -258,7 +258,7 @@ export function Sidebar() {
         opacity: 1,
       }}
       transition={{ duration: 0.25, ease: "easeInOut" }}
-      className="shrink-0 m-10 rounded-2xl border border-border bg-card/95 backdrop-blur-2xl flex flex-col shadow shadow-black/5 dark:shadow-black/15 ring-1 ring-border/50 overflow-hidden"
+      className="shrink-0 m-10 rounded-2xl border border-border bg-card/95 backdrop-blur-2xl flex flex-col shadow shadow-black/5 dark:shadow-black/15 overflow-hidden"
     >
       <div
         className={cn(
@@ -271,7 +271,7 @@ export function Sidebar() {
             <Link
               href="/chat"
               title="Home"
-              className="flex h-full w-full items-center justify-center rounded-xl transition-opacity duration-150 group-hover:opacity-0 group-hover:pointer-events-none"
+              className="flex h-full w-full items-center justify-center rounded-xl transition-all duration-150 group-hover:opacity-0 group-hover:pointer-events-none focus-visible:outline-none focus-visible:ring-0 hover:scale-[1.02]"
             >
               <Image
                 src={logoSrc}
@@ -285,7 +285,7 @@ export function Sidebar() {
               type="button"
               onClick={toggleCollapsed}
               title="Expand sidebar"
-              className="absolute inset-0 flex items-center justify-center rounded-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
+              className="absolute inset-0 flex items-center justify-center rounded-xl opacity-0 transition-all duration-150 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black focus-visible:outline-none focus-visible:ring-0 hover:scale-[1.02]"
             >
               <ChevronRight className="h-5 w-5" />
             </button>
@@ -295,7 +295,7 @@ export function Sidebar() {
             <div className="relative flex min-w-0 flex-1" ref={dropdownRef}>
               <Link
                 href="/chat"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl overflow-hidden"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl overflow-hidden transition-all focus-visible:outline-none focus-visible:ring-0 hover:scale-[1.02]"
                 title="Klarnow AI"
               >
                 <Image
@@ -309,10 +309,14 @@ export function Sidebar() {
               <button
                 type="button"
                 onClick={() => setPackDropdownOpen((o) => !o)}
-                className="flex min-w-0 flex-1 items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-muted transition-colors"
-                title={currentPack?.name ?? "Select a pack"}
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-xl px-2 py-1.5 text-left   transition-all focus-visible:outline-none focus-visible:ring-0 hover:scale-[1.02]"
+                title={
+                  packDropdownOpen
+                    ? undefined
+                    : (currentPack?.name ?? "Select a pack")
+                }
               >
-                <span className="min-w-0 truncate font-semibold text-lg text-foreground">
+                <span className="min-w-0 flex-1 truncate font-semibold text-lg text-foreground">
                   {currentPack?.name ?? "Select a pack"}
                 </span>
                 <ChevronDown
@@ -337,14 +341,16 @@ export function Sidebar() {
                         href={`/packs/${pack.id}`}
                         onClick={() => setPackDropdownOpen(false)}
                         className={cn(
-                          "flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors",
+                          "flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-0 hover:scale-[1.02]",
                           currentPack?.id === pack.id
                             ? "bg-muted text-foreground"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                            : "text-muted-foreground hover:text-foreground",
                         )}
                       >
                         <FolderKanban className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{pack.name}</span>
+                        <span className="truncate" title={pack.name}>
+                          {pack.name}
+                        </span>
                       </Link>
                     ))}
                     <div className="border-t border-border mt-1 pt-1">
@@ -354,7 +360,7 @@ export function Sidebar() {
                           setPackDropdownOpen(false);
                           router.push("/packs/new");
                         }}
-                        className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium text-primary hover:bg-muted"
+                        className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium text-primary  "
                       >
                         <Plus className="h-4 w-4 shrink-0" />
                         New pack
@@ -368,7 +374,7 @@ export function Sidebar() {
               type="button"
               onClick={toggleCollapsed}
               title="Collapse sidebar"
-              className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors"
+              className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all focus-visible:outline-none focus-visible:ring-0 hover:scale-[1.02]"
             >
               <MenuCollapse className="h-5 w-5" />
             </button>
@@ -557,7 +563,7 @@ export function Sidebar() {
           onClick={() => logout()}
           title="Sign out"
           className={cn(
-            "flex items-center rounded-xl text-sm font-medium transition-all duration-200 w-full",
+            "flex items-center rounded-xl text-sm font-medium transition-all duration-200 w-full focus-visible:outline-none focus-visible:ring-0 hover:scale-[1.02]",
             collapsed
               ? "justify-center gap-0 px-2 py-2.5"
               : "gap-3 px-3 py-2.5",

@@ -61,6 +61,19 @@ export const auth = {
   logout() {
     if (typeof window !== "undefined") localStorage.removeItem("klarnow_token");
   },
+  async deleteAccount() {
+    await api(`${AUTH_PREFIX}/account`, { method: "DELETE" });
+    if (typeof window !== "undefined") localStorage.removeItem("klarnow_token");
+  },
+  async changePassword(currentPassword: string, newPassword: string) {
+    await api(`${AUTH_PREFIX}/change-password`, {
+      method: "POST",
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    });
+  },
   getToken,
   isAuthenticated(): boolean {
     return !!getToken();

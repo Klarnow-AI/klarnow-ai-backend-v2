@@ -25,7 +25,13 @@ const USP_CATEGORIES = [
 type Day0StepConfig =
   | { key: "has_existing_brand"; label: string; required: true; type: "choice" }
   | { key: "brand_url"; label: string; required: true; type: "url" }
-  | { key: string; label: string; placeholder?: string; required?: boolean; type: "input" | "select" | "textarea" };
+  | {
+      key: string;
+      label: string;
+      placeholder?: string;
+      required?: boolean;
+      type: "input" | "select" | "textarea";
+    };
 
 const STEP_CHOICE: Day0StepConfig = {
   key: "has_existing_brand",
@@ -86,7 +92,10 @@ const DAY0_STEPS_AFTER_CHOICE: Day0StepConfig[] = [
   },
 ];
 
-function getStepValue(stepConfig: Day0StepConfig, values: Record<string, string>): string {
+function getStepValue(
+  stepConfig: Day0StepConfig,
+  values: Record<string, string>,
+): string {
   const key = stepConfig.key;
   if (key === "has_existing_brand") return values.has_existing_brand ?? "";
   if (key === "brand_url") return values.brand_url ?? "";
@@ -127,18 +136,24 @@ export function Day0Modal({
     proof_text: "",
   });
   const [input, setInput] = useState("");
-  const [extractedBrandData, setExtractedBrandData] = useState<ExtractBrandResponse | null>(null);
+  const [extractedBrandData, setExtractedBrandData] =
+    useState<ExtractBrandResponse | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const hasExistingBrand = values.has_existing_brand === "yes";
   const steps = useMemo<Day0StepConfig[]>(
-    () => [STEP_CHOICE, ...(hasExistingBrand ? [STEP_WEBSITE_URL] : []), ...DAY0_STEPS_AFTER_CHOICE],
+    () => [
+      STEP_CHOICE,
+      ...(hasExistingBrand ? [STEP_WEBSITE_URL] : []),
+      ...DAY0_STEPS_AFTER_CHOICE,
+    ],
     [hasExistingBrand],
   );
   const totalSteps = steps.length;
   const currentStep = steps[step];
   const isLastStep = step === totalSteps - 1;
-  const progressPercent = totalSteps > 0 ? Math.round(((step + 1) / totalSteps) * 100) : 0;
+  const progressPercent =
+    totalSteps > 0 ? Math.round(((step + 1) / totalSteps) * 100) : 0;
 
   useEffect(() => {
     if (!open || !packId) return;
@@ -150,8 +165,12 @@ export function Day0Modal({
         setPack(p);
         setSprintId(s?.id ?? null);
         const oa = p.onboarding_answers || {};
-        const existingBrand = (typeof oa.has_existing_brand === "string" ? oa.has_existing_brand : "") as string;
-        const brandUrl = (typeof oa.brand_url === "string" ? oa.brand_url : "") as string;
+        const existingBrand = (
+          typeof oa.has_existing_brand === "string" ? oa.has_existing_brand : ""
+        ) as string;
+        const brandUrl = (
+          typeof oa.brand_url === "string" ? oa.brand_url : ""
+        ) as string;
         setValues({
           has_existing_brand: existingBrand,
           brand_url: brandUrl,
@@ -212,7 +231,7 @@ export function Day0Modal({
       setError(
         currentStep.type === "choice"
           ? "Please choose an option"
-          : `Please enter ${currentStep.label.toLowerCase()}`
+          : `Please enter ${currentStep.label.toLowerCase()}`,
       );
       return;
     }
@@ -282,11 +301,19 @@ export function Day0Modal({
         usp_proof: nextValues.usp_proof?.trim() || undefined,
         proof_text: nextValues.proof_text?.trim() || undefined,
       };
-      if (nextValues.has_existing_brand === "yes" || nextValues.has_existing_brand === "no") {
-        const oa: Record<string, string> = { has_existing_brand: nextValues.has_existing_brand };
-        if (nextValues.brand_name?.trim()) oa.brand_name = nextValues.brand_name.trim();
-        if (nextValues.primary_cta?.trim()) oa.primary_cta = nextValues.primary_cta.trim();
-        if (nextValues.usp_statement?.trim()) oa.usp_statement = nextValues.usp_statement.trim();
+      if (
+        nextValues.has_existing_brand === "yes" ||
+        nextValues.has_existing_brand === "no"
+      ) {
+        const oa: Record<string, string> = {
+          has_existing_brand: nextValues.has_existing_brand,
+        };
+        if (nextValues.brand_name?.trim())
+          oa.brand_name = nextValues.brand_name.trim();
+        if (nextValues.primary_cta?.trim())
+          oa.primary_cta = nextValues.primary_cta.trim();
+        if (nextValues.usp_statement?.trim())
+          oa.usp_statement = nextValues.usp_statement.trim();
         patchBody.onboarding_answers = oa;
       }
       const updated = await packs.patch(packId, patchBody);
@@ -305,7 +332,7 @@ export function Day0Modal({
           setError(
             completeErr instanceof Error
               ? completeErr.message
-              : "Day 0 saved but generating Brand OS failed. Try again from the pack."
+              : "Day 0 saved but generating Brand OS failed. Try again from the pack.",
           );
           return;
         }
@@ -442,29 +469,30 @@ export function Day0Modal({
                               labelNo="No, new brand"
                             />
                           )}
-                          {currentStep.type === "url" && currentStep.key === "brand_url" && (
-                            <SearchInput
-                              type="text"
-                              placeholder="e.g. example.com"
-                              value={input}
-                              onChange={(e) => setInput(e.target.value)}
-                              disabled={saving}
-                              aria-label="Website URL"
-                              rightAdornment={
-                                <Button
-                                  type="submit"
-                                  disabled={saving || !input.trim()}
-                                  size="md"
-                                >
-                                  {saving ? (
-                                    <Spinner className="h-5 w-5" />
-                                  ) : (
-                                    <ChevronRight className="h-5 w-5" />
-                                  )}
-                                </Button>
-                              }
-                            />
-                          )}
+                          {currentStep.type === "url" &&
+                            currentStep.key === "brand_url" && (
+                              <SearchInput
+                                type="text"
+                                placeholder="e.g. example.com"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                disabled={saving}
+                                aria-label="Website URL"
+                                rightAdornment={
+                                  <Button
+                                    type="submit"
+                                    disabled={saving || !input.trim()}
+                                    size="md"
+                                  >
+                                    {saving ? (
+                                      <Spinner className="h-5 w-5" />
+                                    ) : (
+                                      <ChevronRight className="h-5 w-5" />
+                                    )}
+                                  </Button>
+                                }
+                              />
+                            )}
                           {currentStep.type === "input" && (
                             <SearchInput
                               placeholder={currentStep.placeholder}
@@ -496,7 +524,7 @@ export function Day0Modal({
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 disabled={saving}
-                                className="w-full rounded-full border border-border bg-card px-5 py-4 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
+                                className="w-full rounded-full border border-border bg-card px-5 py-4 text-base text-foreground transition-all focus:outline-none focus:scale-[1.02]"
                                 aria-label={currentStep.label}
                               >
                                 <option value="">Select…</option>
@@ -530,7 +558,7 @@ export function Day0Modal({
                                 onChange={(e) => setInput(e.target.value)}
                                 disabled={saving}
                                 placeholder={currentStep.placeholder}
-                                className="w-full min-h-[100px] rounded-2xl border border-border bg-card px-5 py-4 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 resize-y"
+                                className="w-full min-h-[100px] rounded-2xl border border-border bg-card px-5 py-4 text-base text-foreground placeholder:text-muted-foreground transition-all focus:outline-none focus:scale-[1.02] resize-y"
                                 aria-label={currentStep.label}
                               />
                               <Button
@@ -563,7 +591,6 @@ export function Day0Modal({
                     {error}
                   </p>
                 )}
-
               </>
             )}
           </div>

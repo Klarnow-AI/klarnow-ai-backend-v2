@@ -8,6 +8,10 @@ export type FollowUpTaskRead = {
   due_date: string;
   status: string;
   message_template: string;
+  template_key?: string | null;
+  channel?: string | null;
+  lead_name?: string | null;
+  last_interaction_summary?: string | null;
   created_at: string;
   completed_at: string | null;
 };

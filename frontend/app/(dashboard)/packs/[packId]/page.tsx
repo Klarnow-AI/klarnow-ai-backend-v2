@@ -39,10 +39,7 @@ function getStageLabel(stage: string | undefined): string {
 }
 
 /** Fixed pack summary cards — no add/remove. */
-const PACK_SUMMARY_CARDS: string[] = [
-  "brand_os",
-  "plan_tracker",
-];
+const PACK_SUMMARY_CARDS: string[] = ["brand_os", "plan_tracker"];
 
 const PACK_OVERVIEW_MODULES: Record<
   string,
@@ -310,7 +307,10 @@ export default function PackOverviewPage() {
     ReturnType<typeof me.getNextAction>
   > | null>(null);
 
-  const summaryFetcher = useCallback(() => packsApi.getSummary(packId), [packId]);
+  const summaryFetcher = useCallback(
+    () => packsApi.getSummary(packId),
+    [packId],
+  );
   const {
     data: summary,
     isLoading: loading,
@@ -409,109 +409,119 @@ export default function PackOverviewPage() {
       <div className="flex flex-1 min-h-0 gap-6 overflow-hidden">
         <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden max-w-6xl">
           <div className="flex-1 min-h-0 overflow-y-auto flex flex-col space-y-8">
-          {pack.core_concept && (
-            <motion.section
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.02 }}
-              className="shrink-0 rounded-2xl border border-border/60 bg-muted/30 px-5 py-4"
-            >
-              <p className="text-sm text-foreground/90 leading-relaxed">
-                {pack.core_concept}
-              </p>
-            </motion.section>
-          )}
+            {pack.core_concept && (
+              <motion.section
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.02 }}
+                className="shrink-0 rounded-2xl border border-border/60 bg-muted/30 px-5 py-4"
+              >
+                <p className="text-sm text-foreground/90 leading-relaxed">
+                  {pack.core_concept}
+                </p>
+              </motion.section>
+            )}
 
-          {hasNextStep && (
-            <motion.section
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.04 }}
-              className="shrink-0 space-y-3"
-            >
-              <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                What to do next
-              </h2>
-              <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-                {nextAction?.actionText && (
-                  <div className="px-5 py-4 border-b border-border space-y-2">
-                    <p className="text-sm font-medium text-foreground">
-                      {nextAction.actionText}
-                    </p>
-                    {nextAction.whyItMatters && (
-                      <p className="text-xs text-muted-foreground">
-                        {nextAction.whyItMatters}
+            {hasNextStep && (
+              <motion.section
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.04 }}
+                className="shrink-0 space-y-3"
+              >
+                <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  What to do next
+                </h2>
+                <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+                  {nextAction?.actionText && (
+                    <div className="px-5 py-4 border-b border-border space-y-2">
+                      <p className="text-sm font-medium text-foreground">
+                        {nextAction.actionText}
                       </p>
-                    )}
-                    {(nextAction.timeEstimate || nextAction.progressCounters) && (
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                        {nextAction.timeEstimate && (
-                          <span>{nextAction.timeEstimate}</span>
-                        )}
-                        {nextAction.progressCounters && Object.entries(nextAction.progressCounters).map(([k, v]) => (
-                          <span key={k}>{k}: {v}</span>
-                        ))}
-                      </div>
-                    )}
-                    {nextAction.blockerMessage && (
-                      <p
-                        className="text-xs text-amber-600 dark:text-amber-400"
-                        role="alert"
-                      >
-                        {nextAction.blockerMessage}
-                      </p>
+                      {nextAction.whyItMatters && (
+                        <p className="text-xs text-muted-foreground">
+                          {nextAction.whyItMatters}
+                        </p>
+                      )}
+                      {(nextAction.timeEstimate ||
+                        nextAction.progressCounters) && (
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                          {nextAction.timeEstimate && (
+                            <span>{nextAction.timeEstimate}</span>
+                          )}
+                          {nextAction.progressCounters &&
+                            Object.entries(nextAction.progressCounters).map(
+                              ([k, v]) => (
+                                <span key={k}>
+                                  {k}: {v}
+                                </span>
+                              ),
+                            )}
+                        </div>
+                      )}
+                      {nextAction.blockerMessage && (
+                        <p
+                          className="text-xs text-amber-600 dark:text-amber-400"
+                          role="alert"
+                        >
+                          {nextAction.blockerMessage}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  <div className="divide-y divide-border">
+                    {chips.map((chip, i) =>
+                      chip.href ? (
+                        <Link
+                          key={i}
+                          href={chip.href}
+                          className="flex items-center justify-between gap-3 px-5 py-3 text-sm hover:bg-muted/40 transition-colors"
+                        >
+                          <span className="font-medium truncate">
+                            {chip.label}
+                          </span>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        </Link>
+                      ) : null,
                     )}
                   </div>
-                )}
-                <div className="divide-y divide-border">
-                  {chips.map((chip, i) =>
-                    chip.href ? (
-                      <Link
-                        key={i}
-                        href={chip.href}
-                        className="flex items-center justify-between gap-3 px-5 py-3 text-sm hover:bg-muted/40 transition-colors"
-                      >
-                        <span className="font-medium truncate">
-                          {chip.label}
-                        </span>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      </Link>
-                    ) : null,
-                  )}
                 </div>
+              </motion.section>
+            )}
+
+            <motion.section
+              variants={container}
+              initial="hidden"
+              animate="visible"
+              className="flex flex-1 min-h-0 flex flex-col space-y-3"
+            >
+              <h2 className="shrink-0 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Pack summary
+              </h2>
+              <div className="grid flex-1 min-h-0 grid-cols-2 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
+                {PACK_SUMMARY_CARDS.map((moduleKey, index) => {
+                  const mod = PACK_OVERVIEW_MODULES[moduleKey];
+                  if (!mod) return null;
+                  const isThird = index === 2;
+                  return (
+                    <SummarySection
+                      key={moduleKey}
+                      title={mod.title}
+                      href={
+                        mod.getHref
+                          ? mod.getHref(packId)
+                          : `/packs/${packId}${mod.hrefSuffix}`
+                      }
+                      icon={mod.icon}
+                      emptyMessage={mod.emptyMessage}
+                      className={isThird ? "col-span-2" : undefined}
+                    >
+                      {mod.getContent(summary)}
+                    </SummarySection>
+                  );
+                })}
               </div>
             </motion.section>
-          )}
-
-          <motion.section
-            variants={container}
-            initial="hidden"
-            animate="visible"
-            className="flex flex-1 min-h-0 flex flex-col space-y-3"
-          >
-            <h2 className="shrink-0 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Pack summary
-            </h2>
-            <div className="grid flex-1 min-h-0 grid-cols-2 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
-              {PACK_SUMMARY_CARDS.map((moduleKey, index) => {
-                const mod = PACK_OVERVIEW_MODULES[moduleKey];
-                if (!mod) return null;
-                const isThird = index === 2;
-                return (
-                  <SummarySection
-                    key={moduleKey}
-                    title={mod.title}
-                    href={mod.getHref ? mod.getHref(packId) : `/packs/${packId}${mod.hrefSuffix}`}
-                    icon={mod.icon}
-                    emptyMessage={mod.emptyMessage}
-                    className={isThird ? "col-span-2" : undefined}
-                  >
-                    {mod.getContent(summary)}
-                  </SummarySection>
-                );
-              })}
-            </div>
-          </motion.section>
           </div>
         </div>
 

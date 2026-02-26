@@ -27,6 +27,7 @@ class CampaignUpdate(BaseModel):
     goal: GoalSchema | None = None
     angles: list | None = None
     active_angle_id: str | None = None
+    is_active: bool | None = None
 
     model_config = {"extra": "forbid"}
 

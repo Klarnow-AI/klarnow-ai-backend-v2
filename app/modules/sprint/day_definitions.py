@@ -406,3 +406,52 @@ def get_day_content(day_number: int, mode: str) -> DayContent:
         return day_def["improve_mode"]
     
     return day_def["build_mode"]
+
+
+USP_CATEGORY_OPTIONS = [
+    "Faster",
+    "More reliable",
+    "Better quality",
+    "More specialised",
+    "Better experience",
+    "Better value",
+    "Other",
+]
+
+DAY_CONVERSATION_STEPS: dict[int, list[dict]] = {
+    0: [
+        {"key": "has_existing_brand", "label": "Is this an existing brand?", "input_type": "choice"},
+        {"key": "brand_url", "label": "Enter your website URL", "if_has_brand": True, "input_type": "input", "placeholder": "e.g. https://example.com"},
+        {"key": "brand_name", "label": "What's your brand name?", "input_type": "input", "placeholder": "e.g. Acme Co"},
+        {"key": "primary_cta", "label": "What's your primary call-to-action?", "input_type": "input", "placeholder": "e.g. Book a call"},
+        {"key": "usp_category", "label": "Which USP category fits you best?", "input_type": "choice", "options": USP_CATEGORY_OPTIONS},
+        {"key": "usp_statement", "label": "Why choose you over the obvious alternatives?", "input_type": "input", "placeholder": "e.g. We deliver in half the time"},
+        {"key": "usp_proof", "label": "What proof point makes that true? (optional)", "input_type": "input", "placeholder": "e.g. 200+ projects delivered on time"},
+        {"key": "proof_text", "label": "Any additional proof or testimonials? (optional)", "input_type": "textarea", "placeholder": "Additional proof or testimonials"},
+    ],
+    1: [
+        {"key": "offer_one_liner", "label": "What's your offer in one sentence?", "input_type": "input", "placeholder": "e.g. We help busy founders launch in 30 days"},
+    ],
+    2: [
+        {"key": "primary_pain", "label": "What's the primary pain point?", "input_type": "input", "placeholder": "e.g. Lack of time to focus on growth"},
+        {"key": "primary_outcome", "label": "What's the primary outcome?", "input_type": "input", "placeholder": "e.g. 2x revenue in 90 days"},
+    ],
+    3: [
+        {"key": "pitch_script", "label": "Write your pitch script (under 60 seconds)", "input_type": "textarea", "placeholder": "Hi [Name], I help [who] with [problem]..."},
+        {"key": "voice_notes_sent", "label": "Have you sent 3 voice notes?", "input_type": "choice", "options": ["Yes", "Not yet"]},
+    ],
+}
+
+
+def get_day_conversation_steps(day_number: int) -> list[dict]:
+    """Get conversation step labels and keys for Day 0–3."""
+    return DAY_CONVERSATION_STEPS.get(day_number, [])
+
+
+def get_step_by_field_key(day_number: int, field_key: str) -> dict | None:
+    """Get step config for a field_key within a day. Returns None if not found."""
+    steps = DAY_CONVERSATION_STEPS.get(day_number, [])
+    for s in steps:
+        if s.get("key") == field_key:
+            return s
+    return None

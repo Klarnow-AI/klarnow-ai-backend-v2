@@ -49,3 +49,9 @@ class LandingCompleteBody(BaseModel):
 class LandingCompleteResponse(BaseModel):
     pack_id: str
     redirect: str
+
+
+class ProfileResponse(BaseModel):
+    email: str
+    created_at: str  # ISO datetime
+    last_activity_at: str | None  # ISO datetime or None

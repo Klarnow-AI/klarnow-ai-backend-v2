@@ -15,7 +15,10 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { Lead } from "@/types/api-types";
 
-const STAGE_ICON: Record<string, React.ComponentType<{ className?: string; size?: number }>> = {
+const STAGE_ICON: Record<
+  string,
+  React.ComponentType<{ className?: string; size?: number }>
+> = {
   contacted: Mail,
   drafting: FileText,
   proposal: Receipt,
@@ -45,18 +48,17 @@ type KanbanCardProps = {
   onEdit?: (lead: Lead) => void;
 };
 
-export function KanbanCard({ lead, assigneeLabel = "You", onEdit }: KanbanCardProps) {
+export function KanbanCard({
+  lead,
+  assigneeLabel = "You",
+  onEdit,
+}: KanbanCardProps) {
   const Icon = getLeadIcon(lead);
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    isDragging,
-  } = useDraggable({
-    id: lead.id,
-    data: { lead, type: "card" },
-  });
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: lead.id,
+      data: { lead, type: "card" },
+    });
 
   const style = transform
     ? { transform: CSS.Translate.toString(transform) }
@@ -73,7 +75,7 @@ export function KanbanCard({ lead, assigneeLabel = "You", onEdit }: KanbanCardPr
         "cursor-grab active:cursor-grabbing rounded-xl border border-border bg-card p-4 shadow-sm transition-shadow",
         "hover:shadow-md",
         isDragging && "opacity-90 shadow-lg ring-2 ring-primary/20",
-        lead.urgency === "high" && "border-l-4 border-l-destructive"
+        lead.urgency === "high" && "border-l-4 border-l-destructive",
       )}
       {...attributes}
       {...listeners}

@@ -60,6 +60,9 @@ import {
   StarIcon,
   LockIcon,
   Notification01Icon,
+  Idea01Icon,
+  Search01Icon,
+  ShoppingBag01Icon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 
@@ -142,3 +145,6 @@ export const Pencil = createIcon(PencilEdit01Icon, "Pencil");
 export const Star = createIcon(StarIcon, "Star");
 export const Lock = createIcon(LockIcon, "Lock");
 export const Bell = createIcon(Notification01Icon, "Bell");
+export const Lightbulb = createIcon(Idea01Icon, "Lightbulb");
+export const Search = createIcon(Search01Icon, "Search");
+export const ShoppingBag = createIcon(ShoppingBag01Icon, "ShoppingBag");

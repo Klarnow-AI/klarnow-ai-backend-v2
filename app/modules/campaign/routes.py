@@ -15,6 +15,7 @@ from app.modules.campaign.services import (
     get_active_for_pack,
     update_campaign,
     regenerate_campaign,
+    set_campaign_active_for_pack,
 )
 
 router = APIRouter()
@@ -67,12 +68,17 @@ def update_campaign_route(
     db=Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update campaign (goal, CTA, angles, active angle). Governance: one CTA, no revenue guarantees."""
+    """Update campaign (goal, CTA, angles, active angle, is_active). Governance: one CTA, no revenue guarantees."""
     _ensure_pack_access(db, pack_id, current_user.id)
+    data = body.model_dump(exclude_unset=True)
+    if "is_active" in data:
+        result = set_campaign_active_for_pack(db, pack_id, data["is_active"])
+        if not result:
+            raise NotFoundError("Campaign not found")
+        return CampaignRead.model_validate(result)
     campaign = get_active_for_pack(db, pack_id)
     if not campaign:
         raise NotFoundError("Campaign not found")
-    data = body.model_dump(exclude_unset=True)
     goal_dict = data.get("goal")  # already dict from model_dump
     updated = update_campaign(
         db,

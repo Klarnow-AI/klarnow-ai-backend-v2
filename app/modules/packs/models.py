@@ -29,6 +29,8 @@ class User(Base):
     # Stripe Connect: one connected account per user for invoicing
     stripe_connect_account_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     stripe_connect_onboarding_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Inactivity recovery: when set, Next Action may show "Restart" or "Simplify offer"
+    last_activity_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     packs: Mapped[list["Pack"]] = relationship(
         "Pack", back_populates="created_by_user", cascade="all, delete-orphan"
