@@ -52,6 +52,15 @@ API: `http://localhost:8000`. Docs: `http://localhost:8000/docs`. Health: `http:
 
 See [.env.example](.env.example). Required: `DATABASE_URL`, `SECRET_KEY`. Optional: Resend, S3, OpenAI for later phases.
 
+### Published website builder sites (subdomain URLs)
+
+To serve published sites at brand-name subdomains (e.g. `acme.klarnow.ai`) instead of path-based URLs:
+
+- **Staging:** Set `SITES_DOMAIN=staging.klarnow.ai` in the staging environment. Published URLs will be `{brand-slug}.staging.klarnow.ai`.
+- **Production:** Set `SITES_DOMAIN=klarnow.ai` (or `sites.klarnow.ai`) for URLs like `{brand-slug}.klarnow.ai`.
+
+**Infrastructure:** Configure wildcard DNS (A or CNAME record) for `*.staging.klarnow.ai` and `*.klarnow.ai` pointing to the same backend. Ensure the load balancer or reverse proxy forwards the `Host` header so the subdomain router can resolve the correct site.
+
 ## Documentation
 
 - [docs/INSTRUCTIONS.md](docs/INSTRUCTIONS.md) – Implementation instructions (e.g. who runs migrations).

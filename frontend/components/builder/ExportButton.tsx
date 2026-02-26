@@ -11,6 +11,7 @@ export function ExportButton() {
   const projectId = useProjectStore((s) => s.projectId);
   const liveUrl = useProjectStore((s) => s.liveUrl);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isUnpublishing, setIsUnpublishing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,6 +26,20 @@ export function ExportButton() {
       setError(err instanceof Error ? err.message : "Publish failed");
     } finally {
       setIsPublishing(false);
+    }
+  }, [projectId]);
+
+  const handleUnpublish = useCallback(async () => {
+    if (!projectId) return;
+    setIsUnpublishing(true);
+    setError(null);
+    try {
+      await builder.unpublish(projectId);
+      useProjectStore.getState().setLiveUrl(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unpublish failed");
+    } finally {
+      setIsUnpublishing(false);
     }
   }, [projectId]);
 
@@ -63,6 +78,13 @@ export function ExportButton() {
             className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isPublishing ? "Updating..." : "Republish"}
+          </button>
+          <button
+            onClick={handleUnpublish}
+            disabled={isUnpublishing}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {isUnpublishing ? "Unpublishing..." : "Unpublish"}
           </button>
         </>
       ) : (

@@ -31,6 +31,9 @@ export const builder = {
   publish: (id: string) =>
     api<BuilderProject>(`${PREFIX}/${id}/publish`, { method: "POST" }),
 
+  unpublish: (id: string) =>
+    api<BuilderProject>(`${PREFIX}/${id}/unpublish`, { method: "POST" }),
+
   list: () => api<BuilderProjectList>(PREFIX),
 
   delete: (id: string) =>

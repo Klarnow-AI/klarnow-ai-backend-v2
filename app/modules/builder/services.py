@@ -192,6 +192,17 @@ def publish(db: Session, project: BuilderProject, live_url: str) -> BuilderProje
     return project
 
 
+@log_service_action()
+def unpublish(db: Session, project: BuilderProject) -> BuilderProject:
+    """Clear live_url, published_at, and subdomain_slug so the site is no longer served."""
+    project.live_url = None
+    project.published_at = None
+    project.subdomain_slug = None
+    db.commit()
+    db.refresh(project)
+    return project
+
+
 def get_published(db: Session, project_id: UUID) -> BuilderProject | None:
     """Fetch a project by ID only if it has been published (no user auth required)."""
     return (

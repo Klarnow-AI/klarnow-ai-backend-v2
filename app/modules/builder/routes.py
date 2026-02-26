@@ -27,6 +27,7 @@ from app.modules.builder.services import (
     update,
     delete,
     publish,
+    unpublish,
     get_published,
     build_deploy_html,
     slug_from_name,
@@ -151,6 +152,20 @@ def publish_project(
     else:
         live_url = str(request.base_url).rstrip("/") + f"/p/{project_id}"
     project = publish(db, project, live_url)
+    return BuilderProjectRead.model_validate(project)
+
+
+@router.post("/projects/{project_id}/unpublish", response_model=BuilderProjectRead)
+def unpublish_project(
+    project_id: UUID,
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Unpublish a builder project. Clears live_url and subdomain; site will 404 until republished."""
+    project = get_by_id(db, project_id, current_user.id)
+    if not project:
+        raise NotFoundError("Builder project not found")
+    project = unpublish(db, project)
     return BuilderProjectRead.model_validate(project)
 
 

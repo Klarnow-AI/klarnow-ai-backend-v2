@@ -280,6 +280,7 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
   const [actionsExpanded, setActionsExpanded] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isUnpublishing, setIsUnpublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
 
   // Tracks which message index → version number (local only, not synced)
@@ -616,6 +617,20 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
     }
   }, [projectId]);
 
+  const handleUnpublish = useCallback(async () => {
+    if (!projectId) return;
+    setIsUnpublishing(true);
+    setPublishError(null);
+    try {
+      await builder.unpublish(projectId);
+      useProjectStore.getState().setLiveUrl(null);
+    } catch (err) {
+      setPublishError(err instanceof Error ? err.message : "Unpublish failed");
+    } finally {
+      setIsUnpublishing(false);
+    }
+  }, [projectId]);
+
   // ── Derived values ────────────────────────────────────────────────────────
 
   const contextActions = getContextActions(files);
@@ -852,6 +867,17 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
                     <Globe className="w-3 h-3" />
                   )}
                   {isPublishing ? "Updating…" : "Republish"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUnpublish}
+                  disabled={isUnpublishing || isStreaming}
+                  className="flex-shrink-0 flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-transparent hover:bg-accent/50 border border-border/50 rounded-lg px-2.5 py-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isUnpublishing ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : null}
+                  {isUnpublishing ? "Unpublishing…" : "Unpublish"}
                 </button>
               </>
             ) : (
