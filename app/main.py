@@ -44,15 +44,12 @@ app = FastAPI(
 )
 
 settings = get_settings()
-# In development, always allow localhost frontend; avoid empty allow_origins
-_dev_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
-_cors_origins = [settings.frontend_url] if settings.frontend_url else []
-if settings.app_env == "development":
-    _cors_origins = list(dict.fromkeys([*_cors_origins, *_dev_origins]))
+# Allow all origins; credentials=False required when using allow_origins=["*"]
+# Auth uses Bearer token in Authorization header (not cookies), so this is fine
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins if _cors_origins else _dev_origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
