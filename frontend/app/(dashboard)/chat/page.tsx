@@ -414,18 +414,18 @@ export default function ChatPage() {
         ref={containerRef}
         className="flex-1 flex flex-col min-h-0 lg:items-center overflow-y-auto"
       >
-        <div className="flex-1 lg:relative lg:top-[0%] lg:items-center   lg:translate-y-[0%] lg:w-[840px] fixed top-[50%] w-[100vw]  lg:w-auto px-[18px]  left-[0px] translate-y-[-50%]  flex flex-col min-h-screen justify-center items-center">
-          <div className="w-[100vw] lg:w-[840px] lg:px-0 px-[18px] lg:fixed top-[0px] ">
+        <div className="flex-1 lg:relative lg:top-[0%] lg:items-center lg:translate-y-[0%] w-[100vw] lg:w-[840px] px-[18px] left-[0px] translate-y-[-50%] flex flex-col min-h-screen justify-center items-center fixed top-[50%]">
+          <div className="w-full px-[18px] lg:px-0 lg:fixed top-[0px]">
             <NextActionBanner nextAction={nextAction} />
           </div>
-          <div className="max-w-4xl w-full flex flex-col  items-center text-center">
+          <div className="w-full max-w-[840px] flex flex-col items-center text-center mx-auto">
             {messages.length === 0 && !loading && (
-              <h2 className="text-3xl font-[600] text-foreground max-w-lg mx-auto mb-6">
+              <h2 className="text-4xl font-[600] text-foreground max-w-lg mx-auto mb-6">
                 What are we shipping today?
               </h2>
             )}
             {messages.length > 0 && (
-              <div className="w-full max-w-4xl mx-auto flex flex-col items-start text-left mb-6">
+              <div className="w-full max-w-[840px] mx-auto flex flex-col items-start text-left mb-6">
                 <ChatMessageList
                   messages={messages}
                   streamingContent={streamingContent}
@@ -435,7 +435,7 @@ export default function ChatPage() {
               </div>
             )}
             {isMobile ? (
-              <div className="w-full max-w-4xl mx-auto">
+              <div className="w-full max-w-[840px] mx-auto">
                 <ChatInputBlock
                   input={input}
                   onChange={setInput}
@@ -509,7 +509,7 @@ export default function ChatPage() {
     <div ref={containerRef} className="flex-1 flex flex-col min-h-0 w-full">
       <NextActionBanner nextAction={nextAction} />
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="w-full max-w-4xl mx-auto flex flex-col items-start text-left">
+        <div className="w-full max-w-[840px] mx-auto flex flex-col items-start text-left">
           <ChatMessageList
             messages={messages}
             streamingContent={streamingContent}
@@ -519,7 +519,7 @@ export default function ChatPage() {
         </div>
       </div>
       <div className="shrink-0">
-        <div className="max-w-4xl mx-auto flex items-center gap-2">
+        <div className="w-full max-w-[840px] mx-auto flex items-center gap-2">
           {isMobile ? (
             <div className="w-full">
               <ChatInputBlock

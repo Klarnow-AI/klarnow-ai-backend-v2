@@ -50,7 +50,7 @@ export function ChatInputBlock({
 }: ChatInputBlockProps) {
   const inputPlaceholder = questionContext?.input_placeholder ?? "Type your message to Klaro…";
   return (
-    <div className="w-full max-w-4xl mx-auto flex flex-col items-center text-center">
+    <div className="w-full max-w-[840px] mx-auto flex flex-col items-center text-center">
       {dayContext && (
         <div className="mb-2 flex items-center justify-center gap-2 text-sm text-muted-foreground w-full">
           <Target className="h-4 w-4 shrink-0" />
