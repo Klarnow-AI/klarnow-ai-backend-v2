@@ -41,7 +41,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           </div>
           <main
             className={cn(
-              "flex-1 flex flex-col min-h-0 overflow-hidden p-[16px] lg:p-0 lg:pb-0",
+              "flex-1 flex flex-col min-h-0 overflow-hidden p-[16px] lg:p-6",
               !hideMobileNav &&
                 "pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]",
             )}
