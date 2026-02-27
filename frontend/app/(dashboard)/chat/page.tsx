@@ -412,13 +412,15 @@ export default function ChatPage() {
     return (
       <div
         ref={containerRef}
-        className="flex-1 flex flex-col min-h-0 overflow-y-auto"
+        className="flex-1 flex flex-col min-h-0 lg:items-center overflow-y-auto"
       >
-        <NextActionBanner nextAction={nextAction} />
-        <div className="flex-1 flex flex-col min-h-0 justify-center items-center">
-          <div className="max-w-4xl w-full flex flex-col items-center text-center">
+        <div className="flex-1 lg:relative lg:top-[0%] lg:items-center   lg:translate-y-[0%] lg:w-[840px] fixed top-[50%] w-[100vw]  lg:w-auto px-[18px]  left-[0px] translate-y-[-50%]  flex flex-col min-h-screen justify-center items-center">
+          <div className="w-[100vw] lg:w-[840px] lg:px-0 px-[18px] lg:fixed top-[0px] ">
+            <NextActionBanner nextAction={nextAction} />
+          </div>
+          <div className="max-w-4xl w-full flex flex-col  items-center text-center">
             {messages.length === 0 && !loading && (
-              <h2 className="text-4xl  font-[600] text-foreground max-w-lg mx-auto mb-6">
+              <h2 className="text-3xl font-[600] text-foreground max-w-lg mx-auto mb-6">
                 What are we shipping today?
               </h2>
             )}
