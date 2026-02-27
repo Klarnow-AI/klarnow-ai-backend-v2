@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Image, Download, Trash2 } from "@/components/icons";
+import { patchPosterHtmlForImages } from "@/lib/poster-html";
 
 // Declare html2canvas loaded from CDN so TypeScript is happy
 declare global {
@@ -322,7 +323,9 @@ export function PosterPreviewPanel({
             }}
             // The generated HTML is a single root div (600×850, inline styles)
             // that fills this container exactly.
-            dangerouslySetInnerHTML={{ __html: currentPoster.code }}
+            dangerouslySetInnerHTML={{
+              __html: patchPosterHtmlForImages(currentPoster.code),
+            }}
           />
         ) : currentPoster ? (
           /* Legacy .tsx poster — render inside iframe with React + Tailwind CDN */

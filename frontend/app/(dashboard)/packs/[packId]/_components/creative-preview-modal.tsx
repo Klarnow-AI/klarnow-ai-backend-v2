@@ -20,6 +20,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { Dialog } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
 import { CreativeInput } from "./creative-input";
+import { patchPosterHtmlForImages } from "@/lib/poster-html";
 
 export type CreativePreviewAsset = {
   id?: string;
@@ -271,7 +272,9 @@ export function CreativePreviewModal({
                 boxSizing: "border-box",
                 transform: `scale(${scale})`,
               }}
-              dangerouslySetInnerHTML={{ __html: asset.code }}
+              dangerouslySetInnerHTML={{
+                __html: patchPosterHtmlForImages(asset.code),
+              }}
             />
           ) : (
             <div

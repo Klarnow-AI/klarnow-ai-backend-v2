@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { patchPosterHtmlForImages } from "@/lib/poster-html";
 import { Play } from "@/components/icons";
 
 const POSTER_WIDTH = 600;
@@ -36,7 +37,8 @@ function ThumbnailPreview({ code, name }: { code: string; name: string }) {
       const w = el.clientWidth;
       const h = el.clientHeight;
       if (w > 0 && h > 0) {
-        setScale(Math.min(w / POSTER_WIDTH, h / POSTER_HEIGHT));
+        const s = Math.min(w / POSTER_WIDTH, h / POSTER_HEIGHT);
+        setScale(Math.max(0.1, s));
       }
     };
     updateScale();
@@ -70,7 +72,7 @@ function ThumbnailPreview({ code, name }: { code: string; name: string }) {
           transform: `translate(-50%, -50%) scale(${scale})`,
           transformOrigin: "center center",
         }}
-        dangerouslySetInnerHTML={{ __html: code }}
+        dangerouslySetInnerHTML={{ __html: patchPosterHtmlForImages(code) }}
       />
     </div>
   );
