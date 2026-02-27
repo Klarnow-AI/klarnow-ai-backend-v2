@@ -81,7 +81,7 @@ export function PWAInstallOverlay() {
   if (
     !mounted ||
     !showOverlay ||
-    process.env.NEXT_PUBLIC_ENVIRONMENT !== "development"
+    process.env.NEXT_PUBLIC_ENVIRONMENT === "development"
   )
     return null;
 
