@@ -21,9 +21,15 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  // Bypass SW for subresources — lets images, fonts, etc. load natively.
+  // Fixes poster thumbnails and other images not loading in PWA.
+  const dest = event.request.destination;
+  if (dest && dest !== "document" && event.request.mode !== "navigate") {
+    return;
+  }
   event.respondWith(
     fetch(event.request)
       .then((response) => response)
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(event.request)),
   );
 });
