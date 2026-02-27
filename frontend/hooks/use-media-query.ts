@@ -29,3 +29,8 @@ export function useIsSidebarVisible(): boolean {
 export function useIsTabletOrLarger(): boolean {
   return useMediaQuery("(min-width: 768px)");
 }
+
+/** Matches viewport < 1024px (mobile/tablet - Tailwind lg breakpoint) */
+export function useIsMobile(): boolean {
+  return !useMediaQuery("(min-width: 1024px)");
+}

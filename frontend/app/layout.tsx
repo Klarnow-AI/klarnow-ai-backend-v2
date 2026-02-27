@@ -6,6 +6,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/auth-context";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { PWAProvider } from "@/components/pwa-provider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -54,9 +55,11 @@ export default function RootLayout({
         className={`${inter.variable} ${jetbrainsMono.variable} ${googleSansFlex.variable} font-sans min-h-screen antialiased`}
       >
         <ThemeProvider>
-          <ErrorBoundary>
-            <AuthProvider>{children}</AuthProvider>
-          </ErrorBoundary>
+          <PWAProvider>
+            <ErrorBoundary>
+              <AuthProvider>{children}</AuthProvider>
+            </ErrorBoundary>
+          </PWAProvider>
         </ThemeProvider>
         <Toaster position="bottom-right" richColors closeButton />
       </body>
