@@ -383,7 +383,7 @@ export function Day0Modal({
             </button>
             <h2
               id="day0-modal-title"
-              className="font-heading text-2xl font-bold text-foreground pr-10"
+              className="font-heading text-2xl  font-[600] text-foreground pr-10"
             >
               Day 0 setup
             </h2>

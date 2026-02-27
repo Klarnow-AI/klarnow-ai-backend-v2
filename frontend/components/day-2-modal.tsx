@@ -118,7 +118,8 @@ export function Day2Modal({
     }
   };
 
-  const isValid = primaryPain.trim().length > 0 && primaryOutcome.trim().length > 0;
+  const isValid =
+    primaryPain.trim().length > 0 && primaryOutcome.trim().length > 0;
 
   if (!open) return null;
 
@@ -150,12 +151,13 @@ export function Day2Modal({
             </button>
             <h2
               id="day2-modal-title"
-              className="font-heading text-2xl font-bold text-foreground pr-10"
+              className="font-heading text-2xl  font-[600] text-foreground pr-10"
             >
               Day 2: USP + Audience
             </h2>
             <p className="mt-3 text-sm text-muted-foreground">
-              Define the primary pain point your audience faces and the outcome they desire.
+              Define the primary pain point your audience faces and the outcome
+              they desire.
             </p>
 
             {loading ? (
@@ -204,7 +206,8 @@ export function Day2Modal({
                     />
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Example: &quot;Struggling to generate consistent leads for their business&quot;
+                    Example: &quot;Struggling to generate consistent leads for
+                    their business&quot;
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -241,16 +244,25 @@ export function Day2Modal({
                     />
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Example: &quot;A steady stream of qualified leads without paid ads&quot;
+                    Example: &quot;A steady stream of qualified leads without
+                    paid ads&quot;
                   </p>
                 </div>
                 {error && (
-                  <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                  <p
+                    className="text-sm text-red-600 dark:text-red-400"
+                    role="alert"
+                  >
                     {error}
                   </p>
                 )}
                 <div className="flex gap-2 pt-2">
-                  <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={saving}
+                  >
                     Cancel
                   </Button>
                   <Button type="submit" disabled={!isValid || saving}>

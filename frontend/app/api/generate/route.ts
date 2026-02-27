@@ -301,7 +301,7 @@ MINIMAL PATTERN GUIDE:
 - Cards: bg-white border border-gray-100 rounded-xl p-8 hover:shadow-md transition-all
 - Sections: py-24 px-6, containers max-w-6xl mx-auto
 - Accent: text-blue-600, bg-blue-600
-- Typography: font-black for h1 (4xl-6xl), font-bold for h2 (3xl-4xl), font-medium for body, tracking-tight for headings
+- Typography: font-black for h1 (4xl-6xl),  font-[600] for h2 (3xl-4xl), font-medium for body, tracking-tight for headings
 - Nav: bg-white/90 backdrop-blur border-b border-gray-100
 - Dividers: border border-gray-100 (subtle)
 - DO: lots of whitespace, clean grid, subtle shadows only on hover`,
@@ -324,7 +324,7 @@ DARK PATTERN GUIDE:
 PLAYFUL PATTERN GUIDE:
 - Palette: bg-gradient-to-br from-rose-50 to-purple-50 sections, white cards
 - Primary: pink-500, purple-500 — use both for gradients
-- Buttons: px-6 py-4 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-3xl hover:shadow-lg hover:shadow-pink-200/50 transition-all font-bold hover:-translate-y-0.5
+- Buttons: px-6 py-4 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-3xl hover:shadow-lg hover:shadow-pink-200/50 transition-all  font-[600] hover:-translate-y-0.5
 - Cards: bg-white rounded-3xl p-8 shadow-lg shadow-pink-100/50 hover:-translate-y-1 transition-all border-0
 - Fun elements: Emoji accents, colorful dots/blobs as decorative elements
 - Rounded everywhere: rounded-3xl on sections, rounded-2xl on cards, rounded-full on badges
@@ -355,7 +355,7 @@ LUXURY PATTERN GUIDE:
 - Cards: border border-white/10 rounded-sm p-10 — no heavy shadows
 - Decorative: thin gold lines (border-t border-amber-400/30), large serif-looking font weights (font-thin tracking-widest)
 - Section labels: uppercase tracking-widest text-amber-400/60 text-xs font-light mb-6
-- Typography: font-thin or font-extralight for body, font-bold for key statements, tracking-wider throughout
+- Typography: font-thin or font-extralight for body,  font-[600] for key statements, tracking-wider throughout
 - Whitespace: extremely generous — py-32 or py-40 for sections
 - NO: heavy gradients, many colors, playful elements. YES: restraint, elegance, gold accents`,
 
@@ -364,7 +364,7 @@ VIBRANT PATTERN GUIDE:
 - Palette: bold gradient backgrounds — from-purple-600 via-pink-600 to-orange-500 or from-blue-600 to-cyan-500
 - Text on gradients: text-white
 - Buttons primary: px-6 py-3 bg-yellow-400 text-black rounded-2xl hover:bg-yellow-300 transition-all font-black
-- Buttons secondary: px-6 py-3 bg-white/20 text-white rounded-2xl border border-white/30 hover:bg-white/30 transition-all font-bold backdrop-blur-sm
+- Buttons secondary: px-6 py-3 bg-white/20 text-white rounded-2xl border border-white/30 hover:bg-white/30 transition-all  font-[600] backdrop-blur-sm
 - Cards: bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20 hover:bg-white/20 transition-all
 - Gradient text: text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-300
 - Energy: bold font-black headings, large text, overlapping elements, diagonal sections
@@ -476,7 +476,7 @@ HERO — DARK VARIANT:
       One sentence value proposition that makes the transformation concrete and believable.
     </p>
     <div className="flex flex-col sm:flex-row gap-4 justify-center">
-      <button className="px-8 py-4 bg-violet-600 text-white font-bold rounded-xl hover:bg-violet-500 transition-all hover:scale-105 transform text-lg">Primary CTA</button>
+      <button className="px-8 py-4 bg-violet-600 text-white  font-[600] rounded-xl hover:bg-violet-500 transition-all hover:scale-105 transform text-lg">Primary CTA</button>
       <button className="px-8 py-4 bg-white/10 text-white font-semibold rounded-xl border border-white/20 hover:bg-white/20 transition-all text-lg">Secondary CTA</button>
     </div>
     <p className="text-sm text-white/40 mt-4">No credit card required • Cancel anytime</p>
@@ -501,10 +501,10 @@ HERO — LIGHT VARIANT (split layout):
       <div className="flex items-center gap-4">
         <div className="flex -space-x-2">
           {[1,2,3,4,5].map(i => (
-            <div key={i} className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">{String.fromCharCode(64+i)}</div>
+            <div key={i} className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 border-2 border-white flex items-center justify-center text-white text-xs  font-[600]">{String.fromCharCode(64+i)}</div>
           ))}
         </div>
-        <p className="text-sm text-gray-500">Joined by <span className="font-bold text-gray-900">10,000+</span> people</p>
+        <p className="text-sm text-gray-500">Joined by <span className=" font-[600] text-gray-900">10,000+</span> people</p>
       </div>
     </div>
     <div className="relative">
@@ -523,7 +523,7 @@ HERO — LIGHT VARIANT (split layout):
       </div>
       <div className="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow-xl p-4 flex items-center gap-3">
         <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-xl">✓</div>
-        <div><div className="font-bold text-gray-900 text-sm">Goal achieved</div><div className="text-gray-500 text-xs">+247% this month</div></div>
+        <div><div className=" font-[600] text-gray-900 text-sm">Goal achieved</div><div className="text-gray-500 text-xs">+247% this month</div></div>
       </div>
     </div>
   </div>
@@ -569,7 +569,7 @@ FEATURE GRID (3-col with icons):
       ].map(f => (
         <div key={f.title} className="bg-white p-8 rounded-2xl border border-gray-100 hover:shadow-lg transition-all hover:-translate-y-1 group">
           <div className="text-4xl mb-5">{f.icon}</div>
-          <h3 className="text-xl font-bold text-gray-900 mb-3">{f.title}</h3>
+          <h3 className="text-xl  font-[600] text-gray-900 mb-3">{f.title}</h3>
           <p className="text-gray-600 leading-relaxed">{f.desc}</p>
         </div>
       ))}
@@ -595,7 +595,7 @@ TESTIMONIALS (3-col cards):
           <div className="text-yellow-400 text-lg mb-4">★★★★★</div>
           <p className="text-gray-700 mb-6 leading-relaxed">"{t.quote}"</p>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm">{t.name[0]}</div>
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white  font-[600] text-sm">{t.name[0]}</div>
             <div>
               <div className="font-semibold text-gray-900 text-sm">{t.name}</div>
               <div className="text-gray-500 text-xs">{t.role}</div>
@@ -626,15 +626,15 @@ PRICING (3 tiers, middle highlighted):
           features: ["Everything in Pro", "Custom limits", "SSO & SAML", "SLA & Support"] },
       ].map((plan, i) => (
         <div key={plan.name} className={\`rounded-2xl p-8 \${plan.highlight ? 'bg-gray-900 text-white shadow-2xl scale-105' : 'bg-white border border-gray-200'}\`}>
-          {plan.highlight && <div className="bg-blue-600 text-white text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-4 inline-block">Most Popular</div>}
-          <h3 className={\`text-xl font-bold mb-1 \${plan.highlight ? 'text-white' : 'text-gray-900'}\`}>{plan.name}</h3>
+          {plan.highlight && <div className="bg-blue-600 text-white text-xs  font-[600] uppercase tracking-wider px-3 py-1 rounded-full mb-4 inline-block">Most Popular</div>}
+          <h3 className={\`text-xl  font-[600] mb-1 \${plan.highlight ? 'text-white' : 'text-gray-900'}\`}>{plan.name}</h3>
           <div className={\`text-5xl font-black my-4 \${plan.highlight ? 'text-white' : 'text-gray-900'}\`}>
             \${plan.price}<span className={\`text-lg font-normal \${plan.highlight ? 'text-gray-400' : 'text-gray-400'}\`}>{plan.period}</span>
           </div>
           <ul className="space-y-3 mb-8">
             {plan.features.map(f => (
               <li key={f} className={\`flex items-center gap-2 text-sm \${plan.highlight ? 'text-gray-300' : 'text-gray-600'}\`}>
-                <span className="text-emerald-500 font-bold">✓</span> {f}
+                <span className="text-emerald-500  font-[600]">✓</span> {f}
               </li>
             ))}
           </ul>
@@ -655,7 +655,7 @@ CTA SECTION (high-converting):
     <h2 className="text-5xl font-black text-white mb-6 tracking-tight">Ready to [transformation]?</h2>
     <p className="text-xl text-gray-400 mb-10">Specific value prop + urgency or social proof</p>
     <div className="flex flex-col sm:flex-row gap-4 justify-center">
-      <button className="px-10 py-5 bg-white text-gray-900 font-bold rounded-xl hover:bg-gray-100 transition-all text-lg hover:scale-105 transform">Primary CTA</button>
+      <button className="px-10 py-5 bg-white text-gray-900  font-[600] rounded-xl hover:bg-gray-100 transition-all text-lg hover:scale-105 transform">Primary CTA</button>
       <button className="px-10 py-5 text-white font-semibold rounded-xl border border-white/30 hover:bg-white/10 transition-all text-lg">Secondary CTA</button>
     </div>
     <p className="text-sm text-gray-500 mt-6">No credit card • Free forever plan • Setup in 5 min</p>
@@ -868,7 +868,7 @@ const ContactForm = () => {
   if (done) return (
     <div className="text-center py-8">
       <div className="text-4xl mb-3">✅</div>
-      <h3 className="text-xl font-bold text-gray-900 mb-2">You're all set!</h3>
+      <h3 className="text-xl  font-[600] text-gray-900 mb-2">You're all set!</h3>
       <p className="text-gray-500">We'll be in touch shortly.</p>
     </div>
   );
@@ -887,7 +887,7 @@ const ContactForm = () => {
       <input type="text" name="website" style={{display:"none"}} tabIndex={-1} autoComplete="off" />
       {error && <p className="text-red-600 text-sm">{error}</p>}
       <button type="submit" disabled={loading}
-        className="w-full py-4 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed text-lg">
+        className="w-full py-4 bg-gray-900 text-white  font-[600] rounded-xl hover:bg-gray-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed text-lg">
         {loading ? "Sending…" : "Send Message"}
       </button>
       <p className="text-xs text-gray-400 text-center">At least one of email or phone is required</p>

@@ -22,7 +22,12 @@ export default function PacksPage() {
   }, [searchParams, router]);
 
   const fetcher = useCallback(() => packsApi.list(false), []);
-  const { data, isLoading: loading, error, refetch } = useGet("packs-list", fetcher);
+  const {
+    data,
+    isLoading: loading,
+    error,
+    refetch,
+  } = useGet("packs-list", fetcher);
   const packs = data?.items ?? [];
 
   return (
@@ -33,16 +38,15 @@ export default function PacksPage() {
         className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8"
       >
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Campaign Packs</h1>
+          <h1 className="text-3xl  font-[600] tracking-tight">
+            Campaign Packs
+          </h1>
           <p className="text-muted-foreground mt-1">
             Create and manage your campaign packs. Start with onboarding, then
             strategy and creative.
           </p>
         </div>
-        <Button
-          className="gap-2"
-          onClick={() => router.push("/packs/new")}
-        >
+        <Button className="gap-2" onClick={() => router.push("/packs/new")}>
           <Plus className="h-4 w-4" />
           Start new Campaign Pack
         </Button>
@@ -66,9 +70,9 @@ export default function PacksPage() {
       ) : (
         <ul className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {packs.map((pack, i) => (
-            <PackCard 
-              key={pack.id} 
-              pack={pack} 
+            <PackCard
+              key={pack.id}
+              pack={pack}
               index={i}
               onActionComplete={refetch}
             />

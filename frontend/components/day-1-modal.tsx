@@ -125,12 +125,13 @@ export function Day1Modal({
             </button>
             <h2
               id="day1-modal-title"
-              className="font-heading text-2xl font-bold text-foreground pr-10"
+              className="font-heading text-2xl  font-[600] text-foreground pr-10"
             >
               Day 1: Offer
             </h2>
             <p className="mt-3 text-sm text-muted-foreground">
-              Lock down what you&apos;re selling in one clear sentence. This is the foundation of your marketing.
+              Lock down what you&apos;re selling in one clear sentence. This is
+              the foundation of your marketing.
             </p>
 
             {loading ? (
@@ -179,19 +180,31 @@ export function Day1Modal({
                     />
                   )}
                   <p className="text-xs text-muted-foreground">
-                    What exactly are you selling? One sentence someone can say yes or no to.
+                    What exactly are you selling? One sentence someone can say
+                    yes or no to.
                   </p>
                 </div>
                 {error && (
-                  <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                  <p
+                    className="text-sm text-red-600 dark:text-red-400"
+                    role="alert"
+                  >
                     {error}
                   </p>
                 )}
                 <div className="flex gap-2 pt-2">
-                  <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={saving}
+                  >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={!offerOneLiner.trim() || saving}>
+                  <Button
+                    type="submit"
+                    disabled={!offerOneLiner.trim() || saving}
+                  >
                     {saving ? "Saving…" : "Lock offer & complete Day 1"}
                   </Button>
                 </div>

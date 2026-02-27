@@ -226,7 +226,7 @@ export default function SettingsPage() {
                 className={cn(
                   "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-0 hover:scale-[1.02]",
                   isActive
-                    ? "font-bold text-primary scale-105"
+                    ? " font-[600] text-primary scale-105"
                     : "text-muted-foreground  /50 hover:text-foreground",
                 )}
               >
@@ -269,7 +269,7 @@ export default function SettingsPage() {
                           className={cn(
                             "flex h-9 w-9 items-center justify-center rounded-lg border transition-all focus-visible:outline-none focus-visible:ring-0",
                             isSelected
-                              ? "font-bold text-primary scale-105 border-transparent"
+                              ? " font-[600] text-primary scale-105 border-transparent"
                               : "border-transparent text-muted-foreground  /50 hover:scale-105",
                           )}
                           title={opt.label}

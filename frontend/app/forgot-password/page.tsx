@@ -41,7 +41,7 @@ export default function ForgotPasswordPage() {
         >
           ← Back to Klarnow AI
         </Link> */}
-        <h1 className="text-2xl font-bold text-center">Forgot password?</h1>
+        <h1 className="text-2xl  font-[600] text-center">Forgot password?</h1>
         {sent ? (
           <p className="text-muted-foreground text-sm">
             If an account exists for this email, you&apos;ll receive a link to

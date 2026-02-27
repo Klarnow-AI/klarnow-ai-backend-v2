@@ -100,8 +100,8 @@ const navLinkClass = (isActive: boolean, collapsed?: boolean) =>
     "flex items-center rounded-xl text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-0 hover:scale-[1.02]",
     collapsed ? "justify-center gap-0 px-2 py-2.5" : "gap-3 px-3 py-2.5",
     isActive
-      ? "font-bold text-primary scale-[1.02]"
-      : "text-muted-foreground hover:text-foreground hover:font-bold",
+      ? " font-[600] text-primary scale-[1.02]"
+      : "text-muted-foreground hover:text-foreground hover: font-[600]",
   );
 
 const STORAGE_KEY_SIDEBAR = "sidebar-collapsed";

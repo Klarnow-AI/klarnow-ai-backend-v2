@@ -38,7 +38,7 @@ export const designSystems: Record<DesignSystemKey, DesignSystem> = {
     tokens: `
       - Background: #0a0a0a or #111
       - Primary color: violet-500 or user brand color
-      - Typography: font-bold, large sizes
+      - Typography:  font-[600], large sizes
       - Corners: rounded-xl
       - Shadows: shadow-2xl with color glow
       - Inspired by: Vercel.com, Raycast.com

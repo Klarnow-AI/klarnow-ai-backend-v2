@@ -140,7 +140,7 @@ export default function ResetPasswordPage() {
         >
           ← Back to Klarnow AI
         </Link>
-        <h1 className="text-2xl font-bold">Reset password</h1>
+        <h1 className="text-2xl  font-[600]">Reset password</h1>
         <Suspense fallback={<Spinner className="h-6 w-6" />}>
           <ResetPasswordForm />
         </Suspense>

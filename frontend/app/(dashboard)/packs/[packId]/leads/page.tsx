@@ -32,7 +32,12 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { clients } from "@/api_requests/clients";
-import type { Lead, LeadCreateBody, LeadUpdateBody, PipelineStage } from "@/types/api-types";
+import type {
+  Lead,
+  LeadCreateBody,
+  LeadUpdateBody,
+  PipelineStage,
+} from "@/types/api-types";
 import { KanbanBoard } from "./_components/kanban-board";
 
 const QUALIFIED = "qualified";
@@ -82,7 +87,7 @@ export default function LeadsPage() {
             due_date: l.due_date ?? null,
             deal_value: l.deal_value != null ? Number(l.deal_value) : null,
             assigned_user_id: l.assigned_user_id ?? null,
-          }))
+          })),
         );
       }
     } catch (e) {
@@ -135,8 +140,8 @@ export default function LeadsPage() {
         await clients.updateLead(leadId, { pipeline_stage: pipelineStage });
         setLeads((prev) =>
           prev.map((l) =>
-            l.id === leadId ? { ...l, pipeline_stage: pipelineStage } : l
-          )
+            l.id === leadId ? { ...l, pipeline_stage: pipelineStage } : l,
+          ),
         );
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to move lead");
@@ -144,7 +149,7 @@ export default function LeadsPage() {
         setMovingId(null);
       }
     },
-    []
+    [],
   );
 
   const handleAddLead = useCallback((stage: PipelineStage) => {
@@ -190,8 +195,8 @@ export default function LeadsPage() {
                 due_date: body.due_date ?? l.due_date,
                 deal_value: body.deal_value ?? l.deal_value,
               }
-            : l
-        )
+            : l,
+        ),
       );
       closeEdit();
     } catch (e) {
@@ -223,7 +228,7 @@ export default function LeadsPage() {
         animate={{ opacity: 1, y: 0 }}
         className="mb-6"
       >
-        <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
+        <h1 className="text-3xl  font-[600] tracking-tight">Leads</h1>
         <p className="text-muted-foreground mt-1">
           Add and qualify leads. Qualified leads unlock creating proposals.
         </p>
@@ -246,7 +251,8 @@ export default function LeadsPage() {
           ) : (
             <>
               <span>
-                Total: <strong className="text-foreground">{leads.length}</strong>{" "}
+                Total:{" "}
+                <strong className="text-foreground">{leads.length}</strong>{" "}
                 Leads
               </span>
               <span>
@@ -415,10 +421,7 @@ export default function LeadsPage() {
             />
           </DialogHeader>
           <DialogBody>
-            <form
-              onSubmit={handleCreate}
-              className="space-y-4"
-            >
+            <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <Label htmlFor="add-name">Name *</Label>
                 <Input
@@ -453,7 +456,10 @@ export default function LeadsPage() {
               </div>
               {defaultStage && (
                 <p className="text-sm text-muted-foreground">
-                  Stage: <span className="font-medium capitalize text-foreground">{defaultStage}</span>
+                  Stage:{" "}
+                  <span className="font-medium capitalize text-foreground">
+                    {defaultStage}
+                  </span>
                 </p>
               )}
               <div className="flex justify-end gap-2 pt-2">
@@ -481,7 +487,10 @@ export default function LeadsPage() {
       </Dialog>
 
       {/* Edit lead dialog */}
-      <Dialog open={!!editingLead} onOpenChange={(open) => !open && closeEdit()}>
+      <Dialog
+        open={!!editingLead}
+        onOpenChange={(open) => !open && closeEdit()}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit lead</DialogTitle>
@@ -536,7 +545,11 @@ export default function LeadsPage() {
                   Cancel
                 </Button>
                 <Button onClick={handleSaveEdit} disabled={savingEdit}>
-                  {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                  {savingEdit ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Save"
+                  )}
                 </Button>
               </div>
             </div>

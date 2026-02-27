@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono, DM_Sans } from "next/font/google";
+import { Inter, JetBrains_Mono, Google_Sans_Flex } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/auth-context";
@@ -14,7 +14,7 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-geist-mono",
 });
-const dmSans = DM_Sans({
+const googleSansFlex = Google_Sans_Flex({
   subsets: ["latin"],
   variable: "--font-heading",
 });
@@ -48,7 +48,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} ${dmSans.variable} font-sans min-h-screen antialiased`}
+        className={`${inter.variable} ${jetbrainsMono.variable} ${googleSansFlex.variable} font-sans min-h-screen antialiased`}
       >
         <ThemeProvider>
           <ErrorBoundary>

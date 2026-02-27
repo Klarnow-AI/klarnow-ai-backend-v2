@@ -39,12 +39,7 @@ function ResizableLayout({
       onLayoutChanged={onLayoutChanged}
       className="flex-1 min-h-0"
     >
-      <Panel
-        id="chat"
-        defaultSize="30%"
-        minSize="20%"
-        maxSize="50%"
-      >
+      <Panel id="chat" defaultSize="30%" minSize="20%" maxSize="50%">
         <div className="h-full overflow-hidden">
           <ChatPanel brandContext={brandContext} packName={packName} />
         </div>
@@ -54,11 +49,7 @@ function ResizableLayout({
         <div className="w-0.5 h-8 bg-muted-foreground/40 group-hover:bg-primary-foreground group-data-[active]:bg-primary-foreground rounded-full transition-colors" />
       </Separator>
 
-      <Panel
-        id="preview"
-        defaultSize="70%"
-        minSize="50%"
-      >
+      <Panel id="preview" defaultSize="70%" minSize="50%">
         <div className="h-full overflow-hidden">
           <PreviewPanel />
         </div>
@@ -180,7 +171,11 @@ export default function WebsiteModule() {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load website builder");
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to load website builder",
+          );
           setBrandContext({});
         }
       } finally {
@@ -189,7 +184,9 @@ export default function WebsiteModule() {
     }
 
     init();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [packId]);
 
   if (!packId) return null;
@@ -217,7 +214,7 @@ export default function WebsiteModule() {
     <div className="absolute inset-0 flex flex-col overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card shrink-0">
         <div className="flex items-center gap-3">
-          <h1 className="text-sm font-bold text-foreground tracking-tight">
+          <h1 className="text-sm  font-[600] text-foreground tracking-tight">
             Website Builder
           </h1>
           <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-accent">

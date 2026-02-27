@@ -6,7 +6,7 @@ import { builder } from "@/api_requests/builder";
 const DEFAULT_APP = `export default function App() {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center">
-      <h1 className="text-3xl font-bold text-gray-800">
+      <h1 className="text-3xl  font-[600] text-gray-800">
         Describe your website to get started
       </h1>
     </div>
@@ -48,7 +48,12 @@ type ProjectState = typeof initialProjectState & {
   setProjectId: (id: string) => void;
   setSelectedStyle: (style: string) => void;
   setLiveUrl: (url: string | null) => void;
-  hydrate: (data: { files: Record<string, string>; messages: Message[]; projectId: string; liveUrl?: string | null }) => void;
+  hydrate: (data: {
+    files: Record<string, string>;
+    messages: Message[];
+    projectId: string;
+    liveUrl?: string | null;
+  }) => void;
   updateFiles: (newFiles: Record<string, string>) => void;
   setMessages: (messages: Message[]) => void;
   setIsGenerating: (v: boolean) => void;

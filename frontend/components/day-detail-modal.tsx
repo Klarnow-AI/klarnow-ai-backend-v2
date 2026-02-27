@@ -3,7 +3,14 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, FileCheck, Sparkles, Target, X, Lock } from "@/components/icons";
+import {
+  Check,
+  FileCheck,
+  Sparkles,
+  Target,
+  X,
+  Lock,
+} from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { sprintApi } from "@/api_requests/sprint";
@@ -178,7 +185,7 @@ export function DayDetailModal({
             </button>
             <h2
               id="day-detail-modal-title"
-              className="font-heading text-xl font-bold text-foreground pr-10"
+              className="font-heading text-xl  font-[600] text-foreground pr-10"
             >
               {DAY_LABELS[dayNumber] ?? `Day ${dayNumber}`}
             </h2>
@@ -200,7 +207,8 @@ export function DayDetailModal({
                           Day {dayNumber} is locked
                         </p>
                         <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
-                          {detail.blocker_message ?? `Complete the previous day to unlock Day ${dayNumber}.`}
+                          {detail.blocker_message ??
+                            `Complete the previous day to unlock Day ${dayNumber}.`}
                         </p>
                       </div>
                     </CardContent>
@@ -233,18 +241,24 @@ export function DayDetailModal({
                         <div>
                           <div className="flex items-center gap-2 mb-3">
                             <FileCheck className="h-5 w-5 text-primary" />
-                            <h3 className="font-semibold text-foreground">Tasks</h3>
-                            {checkedTasks.size === guide.tasks.length && guide.tasks.length > 0 && (
-                              <span className="ml-auto text-xs text-green-600 dark:text-green-400 font-medium">
-                                All complete!
-                              </span>
-                            )}
+                            <h3 className="font-semibold text-foreground">
+                              Tasks
+                            </h3>
+                            {checkedTasks.size === guide.tasks.length &&
+                              guide.tasks.length > 0 && (
+                                <span className="ml-auto text-xs text-green-600 dark:text-green-400 font-medium">
+                                  All complete!
+                                </span>
+                              )}
                           </div>
                           <ul className="space-y-2">
                             {guide.tasks.map((task, index) => {
                               const isChecked = checkedTasks.has(index);
                               return (
-                                <li key={index} className="flex items-start gap-3 group">
+                                <li
+                                  key={index}
+                                  className="flex items-start gap-3 group"
+                                >
                                   <button
                                     type="button"
                                     onClick={() => toggleTask(index)}
@@ -289,7 +303,9 @@ export function DayDetailModal({
                                 key={index}
                                 className="text-sm text-amber-800 dark:text-amber-200 flex items-start gap-2"
                               >
-                                <span className="text-amber-600 dark:text-amber-400 mt-0.5">•</span>
+                                <span className="text-amber-600 dark:text-amber-400 mt-0.5">
+                                  •
+                                </span>
                                 <span>{tip}</span>
                               </li>
                             ))}

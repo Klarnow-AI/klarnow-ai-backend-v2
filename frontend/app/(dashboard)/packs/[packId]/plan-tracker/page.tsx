@@ -32,22 +32,30 @@ export default function PlanTrackerPage() {
   const loadSprint = useCallback(() => {
     cancelRef.current?.();
     let cancelled = false;
-    cancelRef.current = () => { cancelled = true; };
+    cancelRef.current = () => {
+      cancelled = true;
+    };
     setError("");
     sprintApi
       .getSprint(packId)
-      .then((data) => { if (!cancelled) setSprint(data); })
+      .then((data) => {
+        if (!cancelled) setSprint(data);
+      })
       .catch((err) => {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : "Failed to load sprint");
         setSprint(null);
       })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
   }, [packId]);
 
   useEffect(() => {
     loadSprint();
-    return () => { cancelRef.current?.(); };
+    return () => {
+      cancelRef.current?.();
+    };
   }, [loadSprint]);
 
   const dayFromUrl = searchParams.get("day");
@@ -78,7 +86,9 @@ export default function PlanTrackerPage() {
     setDayModalOpen(dayNumber);
     const url = new URL(window.location.href);
     url.searchParams.set("day", String(dayNumber));
-    router.replace(url.pathname + "?" + url.searchParams.toString(), { scroll: false });
+    router.replace(url.pathname + "?" + url.searchParams.toString(), {
+      scroll: false,
+    });
   };
 
   const closeDayModal = () => {
@@ -86,7 +96,9 @@ export default function PlanTrackerPage() {
     const url = new URL(window.location.href);
     url.searchParams.delete("day");
     const q = url.searchParams.toString();
-    router.replace(q ? url.pathname + "?" + q : url.pathname, { scroll: false });
+    router.replace(q ? url.pathname + "?" + q : url.pathname, {
+      scroll: false,
+    });
   };
 
   const handleDayComplete = () => {
@@ -94,7 +106,9 @@ export default function PlanTrackerPage() {
     const url = new URL(window.location.href);
     url.searchParams.delete("day");
     const q = url.searchParams.toString();
-    router.replace(q ? url.pathname + "?" + q : url.pathname, { scroll: false });
+    router.replace(q ? url.pathname + "?" + q : url.pathname, {
+      scroll: false,
+    });
     loadSprint();
     router.refresh();
   };
@@ -122,9 +136,12 @@ export default function PlanTrackerPage() {
         animate={{ opacity: 1, y: 0 }}
         className="mb-8"
       >
-        <h1 className="text-3xl font-bold tracking-tight">Sprint Plan & Tracker</h1>
+        <h1 className="text-3xl  font-[600] tracking-tight">
+          Sprint Plan & Tracker
+        </h1>
         <p className="text-muted-foreground mt-1">
-          Your 14-day sprint mapped to a calendar. Click any sprint day to view details and take action.
+          Your 14-day sprint mapped to a calendar. Click any sprint day to view
+          details and take action.
         </p>
       </motion.div>
 
@@ -139,7 +156,8 @@ export default function PlanTrackerPage() {
           <CardHeader>
             <CardTitle>No active sprint</CardTitle>
             <CardDescription>
-              Start a 14-day sprint to get your personalized plan with Build or Improve mode based on your business stage.
+              Start a 14-day sprint to get your personalized plan with Build or
+              Improve mode based on your business stage.
             </CardDescription>
           </CardHeader>
           <CardContent>

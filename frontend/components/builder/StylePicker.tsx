@@ -5,10 +5,7 @@ import { useProjectStore } from "@/store/useProjectStore";
 import { Button } from "@/components/ui/button";
 import { ChevronRight } from "@/components/icons";
 import { cn } from "@/lib/utils";
-import {
-  designSystems,
-  type DesignSystemKey,
-} from "@/lib/designSystems";
+import { designSystems, type DesignSystemKey } from "@/lib/designSystems";
 
 const STYLE_KEYS = Object.keys(designSystems) as DesignSystemKey[];
 
@@ -45,23 +42,23 @@ export function StylePicker() {
               className={cn(
                 "relative flex flex-col gap-2 rounded-xl border p-3 text-left transition-all",
                 "hover:border-foreground/30",
-                isSelected
-                  ? "border-primary/50 scale-105"
-                  : "border-border",
+                isSelected ? "border-primary/50 scale-105" : "border-border",
               )}
             >
-              <div
-                className={cn(
-                  "h-8 w-full rounded-md",
-                  system.preview,
-                )}
-              />
+              <div className={cn("h-8 w-full rounded-md", system.preview)} />
               <div className="flex items-center gap-2">
-                <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", system.dot)} />
+                <span
+                  className={cn(
+                    "h-2.5 w-2.5 rounded-full shrink-0",
+                    system.dot,
+                  )}
+                />
                 <span
                   className={cn(
                     "text-xs truncate",
-                    isSelected ? "font-bold text-primary" : "font-medium text-foreground",
+                    isSelected
+                      ? " font-[600] text-primary"
+                      : "font-medium text-foreground",
                   )}
                 >
                   {system.name}

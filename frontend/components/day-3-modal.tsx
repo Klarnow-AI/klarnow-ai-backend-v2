@@ -120,12 +120,13 @@ export function Day3Modal({
             </button>
             <h2
               id="day3-modal-title"
-              className="font-heading text-2xl font-bold text-foreground pr-10"
+              className="font-heading text-2xl  font-[600] text-foreground pr-10"
             >
               Day 3: Confidence script
             </h2>
             <p className="mt-3 text-sm text-muted-foreground">
-              Build: write your pitch script and send 3 voice notes. Improve: list common objections and craft responses.
+              Build: write your pitch script and send 3 voice notes. Improve:
+              list common objections and craft responses.
             </p>
 
             {loading ? (
@@ -181,15 +182,25 @@ export function Day3Modal({
                     disabled={saving}
                     className="h-4 w-4 rounded border-border"
                   />
-                  <span className="text-sm">I&apos;ve sent 3 voice notes to potential customers</span>
+                  <span className="text-sm">
+                    I&apos;ve sent 3 voice notes to potential customers
+                  </span>
                 </label>
                 {error && (
-                  <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                  <p
+                    className="text-sm text-red-600 dark:text-red-400"
+                    role="alert"
+                  >
                     {error}
                   </p>
                 )}
                 <div className="flex gap-2 pt-2">
-                  <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={saving}
+                  >
                     Cancel
                   </Button>
                   <Button type="submit" disabled={saving}>

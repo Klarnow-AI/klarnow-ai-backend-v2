@@ -123,7 +123,9 @@ export default function ChatPage() {
     if (conversationId) return conversationId;
     const dayNum = dayParam !== null ? parseInt(dayParam, 10) : NaN;
     const dayCtx =
-      Number.isInteger(dayNum) && dayNum >= 0 && dayNum <= 3 ? dayNum : undefined;
+      Number.isInteger(dayNum) && dayNum >= 0 && dayNum <= 3
+        ? dayNum
+        : undefined;
     const conv = await chatApi.createConversation(packId, dayCtx);
     setConversationId(conv.id);
     router.replace(buildChatUrl(conv.id, packId, dayCtx));
@@ -403,7 +405,7 @@ export default function ChatPage() {
         <div className="flex-1 flex flex-col min-h-0 justify-center items-center px-4 py-12">
           <div className="max-w-4xl w-full flex flex-col items-center text-center">
             {messages.length === 0 && !loading && (
-              <h2 className="text-4xl font-bold text-foreground max-w-lg mx-auto mb-6">
+              <h2 className="text-4xl  font-[600] text-foreground max-w-lg mx-auto mb-6">
                 What are we shipping today?
               </h2>
             )}
@@ -428,7 +430,9 @@ export default function ChatPage() {
               applyTargetId={applyTargetId}
               suggestionChips={nextAction?.actionChips}
               dayContext={dayContext}
-              onDay0Choice={dayContext?.day === 0 ? handleDay0Choice : undefined}
+              onDay0Choice={
+                dayContext?.day === 0 ? handleDay0Choice : undefined
+              }
               showDay0ChoiceChips={!hasAnsweredBrandChoice}
               questionContext={questionContext}
               onQuestionChipClick={(value) => send("use", undefined, value)}

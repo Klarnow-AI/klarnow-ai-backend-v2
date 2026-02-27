@@ -672,7 +672,7 @@ export default function BrandOSPage() {
         ) : (
           <>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              <h1 className="text-2xl sm:text-3xl  font-[600] tracking-tight">
                 Brand Identity
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
@@ -692,7 +692,7 @@ export default function BrandOSPage() {
               >
                 <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                   <span
-                    className="font-bold text-foreground truncate"
+                    className=" font-[600] text-foreground truncate"
                     style={
                       headlineFont
                         ? { fontFamily: `"${headlineFont}", sans-serif` }
@@ -862,7 +862,7 @@ export default function BrandOSPage() {
                         }
                         className="text-left w-full"
                       >
-                        <p className="text-lg font-bold text-foreground truncate">
+                        <p className="text-lg  font-[600] text-foreground truncate">
                           {headlineFont || "—"}
                         </p>
                         {headlineFont && (

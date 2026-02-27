@@ -18,7 +18,7 @@ export default function StudioPage() {
         animate={{ opacity: 1, y: 0 }}
         className="mb-8"
       >
-        <h1 className="text-3xl font-bold tracking-tight">Studio</h1>
+        <h1 className="text-3xl  font-[600] tracking-tight">Studio</h1>
         <p className="text-muted-foreground mt-1">
           Creative and brand identity. Coming soon.
         </p>

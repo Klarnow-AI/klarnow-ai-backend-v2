@@ -17,7 +17,7 @@ export default function TermsPage() {
         >
           ← Back to Klarnow AI
         </Link>
-        <h1 className="text-2xl font-bold">Terms of Service</h1>
+        <h1 className="text-2xl  font-[600]">Terms of Service</h1>
         <p className="text-muted-foreground text-sm">
           Terms of service content. Placeholder for legal terms.
         </p>

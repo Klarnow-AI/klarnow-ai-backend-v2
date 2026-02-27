@@ -53,7 +53,10 @@ export function ProfileDropdown({
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
-        className={cn(className, "transition-all hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black focus-visible:outline-none focus-visible:ring-0 hover:scale-105")}
+        className={cn(
+          className,
+          "transition-all hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black focus-visible:outline-none focus-visible:ring-0 hover:scale-105",
+        )}
         aria-label="Profile menu"
         aria-expanded={open}
       >
@@ -80,8 +83,8 @@ export function ProfileDropdown({
                     className={cn(
                       "flex h-9 w-9 items-center justify-center rounded-lg border transition-all focus-visible:outline-none focus-visible:ring-0",
                       isSelected
-                        ? "font-bold text-primary scale-105 border-transparent"
-                        : "border-transparent text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black hover:scale-105"
+                        ? " font-[600] text-primary scale-105 border-transparent"
+                        : "border-transparent text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black hover:scale-105",
                     )}
                     title={opt.label}
                     aria-label={opt.label}

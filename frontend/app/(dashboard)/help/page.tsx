@@ -18,7 +18,7 @@ export default function HelpPage() {
         animate={{ opacity: 1, y: 0 }}
         className="mb-8"
       >
-        <h1 className="text-3xl font-bold tracking-tight">Help</h1>
+        <h1 className="text-3xl  font-[600] tracking-tight">Help</h1>
         <p className="text-muted-foreground mt-1">Docs and support.</p>
       </motion.div>
       <Card asMotion delay={0.1}>

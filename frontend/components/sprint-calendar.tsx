@@ -33,15 +33,28 @@ const DAY_TITLES = [
 
 // Helper functions to replace date-fns
 function formatDate(date: Date, formatStr: string): string {
-  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  
+
   if (formatStr === "MMMM yyyy") {
     return `${months[date.getMonth()]} ${date.getFullYear()}`;
   } else if (formatStr === "d") {
     return date.getDate().toString();
   } else if (formatStr === "yyyy-MM-dd") {
-    return date.toISOString().split('T')[0];
+    return date.toISOString().split("T")[0];
   }
   return date.toLocaleDateString();
 }
@@ -58,16 +71,19 @@ function getDaysInMonth(date: Date): Date[] {
   const start = getStartOfMonth(date);
   const end = getEndOfMonth(date);
   const days: Date[] = [];
-  
+
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     days.push(new Date(d));
   }
-  
+
   return days;
 }
 
 function isSameMonthFn(date1: Date, date2: Date): boolean {
-  return date1.getMonth() === date2.getMonth() && date1.getFullYear() === date2.getFullYear();
+  return (
+    date1.getMonth() === date2.getMonth() &&
+    date1.getFullYear() === date2.getFullYear()
+  );
 }
 
 function addMonthsFn(date: Date, months: number): Date {
@@ -96,9 +112,14 @@ export function SprintCalendar({ sprint, onDayClick }: SprintCalendarProps) {
   }, [sprint.started_at]);
 
   const getDayCardReadForDate = (date: Date): DayCardRead | null => {
-    const daysSinceStart = Math.floor((date.getTime() - sprintStartDate.getTime()) / (1000 * 60 * 60 * 24));
+    const daysSinceStart = Math.floor(
+      (date.getTime() - sprintStartDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
     if (daysSinceStart >= 0 && daysSinceStart <= 14) {
-      return sprint.day_cards.find(card => card.day_number === daysSinceStart) || null;
+      return (
+        sprint.day_cards.find((card) => card.day_number === daysSinceStart) ||
+        null
+      );
     }
     return null;
   };
@@ -149,15 +170,24 @@ export function SprintCalendar({ sprint, onDayClick }: SprintCalendarProps) {
               </div>
               <div className="grid grid-cols-7 gap-2">
                 {Array.from({ length: monthStart.getDay() }).map((_, i) => (
-                  <div key={`empty-${currentMonth.getTime()}-${i}`} className="aspect-square min-h-[60px]" />
+                  <div
+                    key={`empty-${currentMonth.getTime()}-${i}`}
+                    className="aspect-square min-h-[60px]"
+                  />
                 ))}
                 {daysInMonth.map((date) => {
                   const dayCard = getDayCardReadForDate(date);
-                  const isToday = formatDate(date, "yyyy-MM-dd") === formatDate(new Date(), "yyyy-MM-dd");
+                  const isToday =
+                    formatDate(date, "yyyy-MM-dd") ===
+                    formatDate(new Date(), "yyyy-MM-dd");
                   const isSprintDay = dayCard !== null;
                   const isCompleted = !!dayCard?.completed_at;
                   const isCurrent = dayCard?.day_number === sprint.current_day;
-                  const isLocked = isSprintDay && dayCard != null && dayCard.day_number > sprint.current_day && !dayCard.completed_at;
+                  const isLocked =
+                    isSprintDay &&
+                    dayCard != null &&
+                    dayCard.day_number > sprint.current_day &&
+                    !dayCard.completed_at;
                   const isClickable = isSprintDay && !isLocked && !isCompleted;
                   const progress = dayCard ? getProgressPercentage(dayCard) : 0;
 
@@ -175,15 +205,21 @@ export function SprintCalendar({ sprint, onDayClick }: SprintCalendarProps) {
                         isCurrent && "bg-primary/5 border-primary",
                         isCompleted && "bg-green-50 dark:bg-green-950/20",
                       )}
-                      onClick={() => isClickable && dayCard && onDayClick(dayCard.day_number)}
-                      title={isLocked ? `Complete Day ${sprint.current_day} first` : undefined}
+                      onClick={() =>
+                        isClickable && dayCard && onDayClick(dayCard.day_number)
+                      }
+                      title={
+                        isLocked
+                          ? `Complete Day ${sprint.current_day} first`
+                          : undefined
+                      }
                     >
                       <div className="flex flex-col h-full">
                         <div className="flex items-start justify-between mb-1">
                           <span
                             className={cn(
                               "text-sm font-medium",
-                              isToday && "text-primary font-bold",
+                              isToday && "text-primary  font-[600]",
                             )}
                           >
                             {formatDate(date, "d")}
@@ -208,7 +244,9 @@ export function SprintCalendar({ sprint, onDayClick }: SprintCalendarProps) {
                               <div
                                 className={cn(
                                   "text-xs font-semibold mb-0.5",
-                                  isLocked ? "text-muted-foreground/60" : "text-primary",
+                                  isLocked
+                                    ? "text-muted-foreground/60"
+                                    : "text-primary",
                                 )}
                               >
                                 Day {dayCard.day_number}
@@ -217,9 +255,15 @@ export function SprintCalendar({ sprint, onDayClick }: SprintCalendarProps) {
                                 {DAY_TITLES[dayCard.day_number]}
                               </div>
                             </div>
-                            {!isCompleted && !isLocked && dayCard.day_number >= 4 && dayCard.day_number <= 13 && (
-                              <Progress value={progress} className="h-1 mt-1.5" />
-                            )}
+                            {!isCompleted &&
+                              !isLocked &&
+                              dayCard.day_number >= 4 &&
+                              dayCard.day_number <= 13 && (
+                                <Progress
+                                  value={progress}
+                                  className="h-1 mt-1.5"
+                                />
+                              )}
                           </div>
                         )}
                       </div>

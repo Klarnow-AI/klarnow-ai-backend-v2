@@ -109,16 +109,7 @@ export default function LandingPage() {
   const show14Dots = context?.pack != null && context?.stage === "sprint";
 
   return (
-    <div className="relative min-h-screen flex flex-col text-foreground overflow-hidden">
-      {/* Glassmorphism background: base gradient + frosted glass overlay */}
-      <div
-        className="fixed inset-0 -z-10 pointer-events-none bg-gradient-to-br from-background via-background to-muted/30"
-        aria-hidden
-      />
-      <div
-        className="fixed inset-0 -z-10 pointer-events-none bg-background/70 backdrop-blur-xl backdrop-saturate-150"
-        aria-hidden
-      />
+    <div className="relative min-h-screen flex flex-col text-foreground overflow-hidden bg-background">
       {landingLoading && isAuthenticated && (
         <PageLoader variant="overlay" message="Loading…" />
       )}
@@ -157,9 +148,9 @@ export default function LandingPage() {
           )}
 
           {/* Contextual headline - two lines */}
-          <h1 className="font-heading font-bold text-foreground tracking-tight mb-2 line-clamp-2 text-4xl sm:text-5xl md:text-6xl">
+          <h3 className="font-heading font-[500] text-foreground tracking-tight mb-2 line-clamp-2 text-3xl sm:text-4xl md:text-5xl">
             {headline}
-          </h1>
+          </h3>
 
           {/* Sprint dots: Day 0–14 when in sprint; otherwise none */}
           <div

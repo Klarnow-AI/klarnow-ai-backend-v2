@@ -54,6 +54,7 @@
   h6 {
     font-family:
       var(--font-heading), var(--font-geist-sans), system-ui, sans-serif;
+    letter-spacing: -0.025em;
   }
 }
 
@@ -103,3 +104,4 @@ html {
   );
   background-size: 28px 28px;
 }
+

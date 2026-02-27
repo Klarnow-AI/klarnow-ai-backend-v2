@@ -17,7 +17,7 @@ export default function PrivacyPage() {
         >
           ← Back to Klarnow AI
         </Link>
-        <h1 className="text-2xl font-bold">Privacy Policy</h1>
+        <h1 className="text-2xl  font-[600]">Privacy Policy</h1>
         <p className="text-muted-foreground text-sm">
           Privacy policy content. Placeholder for privacy policy.
         </p>

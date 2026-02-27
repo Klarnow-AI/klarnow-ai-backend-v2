@@ -63,8 +63,8 @@ export function ThemeSettingsPopover({
                     className={cn(
                       "flex h-9 w-9 items-center justify-center rounded-lg border transition-all focus-visible:outline-none focus-visible:ring-0",
                       isSelected
-                        ? "font-bold text-primary scale-105 border-transparent"
-                        : "border-transparent text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black hover:scale-105"
+                        ? " font-[600] text-primary scale-105 border-transparent"
+                        : "border-transparent text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black hover:scale-105",
                     )}
                     title={opt.label}
                     aria-label={opt.label}

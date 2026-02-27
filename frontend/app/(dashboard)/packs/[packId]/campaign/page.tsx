@@ -18,7 +18,7 @@ export default function CampaignPage() {
         animate={{ opacity: 1, y: 0 }}
         className="mb-8"
       >
-        <h1 className="text-3xl font-bold tracking-tight">Campaign</h1>
+        <h1 className="text-3xl  font-[600] tracking-tight">Campaign</h1>
         <p className="text-muted-foreground mt-1">
           One CTA, goal, angles. Conversion page reflects CTA.
         </p>

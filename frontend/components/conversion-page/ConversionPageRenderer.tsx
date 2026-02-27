@@ -83,10 +83,12 @@ function RenderSection({
   if (t === "hero") {
     const headline = String(props.headline ?? "Your headline");
     const subheadline = String(props.subheadline ?? "");
-    const backgroundImage = props.backgroundImage ? String(props.backgroundImage) : null;
+    const backgroundImage = props.backgroundImage
+      ? String(props.backgroundImage)
+      : null;
     const gradientFrom = props.gradientFrom ? String(props.gradientFrom) : null;
     const gradientTo = props.gradientTo ? String(props.gradientTo) : null;
-    
+
     // Build background style
     let backgroundStyle: React.CSSProperties = {};
     if (backgroundImage) {
@@ -100,28 +102,34 @@ function RenderSection({
         backgroundImage: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})`,
       };
     }
-    
+
     const hasBackground = backgroundImage || (gradientFrom && gradientTo);
-    
+
     return (
-      <section 
+      <section
         className={cn(
           "space-y-4 rounded-2xl p-8",
-          hasBackground ? "text-white" : ""
+          hasBackground ? "text-white" : "",
         )}
         style={backgroundStyle}
       >
-        <h1 className={cn(
-          "text-4xl font-bold tracking-tight sm:text-5xl",
-          hasBackground ? "text-white" : ""
-        )} style={{ fontFamily: "var(--font-heading, inherit)" }}>
+        <h1
+          className={cn(
+            "text-4xl  font-[600] tracking-tight sm:text-5xl",
+            hasBackground ? "text-white" : "",
+          )}
+          style={{ fontFamily: "var(--font-heading, inherit)" }}
+        >
           {headline}
         </h1>
         {subheadline && (
-          <p className={cn(
-            "text-base sm:text-lg",
-            hasBackground ? "text-white/90" : "text-muted-foreground"
-          )} style={{ fontFamily: "var(--font-body, inherit)" }}>
+          <p
+            className={cn(
+              "text-base sm:text-lg",
+              hasBackground ? "text-white/90" : "text-muted-foreground",
+            )}
+            style={{ fontFamily: "var(--font-body, inherit)" }}
+          >
             {subheadline}
           </p>
         )}
@@ -132,9 +140,12 @@ function RenderSection({
   if (t === "benefits") {
     const title = String(props.title ?? "Benefits");
     const itemsRaw = props.items;
-    const items: Array<{ text?: string; title?: string; description?: string; icon?: string }> = Array.isArray(
-      itemsRaw
-    )
+    const items: Array<{
+      text?: string;
+      title?: string;
+      description?: string;
+      icon?: string;
+    }> = Array.isArray(itemsRaw)
       ? itemsRaw.map((x) => {
           if (typeof x === "string") return { text: x };
           if (x && typeof x === "object") {
@@ -152,14 +163,22 @@ function RenderSection({
 
     return (
       <section className="rounded-2xl border border-border bg-card p-6">
-        <h2 className="text-xl font-semibold" style={{ fontFamily: "var(--font-heading, inherit)" }}>{title}</h2>
+        <h2
+          className="text-xl font-semibold"
+          style={{ fontFamily: "var(--font-heading, inherit)" }}
+        >
+          {title}
+        </h2>
         {items.length > 0 ? (
           <ul className="mt-4 space-y-3">
             {items.map((it, i) => (
               <li key={i} className="flex items-start gap-3 text-sm">
                 {it.icon && <span className="text-xl">{it.icon}</span>}
                 <div className="flex-1">
-                  <p className="font-medium" style={{ fontFamily: "var(--font-body, inherit)" }}>
+                  <p
+                    className="font-medium"
+                    style={{ fontFamily: "var(--font-body, inherit)" }}
+                  >
                     {it.text || it.title}
                   </p>
                   {it.description && (
@@ -182,7 +201,7 @@ function RenderSection({
     const title = String(props.title ?? "Social proof");
     const quotesRaw = props.quotes ?? props.items;
     const quotes: Array<{ quote: string; name?: string }> = Array.isArray(
-      quotesRaw
+      quotesRaw,
     )
       ? quotesRaw.map((x) => {
           if (typeof x === "string") return { quote: x };
@@ -227,7 +246,9 @@ function RenderSection({
 
   if (t === "leadForm") {
     const headline = props.headline ? String(props.headline) : undefined;
-    const subheadline = props.subheadline ? String(props.subheadline) : undefined;
+    const subheadline = props.subheadline
+      ? String(props.subheadline)
+      : undefined;
     return (
       <section>
         <LeadCaptureForm
@@ -249,9 +270,17 @@ function RenderSection({
       <section className="rounded-2xl border border-border bg-card p-6">
         <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-semibold" style={{ fontFamily: "var(--font-heading, inherit)" }}>{headline}</h2>
+            <h2
+              className="text-xl font-semibold"
+              style={{ fontFamily: "var(--font-heading, inherit)" }}
+            >
+              {headline}
+            </h2>
             {subheadline && (
-              <p className="mt-1 text-sm text-muted-foreground" style={{ fontFamily: "var(--font-body, inherit)" }}>
+              <p
+                className="mt-1 text-sm text-muted-foreground"
+                style={{ fontFamily: "var(--font-body, inherit)" }}
+              >
                 {subheadline}
               </p>
             )}
@@ -259,9 +288,9 @@ function RenderSection({
           <a
             href={href}
             className={cn(buttonVariants({ variant: "default", size: "lg" }))}
-            style={{ 
+            style={{
               backgroundColor: "var(--color-primary, #6366f1)",
-              fontFamily: "var(--font-body, inherit)"
+              fontFamily: "var(--font-body, inherit)",
             }}
           >
             {label}
@@ -284,4 +313,3 @@ function RenderSection({
 
   return null;
 }
-

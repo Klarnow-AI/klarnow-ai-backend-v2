@@ -585,7 +585,7 @@ export function BrandPreview({
         )}
 
         <div className="text-center">
-          <h4 className="text-3xl font-bold text-foreground">
+          <h4 className="text-3xl  font-[600] text-foreground">
             {draft.brand_name}
           </h4>
           {draft.tagline && (

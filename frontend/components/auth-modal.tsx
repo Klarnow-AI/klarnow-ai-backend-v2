@@ -154,7 +154,7 @@ export function AuthModal({
                 </button>
                 <h2
                   id="auth-modal-title"
-                  className="font-heading text-2xl font-bold text-foreground pr-10"
+                  className="font-heading text-2xl  font-[600] text-foreground pr-10"
                 >
                   Log in or sign up
                 </h2>
