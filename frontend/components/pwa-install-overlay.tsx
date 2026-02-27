@@ -15,8 +15,10 @@ function isStandalone(): boolean {
 
 function isIOS(): boolean {
   if (typeof navigator === "undefined") return false;
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
 }
 
 export function PWAInstallOverlay() {
@@ -70,13 +72,18 @@ export function PWAInstallOverlay() {
     return () => {
       window.removeEventListener(
         "beforeinstallprompt",
-        handleBeforeInstallPrompt
+        handleBeforeInstallPrompt,
       );
       window.removeEventListener("appinstalled", handleAppInstalled);
     };
   }, [mounted, isMobile]);
 
-  if (!mounted || !showOverlay) return null;
+  if (
+    !mounted ||
+    !showOverlay ||
+    process.env.NEXT_PUBLIC_ENVIRONMENT !== "development"
+  )
+    return null;
 
   const hasInstallPrompt = !!installPromptEvent;
   const ios = isIOS();
