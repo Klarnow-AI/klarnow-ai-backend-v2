@@ -53,6 +53,7 @@ import {
   Location01Icon,
   GlobeIcon,
   MoreVerticalIcon,
+  DiscoverCircleIcon,
   Archive01Icon,
   AlertCircleIcon,
   RotateLeft01Icon,
@@ -63,6 +64,9 @@ import {
   Idea01Icon,
   Search01Icon,
   ShoppingBag01Icon,
+  PlayIcon,
+  HeartAddIcon,
+  ComputerScreenShareIcon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 
@@ -126,6 +130,7 @@ export const ChevronRight = createIcon(ArrowRight01Icon, "ChevronRight");
 export const ChevronUp = createIcon(ArrowUp01Icon, "ChevronUp");
 export const FolderPlus = createIcon(FolderAddIcon, "FolderPlus");
 export const GripVertical = createIcon(Menu01Icon, "GripVertical");
+export const Menu = createIcon(Menu01Icon, "Menu");
 export const PanelLeftClose = createIcon(PanelLeftCloseIcon, "PanelLeftClose");
 export const MenuCollapse = createIcon(MenuCollapseIcon, "MenuCollapse");
 export const Feedback = createIcon(ChatFeedback01Icon, "Feedback");
@@ -138,6 +143,7 @@ export const Phone = createIcon(CallIcon, "Phone");
 export const MapPin = createIcon(Location01Icon, "MapPin");
 export const Globe = createIcon(GlobeIcon, "Globe");
 export const MoreVertical = createIcon(MoreVerticalIcon, "MoreVertical");
+export const Discover = createIcon(DiscoverCircleIcon, "Discover");
 export const Archive = createIcon(Archive01Icon, "Archive");
 export const AlertCircle = createIcon(AlertCircleIcon, "AlertCircle");
 export const RotateCcw = createIcon(RotateLeft01Icon, "RotateCcw");
@@ -148,3 +154,6 @@ export const Bell = createIcon(Notification01Icon, "Bell");
 export const Lightbulb = createIcon(Idea01Icon, "Lightbulb");
 export const Search = createIcon(Search01Icon, "Search");
 export const ShoppingBag = createIcon(ShoppingBag01Icon, "ShoppingBag");
+export const Play = createIcon(PlayIcon, "Play");
+export const Heart = createIcon(HeartAddIcon, "Heart");
+export const Share = createIcon(ComputerScreenShareIcon, "Share");

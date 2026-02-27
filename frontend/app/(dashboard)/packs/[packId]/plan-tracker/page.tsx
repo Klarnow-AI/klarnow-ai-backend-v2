@@ -130,7 +130,7 @@ export default function PlanTrackerPage() {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="w-full max-w-7xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}

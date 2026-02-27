@@ -19,7 +19,8 @@ type PackDeleteModalProps = {
 const ACTION_CONFIG = {
   archive: {
     title: "Archive Pack",
-    description: "This pack will be archived and hidden from your main list. You can restore it later.",
+    description:
+      "This pack will be archived and hidden from your main list. You can restore it later.",
     confirmLabel: "Archive",
     confirmColor: "bg-amber-600 hover:bg-amber-700 text-white",
     icon: Archive,
@@ -28,7 +29,8 @@ const ACTION_CONFIG = {
   },
   restore: {
     title: "Restore Pack",
-    description: "This pack will be restored and moved back to your active packs list.",
+    description:
+      "This pack will be restored and moved back to your active packs list.",
     confirmLabel: "Restore",
     confirmColor: "bg-emerald-600 hover:bg-emerald-700 text-white",
     icon: RotateCcw,
@@ -37,8 +39,9 @@ const ACTION_CONFIG = {
   },
   delete: {
     title: "Delete Pack Permanently",
-    description: "This action cannot be undone. All associated data will be permanently deleted:",
-    confirmLabel: "Delete Forever",
+    description:
+      "This action cannot be undone. All associated data will be permanently deleted:",
+    confirmLabel: "Delete",
     confirmColor: "bg-red-600 hover:bg-red-700 text-white",
     icon: Trash2,
     iconColor: "text-red-600",
@@ -67,12 +70,10 @@ export function PackDeleteModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [confirmText, setConfirmText] = useState("");
-  
+
   const config = ACTION_CONFIG[type];
   const Icon = config.icon;
-  const canConfirm = config.requireTyping 
-    ? confirmText === packName 
-    : true;
+  const canConfirm = config.requireTyping ? confirmText === packName : true;
 
   useEffect(() => {
     if (open) {
@@ -84,7 +85,7 @@ export function PackDeleteModal({
 
   async function handleConfirm() {
     if (!canConfirm) return;
-    
+
     setError("");
     setLoading(true);
     try {
@@ -128,7 +129,9 @@ export function PackDeleteModal({
               {/* Header */}
               <div className="flex items-start justify-between p-6 pb-4">
                 <div className="flex items-start gap-3">
-                  <div className={`p-2 rounded-full bg-muted ${config.iconColor}`}>
+                  <div
+                    className={`p-2 rounded-full bg-muted ${config.iconColor}`}
+                  >
                     <Icon className="h-5 w-5" />
                   </div>
                   <div>
@@ -181,7 +184,8 @@ export function PackDeleteModal({
                 {config.requireTyping && (
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Type <span className="font-semibold">{packName}</span> to confirm
+                      Type <span className="font-semibold">{packName}</span> to
+                      confirm
                     </label>
                     <Input
                       value={confirmText}

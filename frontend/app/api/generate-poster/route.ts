@@ -133,7 +133,7 @@ OUTPUT FORMAT (Mode 2 only):
 </file>
 
 - File name must end in .html and describe the design (e.g. /SummerPromoFlyer.html, /EventAnnouncement.html)
-- You may output multiple <file> tags if the user asks for variations
+- ALWAYS output exactly 4 <file> tags with distinct design variations (different layouts, color schemes, or visual styles). Each variation should be a unique interpretation of the request.
 - When generating, do NOT write ANY text outside <summary> and <file> tags — no markdown, no explanations
 ${brandSection}`;
 }

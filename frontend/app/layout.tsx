@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono, Google_Sans_Flex } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/auth-context";
@@ -14,9 +15,10 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-geist-mono",
 });
-const googleSansFlex = Google_Sans_Flex({
-  subsets: ["latin"],
+const googleSansFlex = localFont({
+  src: "../fonts/GoogleSansFlex-VariableFont.ttf",
   variable: "--font-heading",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -41,6 +43,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){var t=localStorage.getItem('klarnow-theme');var r=t==='light'?'light':t==='system'?(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):'light';document.documentElement.classList.add(r);})();`,

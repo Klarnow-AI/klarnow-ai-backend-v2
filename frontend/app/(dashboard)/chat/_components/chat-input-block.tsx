@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, Target } from "@/components/icons";
+import { Check, Eye, Target } from "@/components/icons";
 import { Chip } from "@/components/ui/chip";
 import { ComposeInput } from "@/components/ui/compose-input";
 import type { DayQuestionContext, NextActionChip } from "@/types/api-types";
@@ -23,6 +23,7 @@ export type ChatInputBlockProps = {
   onQuestionChipClick?: (value: string) => void;
   onResuggest?: () => void;
   onOpenHistory?: () => void;
+  onMarkDayComplete?: () => void;
 };
 
 const DAY0_CHOICE_YES = "Yes, I have a brand";
@@ -45,6 +46,7 @@ export function ChatInputBlock({
   onQuestionChipClick,
   onResuggest,
   onOpenHistory,
+  onMarkDayComplete,
 }: ChatInputBlockProps) {
   const inputPlaceholder = questionContext?.input_placeholder ?? "Type your message to Klaro…";
   return (
@@ -96,6 +98,17 @@ export function ChatInputBlock({
         wrapperClassName="mb-4"
       />
       <div className="flex flex-wrap items-center justify-center gap-2">
+        {dayContext && dayContext.day >= 0 && dayContext.day <= 3 && onMarkDayComplete && (
+          <Chip
+            size="md"
+            icon={<Check className="h-4 w-4" />}
+            onClick={onMarkDayComplete}
+            disabled={loading}
+            className="cursor-pointer"
+          >
+            Mark day complete
+          </Chip>
+        )}
         <Chip
           size="md"
           icon={<Eye className="h-4 w-4" />}

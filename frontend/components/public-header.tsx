@@ -53,10 +53,10 @@ export function PublicHeader({
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="relative flex items-center justify-between px-6 py-4"
+      className="relative flex items-center justify-between px-4 sm:px-6 py-4"
     >
-      <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-        <div className="relative flex h-9 w-9 items-center justify-center rounded-full overflow-hidden">
+      <Link href="/" className="flex items-center gap-2 flex-shrink-0 min-w-0">
+        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full overflow-hidden">
           <Image
             src={logoSrc}
             alt="Klarnow AI"
@@ -65,13 +65,13 @@ export function PublicHeader({
             className="object-contain"
           />
         </div>
-        <span className="font-semibold text-lg text-foreground whitespace-nowrap">
+        <span className="font-semibold text-base sm:text-lg text-foreground whitespace-nowrap truncate">
           Klarnow.ai
         </span>
       </Link>
       {showInstallAbout && !isLoading && (
         <nav
-          className="absolute left-1/2 -translate-x-1/2 flex items-center gap-6"
+          className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-6"
           aria-label="Main"
         >
           <Link
@@ -88,15 +88,15 @@ export function PublicHeader({
           </Link>
         </nav>
       )}
-      <nav className="flex items-center gap-2 flex-shrink-0">
+      <nav className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
         {!isLoading && (
           <>
             {isAuthenticated ? (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4">
                 <button
                   type="button"
                   onClick={handleDashboardClick}
-                  className="text-sm text-foreground/50 no-underline hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all rounded-lg px-2 py-1 -mx-2 -my-1 focus-visible:outline-none focus-visible:ring-0 hover:scale-105"
+                  className="text-xs sm:text-sm text-foreground/50 no-underline hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all rounded-lg px-2 py-1 -mx-2 -my-1 focus-visible:outline-none focus-visible:ring-0 hover:scale-105 whitespace-nowrap"
                 >
                   Dashboard
                 </button>

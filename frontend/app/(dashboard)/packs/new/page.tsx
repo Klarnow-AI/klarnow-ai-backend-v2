@@ -16,7 +16,7 @@ export default function NewPackPage() {
 
   function handleComplete(packId: string) {
     dispatchPacksUpdated();
-    router.push(`/packs/${packId}`);
+    router.push(`/chat?pack=${packId}`);
   }
 
   const state = useOnboardingChat({
@@ -39,7 +39,7 @@ export default function NewPackPage() {
           router.push("/packs/new");
         }}
       />
-      <main className="flex-1 flex flex-col items-center justify-center p-4">
+      <main className="flex-1 flex flex-col items-center justify-center">
         <div className="w-full max-w-[600px] min-h-[220px]">
           <OnboardingSlideView
             step={state.step}

@@ -37,9 +37,12 @@ export function BrandPreviewModal({
         onClick={onClose}
         aria-hidden
       />
-      
+
       {/* Preview modal z-[60] */}
-      <div key="brand-preview-container" className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none">
+      <div
+        key="brand-preview-container"
+        className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none"
+      >
         <motion.div
           key="brand-preview-modal"
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -63,7 +66,7 @@ export function BrandPreviewModal({
               <X className="w-5 h-5" />
             </button>
           )}
-          
+
           {/* Preview content */}
           <div className="p-8">
             <BrandPreview

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, FormEvent } from "react";
 import { Paperclip, Send, Stop } from "@/components/icons";
 import { IconButton } from "@/components/ui/icon-button";
+import { AssistantAvatar } from "@/components/assistant-avatar";
 import { SearchInput } from "@/components/ui/search-input";
 import type { BrandContext } from "@/app/api/generate/route";
 
@@ -37,7 +38,7 @@ type BuilderChatPanelProps = {
   emptyStateDescription?: string;
   onFilesGenerated?: (
     files: Record<string, string>,
-    messages: Message[]
+    messages: Message[],
   ) => void;
   onGeneratingChange?: (generating: boolean) => void;
 };
@@ -172,7 +173,7 @@ export function BuilderChatPanel({
         inputRef.current?.focus();
       }
     },
-    [apiRoute, brandContext]
+    [apiRoute, brandContext],
   );
 
   const handleSubmit = async (e: FormEvent) => {
@@ -219,15 +220,19 @@ export function BuilderChatPanel({
                   <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                 </div>
               ) : (
-                <div className="rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] text-sm text-foreground">
-                  <span className="whitespace-pre-wrap">{msg.content}</span>
-                </div>
+                <>
+                  <AssistantAvatar />
+                  <div className="rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] text-sm text-foreground">
+                    <span className="whitespace-pre-wrap">{msg.content}</span>
+                  </div>
+                </>
               )}
             </div>
           ))}
 
           {isStreaming && (
-            <div className="flex justify-start">
+            <div className="flex justify-start gap-3">
+              <AssistantAvatar />
               <div className="rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] text-sm text-foreground">
                 <span className="whitespace-pre-wrap">{"\u00A0"}</span>
                 <span

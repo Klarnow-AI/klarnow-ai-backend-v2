@@ -1,25 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { packs as packsApi, creative as creativeApi } from "@/lib/api";
 import { brandOs as brandOsApi } from "@/api_requests/brand-os";
-import {
-  Panel,
-  Group,
-  Separator,
-  useDefaultLayout,
-} from "react-resizable-panels";
-import { BuilderChatPanel } from "../_components/builder-chat-panel";
-import {
-  PosterPreviewPanel,
-  type PosterAsset,
-} from "./_components/poster-preview-panel";
-
-export type PosterWithMeta = PosterAsset & {
-  id?: string;
-  chat_messages?: { role: "user" | "assistant"; content: string }[];
-};
+import { sprintApi } from "@/api_requests/sprint";
+import { generatePosters } from "@/lib/generate-poster";
+import { CreativeFactoryLayout } from "../_components/creative-factory-layout";
+import type { CreativeTemplateCardAsset } from "../_components/creative-template-card";
+import type { PromptWithResults } from "../_components/creative-template-grid";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
@@ -96,73 +85,66 @@ function buildBrandContext(pack: Pack, brand: BrandOS | null): BrandContext {
   };
 }
 
-function ResizableLayout({
-  brandContext,
-  posters,
-  isGenerating,
-  selectedPosterIndex,
-  onSelectPosterIndex,
-  onDeletePoster,
-  onFilesGenerated,
-  onGeneratingChange,
-}: {
-  brandContext: BrandContext | null;
-  posters: PosterWithMeta[];
-  isGenerating: boolean;
-  selectedPosterIndex: number;
-  onSelectPosterIndex: (index: number) => void;
-  onDeletePoster: (index: number) => void;
-  onFilesGenerated: (
-    files: Record<string, string>,
-    messages: { role: "user" | "assistant"; content: string }[]
-  ) => void;
-  onGeneratingChange: (generating: boolean) => void;
-}) {
-  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: "posters-panel-layout",
-    storage: typeof window !== "undefined" ? localStorage : undefined,
-  });
+type AssetWithMeta = CreativeTemplateCardAsset & {
+  created_at: string;
+  chat_messages?: { role: string; content: string }[] | null;
+};
 
-  return (
-    <Group
-      orientation="horizontal"
-      defaultLayout={defaultLayout}
-      onLayoutChanged={onLayoutChanged}
-      className="flex-1 min-h-0"
-    >
-      <Panel id="chat" defaultSize="30%" minSize="20%" maxSize="50%">
-        <div className="flex flex-col h-full overflow-hidden">
-          <BuilderChatPanel
-            title="Posters & Flyers"
-            apiRoute="/api/generate-poster"
-            brandContext={brandContext}
-            emptyStateTitle="Create a poster or flyer"
-            emptyStateDescription="Describe the poster or flyer you'd like to create and Klaro will generate it using your brand identity."
-            initialMessages={
-              posters[selectedPosterIndex]?.chat_messages ?? undefined
-            }
-            threadKey={selectedPosterIndex}
-            onFilesGenerated={onFilesGenerated}
-            onGeneratingChange={onGeneratingChange}
-          />
-        </div>
-      </Panel>
+function getPromptFromAsset(asset: AssetWithMeta): string {
+  const msgs = asset.chat_messages;
+  if (!msgs || !Array.isArray(msgs)) return "Your creation";
+  const userMsg = msgs.find((m) => m.role === "user");
+  return userMsg?.content?.trim() || "Your creation";
+}
 
-      <Separator className="w-1.5 bg-transparent hover:bg-primary/50 transition-colors duration-150 cursor-col-resize" />
-
-      <Panel id="preview" defaultSize="70%" minSize="50%">
-        <div className="h-full overflow-hidden">
-          <PosterPreviewPanel
-            posters={posters}
-            isGenerating={isGenerating}
-            selectedIndex={selectedPosterIndex}
-            onSelectIndex={onSelectPosterIndex}
-            onDeletePoster={onDeletePoster}
-          />
-        </div>
-      </Panel>
-    </Group>
+function groupAssetsByPrompt(assets: AssetWithMeta[]): PromptWithResults[] {
+  const sorted = [...assets].sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
   );
+  const groups: PromptWithResults[] = [];
+  let current: {
+    prompt: string;
+    results: CreativeTemplateCardAsset[];
+    createdAt: string;
+  } | null = null;
+
+  for (const asset of sorted) {
+    const prompt = getPromptFromAsset(asset);
+    const card: CreativeTemplateCardAsset = {
+      id: asset.id,
+      name: asset.name,
+      code: asset.code,
+    };
+    if (current && current.prompt === prompt) {
+      current.results.push(card);
+    } else {
+      current = { prompt, results: [card], createdAt: asset.created_at };
+      groups.push(current);
+    }
+  }
+  return groups;
+}
+
+function toAssetsWithMeta(
+  items: {
+    id: string;
+    type: string;
+    name: string | null;
+    source_code: string | null;
+    created_at: string;
+    chat_messages?: { role: string; content: string }[] | null;
+  }[],
+): AssetWithMeta[] {
+  return items
+    .filter((a) => (a.type === "poster" || a.type === "flyer") && a.source_code)
+    .map((a) => ({
+      id: a.id,
+      name: a.name ?? `/${a.type}_${a.id}.tsx`,
+      code: a.source_code!,
+      created_at: a.created_at,
+      chat_messages: a.chat_messages ?? null,
+    }));
 }
 
 export default function PostersPage() {
@@ -171,9 +153,15 @@ export default function PostersPage() {
   const [brandContext, setBrandContext] = useState<BrandContext | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [posters, setPosters] = useState<PosterWithMeta[]>([]);
+  const [assets, setAssets] = useState<AssetWithMeta[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [selectedPosterIndex, setSelectedPosterIndex] = useState(0);
+  const [generatingPrompt, setGeneratingPrompt] = useState<string | null>(null);
+  const [selectedAsset, setSelectedAsset] =
+    useState<CreativeTemplateCardAsset | null>(null);
+  const [sprintDay, setSprintDay] = useState<number | null>(null);
+  const autoGeneratedRef = useRef(false);
+
+  const promptGroups = groupAssetsByPrompt(assets);
 
   useEffect(() => {
     if (!packId) return;
@@ -182,32 +170,25 @@ export default function PostersPage() {
 
     async function init() {
       try {
-        const [pack, brand, assetsRes] = await Promise.all([
+        const [pack, brand, assetsRes, sprint] = await Promise.all([
           packsApi.get(packId!),
           brandOsApi.getActive(packId!).catch(() => null),
           creativeApi.listAssets(packId!),
+          sprintApi.getSprint(packId!).catch(() => null),
         ]);
 
         if (!cancelled) {
           setBrandContext(buildBrandContext(pack, brand ?? null));
-          const savedPosters: PosterWithMeta[] = assetsRes.items
-            .filter(
-              (a) =>
-                (a.type === "poster" || a.type === "flyer") && a.source_code
-            )
-            .map((a) => ({
-              name: a.name ?? `/${a.type}_${a.id}.tsx`,
-              code: a.source_code!,
-              id: a.id,
-              chat_messages: a.chat_messages ?? undefined,
-            }));
-          setPosters(savedPosters);
-          if (savedPosters.length > 0)
-            setSelectedPosterIndex(savedPosters.length - 1);
+          setAssets(toAssetsWithMeta(assetsRes.items));
+          setSprintDay(sprint?.current_day ?? null);
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load poster builder");
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to load poster builder",
+          );
           setBrandContext({});
         }
       } finally {
@@ -216,7 +197,9 @@ export default function PostersPage() {
     }
 
     init();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [packId]);
 
   useEffect(() => {
@@ -227,25 +210,10 @@ export default function PostersPage() {
       creativeApi
         .listAssets(packId!)
         .then((res) => {
-          const savedPosters: PosterWithMeta[] = res.items
-            .filter(
-              (a) =>
-                (a.type === "poster" || a.type === "flyer") && a.source_code
-            )
-            .map((a) => ({
-              name: a.name ?? `/${a.type}_${a.id}.tsx`,
-              code: a.source_code!,
-              id: a.id,
-              chat_messages: a.chat_messages ?? undefined,
-            }));
-          setPosters(savedPosters);
-          if (savedPosters.length > 0)
-            setSelectedPosterIndex(savedPosters.length - 1);
+          setAssets(toAssetsWithMeta(res.items));
           setError(null);
         })
-        .catch(() => {
-          // Keep current state; don't overwrite with empty or show error on refetch
-        });
+        .catch(() => {});
     }
 
     document.addEventListener("visibilitychange", onVisibilityChange);
@@ -256,14 +224,23 @@ export default function PostersPage() {
   const handleFilesGenerated = useCallback(
     async (
       files: Record<string, string>,
-      messages: { role: "user" | "assistant"; content: string }[]
+      messages: { role: "user" | "assistant"; content: string }[],
     ) => {
-      const newPosters: PosterWithMeta[] = [];
+      const userPrompt =
+        messages.find((m) => m.role === "user")?.content ?? "Your creation";
+      const newAssets: AssetWithMeta[] = [];
       let saveFailCount = 0;
       let lastSaveError: Error | null = null;
+      const now = new Date().toISOString();
+
       for (const [name, code] of Object.entries(files)) {
-        const poster: PosterWithMeta = { name, code };
-        newPosters.push(poster);
+        const asset: AssetWithMeta = {
+          name,
+          code,
+          created_at: now,
+          chat_messages: messages,
+        };
+        newAssets.push(asset);
         if (packId) {
           try {
             const created = await creativeApi.createAsset({
@@ -274,8 +251,8 @@ export default function PostersPage() {
               template_id: null,
               chat_messages: messages.length > 0 ? messages : null,
             });
-            poster.id = created.id;
-            poster.chat_messages = created.chat_messages ?? undefined;
+            asset.id = created.id;
+            asset.created_at = created.created_at;
           } catch (e) {
             saveFailCount += 1;
             lastSaveError = e instanceof Error ? e : new Error(String(e));
@@ -291,34 +268,82 @@ export default function PostersPage() {
           description: lastSaveError?.message,
         });
       }
-      setPosters((prev) => [...prev, ...newPosters]);
-      if (newPosters.length > 0)
-        setSelectedPosterIndex(
-          posters.length + newPosters.length - 1
-        );
+      setAssets((prev) => [...prev, ...newAssets]);
+      setGeneratingPrompt(null);
     },
-    [packId]
+    [packId],
   );
 
-  const handleDeletePoster = useCallback(
-    async (index: number) => {
-      const poster = posters[index];
-      if (!poster) return;
-      if (poster.id && packId) {
-        try {
-          await creativeApi.deleteAsset(poster.id);
-        } catch {
-          // Still remove from UI on API failure so list doesn't get stuck
+  useEffect(() => {
+    if (
+      !packId ||
+      loading ||
+      assets.length > 0 ||
+      sprintDay === null ||
+      sprintDay < 4 ||
+      !brandContext ||
+      autoGeneratedRef.current
+    )
+      return;
+
+    autoGeneratedRef.current = true;
+    const prompt =
+      "Create 4 starter poster designs for my brand with distinct layouts, color schemes, and visual styles.";
+    setIsGenerating(true);
+    setGeneratingPrompt(prompt);
+
+    generatePosters("/api/generate-poster", prompt, brandContext)
+      .then((files) => {
+        if (Object.keys(files).length > 0) {
+          const messages = [
+            { role: "user" as const, content: prompt },
+            {
+              role: "assistant" as const,
+              content: "Done! Your designs have been generated.",
+            },
+          ];
+          handleFilesGenerated(files, messages);
         }
-      }
-      setPosters((prev) => prev.filter((_, i) => i !== index));
-      setSelectedPosterIndex((prev) => {
-        if (prev === index) return Math.max(0, index - 1);
-        if (prev > index) return prev - 1;
-        return prev;
+      })
+      .catch((err) => {
+        autoGeneratedRef.current = false;
+        toast.error("Auto-generation failed", {
+          description: err instanceof Error ? err.message : String(err),
+        });
+      })
+      .finally(() => {
+        setIsGenerating(false);
+        setGeneratingPrompt(null);
       });
+  }, [
+    packId,
+    loading,
+    assets.length,
+    sprintDay,
+    brandContext,
+    handleFilesGenerated,
+  ]);
+
+  const handleGeneratingChange = useCallback(
+    (generating: boolean, prompt?: string | null) => {
+      setIsGenerating(generating);
+      setGeneratingPrompt(generating && prompt ? prompt : null);
     },
-    [posters, packId]
+    [],
+  );
+
+  const handleDeleteAsset = useCallback(
+    async (assetId: string) => {
+      if (!packId) return;
+      try {
+        await creativeApi.deleteAsset(assetId);
+      } catch {
+        // Still remove from UI
+      }
+      setAssets((prev) => prev.filter((a) => a.id !== assetId));
+      setSelectedAsset((prev) => (prev?.id === assetId ? null : prev));
+    },
+    [packId],
   );
 
   if (!packId) return null;
@@ -343,16 +368,19 @@ export default function PostersPage() {
   }
 
   return (
-    <div className="flex flex-1 min-h-0 overflow-hidden p-4">
-      <ResizableLayout
+    <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
+      <CreativeFactoryLayout
+        variant="posters"
+        packId={packId}
         brandContext={brandContext}
-        posters={posters}
+        promptGroups={promptGroups}
+        generatingPrompt={generatingPrompt}
         isGenerating={isGenerating}
-        selectedPosterIndex={selectedPosterIndex}
-        onSelectPosterIndex={setSelectedPosterIndex}
-        onDeletePoster={handleDeletePoster}
+        selectedAsset={selectedAsset}
+        onAssetSelect={setSelectedAsset}
         onFilesGenerated={handleFilesGenerated}
-        onGeneratingChange={setIsGenerating}
+        onGeneratingChange={handleGeneratingChange}
+        onDeleteAsset={handleDeleteAsset}
       />
     </div>
   );

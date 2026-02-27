@@ -149,7 +149,7 @@ def export_conversion_page_for_react(
     db=Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Export conversion page as React payload (structure + metadata) for Launch Pack or static build."""
+    """Export conversion page as React payload (structure + metadata) for static build."""
     _ensure_pack_access(db, pack_id, current_user.id)
     page = get_by_version(db, pack_id, version)
     if not page:

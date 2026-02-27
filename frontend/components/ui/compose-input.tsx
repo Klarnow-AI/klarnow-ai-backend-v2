@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -18,6 +19,7 @@ import {
   Clock,
 } from "@/components/icons";
 import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
+import { useDynamicPopover } from "@/hooks/use-dynamic-popover";
 import { IconButton } from "@/components/ui/icon-button";
 import { VoiceWaveIndicator } from "@/components/ui/voice-wave-indicator";
 import { cn } from "@/lib/utils";
@@ -90,22 +92,30 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
     const valueRef = useRef(value);
     valueRef.current = value;
     const [popoverOpen, setPopoverOpen] = useState(false);
-    const popoverRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const { refs, floatingStyles, isPositioned } = useDynamicPopover({
+      open: popoverOpen,
+      placement: "top-start",
+      offset: 12,
+    });
+
     useEffect(() => {
-      const handler = (e: MouseEvent) => {
+      function handler(e: MouseEvent) {
+        const target = e.target as Node;
+        const ref = refs.reference.current;
         if (
-          popoverRef.current &&
-          !popoverRef.current.contains(e.target as Node)
+          (ref instanceof Element && ref.contains(target)) ||
+          refs.floating.current?.contains(target)
         )
-          setPopoverOpen(false);
-      };
+          return;
+        setPopoverOpen(false);
+      }
       if (popoverOpen) {
         document.addEventListener("mousedown", handler);
         return () => document.removeEventListener("mousedown", handler);
       }
-    }, [popoverOpen]);
+    }, [popoverOpen, refs.reference, refs.floating]);
 
     const handleAttachClick = useCallback(() => {
       setPopoverOpen(false);
@@ -149,7 +159,7 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
     }, []);
 
     const defaultLeft = (
-      <div ref={popoverRef} className="relative shrink-0">
+      <div ref={refs.setReference} className="relative shrink-0">
         <input
           ref={fileInputRef}
           type="file"
@@ -169,70 +179,84 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
         >
           <Plus className="h-4 w-4" />
         </IconButton>
-        <AnimatePresence>
-          {popoverOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.15 }}
-              className="absolute left-0 top-full mt-2 z-50 w-56 rounded-xl border border-border bg-card p-2 shadow shadow-black/10"
-            >
-              <button
-                type="button"
-                onClick={handleAttachClick}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground   transition-colors"
-              >
-                <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span>Attach photo, video, docx</span>
-              </button>
-              <div className="my-2 border-t border-border" />
-              <button
-                type="button"
-                onClick={() => handleMenuAction(onCreateImage)}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground   transition-colors"
-              >
-                <Image className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span>Create image</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleMenuAction(onThinking)}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground   transition-colors"
-              >
-                <Lightbulb className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span>Thinking</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleMenuAction(onDeepResearch)}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground   transition-colors"
-              >
-                <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span>Deep Research</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleMenuAction(onShoppingResearch)}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground   transition-colors"
-              >
-                <ShoppingBag className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span>Shopping research</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleMenuAction(onMore)}
-                className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground   transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <MoreVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span>More</span>
+        {typeof document !== "undefined" &&
+          createPortal(
+            <AnimatePresence>
+              {popoverOpen && (
+                <div
+                  ref={refs.setFloating}
+                  style={{
+                    ...floatingStyles,
+                    visibility: isPositioned ? "visible" : "hidden",
+                  }}
+                >
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: isPositioned ? 1 : 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="z-[100] w-56 rounded-xl border border-border bg-card/100 p-2 shadow shadow-black/10"
+                  >
+                  <button
+                    type="button"
+                    onClick={handleAttachClick}
+                    className="flex w-full min-w-0 items-center gap-2 overflow-hidden rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
+                  >
+                    <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 truncate">
+                      Attach photo, video, docx
+                    </span>
+                  </button>
+                  <div className="my-2 border-t border-border" />
+                  <button
+                    type="button"
+                    onClick={() => handleMenuAction(onCreateImage)}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
+                  >
+                    <Image className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span>Create image</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMenuAction(onThinking)}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
+                  >
+                    <Lightbulb className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span>Thinking</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMenuAction(onDeepResearch)}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
+                  >
+                    <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span>Deep Research</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMenuAction(onShoppingResearch)}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
+                  >
+                    <ShoppingBag className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span>Shopping research</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMenuAction(onMore)}
+                    className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <MoreVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span>More</span>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </button>
+                </motion.div>
                 </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </button>
-            </motion.div>
+              )}
+            </AnimatePresence>,
+            document.body,
           )}
-        </AnimatePresence>
       </div>
     );
     const defaultRightIcons = isRecording ? (
@@ -272,7 +296,8 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
         <div
           className={cn(
             "relative flex flex-col w-full rounded-3xl border border-border bg-card",
-            "focus-within:border-foreground/30 focus-within:scale-[1.02] transition-all",
+            "focus-within:border-foreground/30 transition-all",
+            !popoverOpen && "focus-within:scale-[1.02]",
           )}
         >
           <textarea

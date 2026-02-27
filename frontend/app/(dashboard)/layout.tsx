@@ -1,15 +1,22 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { useHasPacks } from "@/hooks/use-has-packs";
+import { MobileInputNavProvider } from "@/contexts/mobile-input-nav-context";
+import { cn } from "@/lib/utils";
 import { Sidebar } from "@/components/layout/sidebar";
+import { MobileHeaderBar } from "@/components/layout/mobile-header-bar";
+import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { SidebarContent } from "@/components/layout/sidebar-content";
 import { PageLoader } from "@/components/ui/page-loader";
 import { ErrorBoundary } from "@/components/error-boundary";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   if (pathname === "/packs/new") {
     return (
@@ -21,15 +28,45 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     );
   }
 
+  const hideMobileNav =
+    pathname?.endsWith("/posters") || pathname?.endsWith("/ad-factory");
+
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar />
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <ErrorBoundary fallbackTitle="This page encountered an error">
-          {children}
-        </ErrorBoundary>
-      </main>
-    </div>
+    <MobileInputNavProvider>
+      <div className="flex h-dvh overflow-hidden bg-background">
+        <Sidebar />
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden min-w-0 w-full">
+          <div className="lg:hidden">
+            <MobileHeaderBar />
+          </div>
+          <main
+            className={cn(
+              "flex-1 flex flex-col min-h-0 overflow-hidden p-[16px] lg:p-0 lg:pb-0",
+              !hideMobileNav &&
+                "pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]",
+            )}
+          >
+            <ErrorBoundary fallbackTitle="This page encountered an error">
+              {children}
+            </ErrorBoundary>
+          </main>
+          {!hideMobileNav && (
+            <div className="lg:hidden">
+              <MobileBottomNav />
+            </div>
+          )}
+        </div>
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen} side="left">
+          <SheetContent className="bg-card">
+            <SidebarContent
+              variant="sheet"
+              onClose={() => setSheetOpen(false)}
+              onNavigate={() => setSheetOpen(false)}
+            />
+          </SheetContent>
+        </Sheet>
+      </div>
+    </MobileInputNavProvider>
   );
 }
 

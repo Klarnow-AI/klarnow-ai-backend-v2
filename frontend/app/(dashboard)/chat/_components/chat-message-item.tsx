@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Check } from "@/components/icons";
+import { AssistantAvatar } from "@/components/assistant-avatar";
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/ui/markdown-content";
 import { cn } from "@/lib/utils";
@@ -40,7 +41,9 @@ export function ChatMessageItem({
           )}
         </div>
       ) : (
-        <div className="rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] text-sm text-foreground">
+        <>
+          <AssistantAvatar />
+          <div className="rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] text-sm text-foreground">
           {isStreaming ? (
             <>
               <span className="whitespace-pre-wrap">
@@ -72,7 +75,8 @@ export function ChatMessageItem({
                 </Button>
               </div>
             )}
-        </div>
+          </div>
+        </>
       )}
       {message.role === "user" && <div className="w-8 shrink-0" />}
     </motion.div>

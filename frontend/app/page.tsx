@@ -81,7 +81,7 @@ export default function LandingPage() {
   function handleDashboardClick(e: React.MouseEvent) {
     e.preventDefault();
     if (context?.pack) {
-      router.push(`/packs/${context.pack.id}`);
+      router.push(`/chat?pack=${context.pack.id}`);
     } else if (landingLoading) {
       return;
     } else {
@@ -125,16 +125,16 @@ export default function LandingPage() {
       />
 
       {/* Main */}
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
+      <main className="flex-1 flex flex-col items-center justify-center">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
-          className="w-full max-w-4xl flex flex-col items-center text-center"
+          className="w-full max-w-4xl flex flex-col items-center text-center px-4 sm:px-6"
         >
           {/* Top strip: Pack name, Day X of 14, date (Command Centre) */}
           {showStrip && context?.pack && (
-            <div className="flex items-center justify-center gap-3 mb-4 text-xs text-muted-foreground flex-wrap">
+            <div className="flex items-center justify-center gap-2 sm:gap-3 mb-4 text-xs text-muted-foreground flex-wrap">
               <span>Pack: {context.pack.name}</span>
               <span aria-hidden className="text-muted-foreground/50">
                 ·
@@ -179,12 +179,12 @@ export default function LandingPage() {
             value={query}
             onChange={setQuery}
             onSubmit={handleSubmit}
-            placeholder="Describe the offer you want to launch…"
+            placeholder="Describe the campaign you want to launch…"
             wrapperClassName="mb-2"
           />
 
           {/* Next Action chips (stateful from API, max 3) */}
-          <div className="flex flex-wrap items-center justify-center gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
             {!isAuthenticated && (
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
@@ -239,7 +239,7 @@ export default function LandingPage() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
-        className="py-6 px-6 flex flex-col items-end gap-4"
+        className="py-6 flex flex-col items-end gap-4"
       >
         <p className="w-full text-center text-sm text-muted-foreground">
           By using Klarnow AI, you agree to our{" "}

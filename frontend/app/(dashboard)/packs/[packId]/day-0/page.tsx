@@ -14,7 +14,7 @@ export default function Day0Redirect() {
   }, [packId, router]);
 
   return (
-    <div className="p-8 flex items-center justify-center">
+    <div className="flex items-center justify-center min-h-[40vh]">
       <p className="text-sm text-muted-foreground">Opening Day 0…</p>
     </div>
   );

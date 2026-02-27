@@ -1,16 +1,20 @@
 """Pack tools for Day 0-3 conversational flow."""
 
+import asyncio
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
 from app.modules.packs.models import Pack
+from app.modules.packs.services import merge_onboarding_answers
 
 
 UPDATE_PACK_SCHEMA = {
     "type": "object",
     "properties": {
         "pack_id": {"type": "string", "format": "uuid", "description": "Pack id"},
+        "has_existing_brand": {"type": "string", "description": "Day 0: 'yes' or 'no'"},
+        "brand_url": {"type": "string", "description": "Day 0: website URL (triggers extraction when has_existing_brand=yes)"},
         "brand_name": {"type": "string", "description": "Brand name (Day 0)"},
         "primary_cta": {"type": "string", "description": "Primary call-to-action (Day 0)"},
         "usp_statement": {"type": "string", "description": "USP statement (Day 0)"},
@@ -26,11 +30,75 @@ UPDATE_PACK_SCHEMA = {
     "required": ["pack_id"],
 }
 
+EXTRACT_BRAND_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "pack_id": {"type": "string", "format": "uuid", "description": "Pack id"},
+        "url": {"type": "string", "description": "Website URL to extract brand from"},
+    },
+    "required": ["pack_id", "url"],
+}
+
+
+def extract_brand_from_url(db: Session, pack_id: UUID | str, *, url: str, **kwargs: object) -> dict:
+    """
+    Extract brand profile from website URL for existing brand (Day 0).
+    Merges extracted data into onboarding_answers and pack fields.
+    Call this when user provides a website URL and has_existing_brand is yes.
+    """
+    import json
+    from app.modules.packs.onboarding_services import extract_brand as extract_brand_async
+
+    if isinstance(pack_id, str):
+        pack_id = UUID(pack_id)
+    pack = db.query(Pack).filter(Pack.id == pack_id).first()
+    if not pack:
+        raise ValueError("Pack not found")
+    url = (url or "").strip()
+    if not url:
+        raise ValueError("URL is required")
+    result = asyncio.run(extract_brand_async(input_type="url", url=url))
+    extracted = {
+        "brand_name": result.get("brand_name") or "My Brand",
+        "offer_cues": result.get("offer_cues", []),
+        "tagline": result.get("tagline"),
+        "description": result.get("description"),
+        "industry": result.get("industry"),
+        "contact_info": result.get("contact_info", {}),
+        "social_links": result.get("social_links", []),
+        "logo_url": result.get("logo_url"),
+        "color_candidates": result.get("color_candidates", []),
+        "raw_extract": result.get("raw_extract", {}),
+    }
+    merge_onboarding_answers(
+        db,
+        pack,
+        {
+            "has_existing_brand": "yes",
+            "brand_url": url,
+            "brand_input_type": "url",
+            "extracted_brand": json.dumps(extracted),
+        },
+    )
+    if extracted.get("brand_name"):
+        pack.brand_name = extracted["brand_name"].strip()
+        db.commit()
+        db.refresh(pack)
+    return {
+        "extracted": True,
+        "brand_name": extracted.get("brand_name"),
+        "tagline": extracted.get("tagline"),
+        "industry": extracted.get("industry"),
+        "description": (extracted.get("description") or "")[:500],
+    }
+
 
 def update_pack(
     db: Session,
     pack_id: UUID,
     *,
+    has_existing_brand: str | None = None,
+    brand_url: str | None = None,
     brand_name: str | None = None,
     primary_cta: str | None = None,
     usp_statement: str | None = None,
@@ -57,6 +125,23 @@ def update_pack(
         raise ValueError("Pack not found")
 
     updates: dict = {}
+
+    if has_existing_brand is not None:
+        merge_onboarding_answers(db, pack, {"has_existing_brand": has_existing_brand})
+        updates["has_existing_brand"] = has_existing_brand
+    if brand_url is not None:
+        url = (brand_url or "").strip()
+        oa = pack.onboarding_answers or {}
+        is_existing = has_existing_brand == "yes" or oa.get("has_existing_brand") == "yes"
+        if url and is_existing:
+            extract_result = extract_brand_from_url(db, pack_id, url=url)
+            if extract_result.get("brand_name"):
+                pack.brand_name = extract_result["brand_name"]
+                updates["brand_name"] = pack.brand_name
+        else:
+            merge_onboarding_answers(db, pack, {"brand_url": url})
+        updates["brand_url"] = brand_url
+
     if brand_name is not None:
         pack.brand_name = (brand_name or "").strip() or None
         updates["brand_name"] = pack.brand_name

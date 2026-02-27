@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import { chat as chatApi } from "@/api_requests/chat";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import type { Message } from "@/types/api-types";
 import {
   buildChatUrl,
@@ -17,7 +18,6 @@ import {
   ChatMessageList,
   ChatInputBlock,
   ChatHistoryModal,
-  ChatFab,
   NextActionBanner,
 } from "./_components";
 import { me } from "@/api_requests/me";
@@ -47,6 +47,14 @@ export default function ChatPage() {
       : undefined;
   const [historyModalOpenState, setHistoryModalOpenState] = useState(false);
   const [nextAction, setNextAction] = useState<NextAction | null>(null);
+
+  useEffect(() => {
+    if (packId) {
+      try {
+        localStorage.setItem("sidebar-last-pack-id", packId);
+      } catch {}
+    }
+  }, [packId]);
   const [
     conversationId,
     messages,
@@ -97,7 +105,7 @@ export default function ChatPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamingContentRef = useRef("");
-
+  const isMobile = !useMediaQuery("(min-width: 1024px)");
   useEffect(() => {
     if (!historyModalOpenState) return;
     setHistoryLoading(true);
@@ -362,6 +370,11 @@ export default function ChatPage() {
     send("use", undefined, message);
   }
 
+  function handleMarkDayComplete() {
+    if (loading) return;
+    send("use", undefined, "Mark this day as complete");
+  }
+
   function startNewChat() {
     router.replace(buildNewChatUrl(packId));
     resetForNewChat();
@@ -402,7 +415,7 @@ export default function ChatPage() {
         className="flex-1 flex flex-col min-h-0 overflow-y-auto"
       >
         <NextActionBanner nextAction={nextAction} />
-        <div className="flex-1 flex flex-col min-h-0 justify-center items-center px-4 py-12">
+        <div className="flex-1 flex flex-col min-h-0 justify-center items-center">
           <div className="max-w-4xl w-full flex flex-col items-center text-center">
             {messages.length === 0 && !loading && (
               <h2 className="text-4xl  font-[600] text-foreground max-w-lg mx-auto mb-6">
@@ -419,6 +432,121 @@ export default function ChatPage() {
                 />
               </div>
             )}
+            {isMobile ? (
+              <div className="w-full max-w-4xl mx-auto">
+                <ChatInputBlock
+                  input={input}
+                  onChange={setInput}
+                  onSubmit={handleSubmit}
+                  onPreview={() => send("preview")}
+                  onStop={handleStop}
+                  loading={loading}
+                  stopTriggered={stopTriggered}
+                  applyTargetId={applyTargetId}
+                  suggestionChips={nextAction?.actionChips}
+                  dayContext={dayContext}
+                  onDay0Choice={
+                    dayContext?.day === 0 ? handleDay0Choice : undefined
+                  }
+                  showDay0ChoiceChips={!hasAnsweredBrandChoice}
+                  questionContext={questionContext}
+                  onQuestionChipClick={(value) => send("use", undefined, value)}
+                  onResuggest={() =>
+                    send("use", undefined, "Give me different suggestions")
+                  }
+                  onOpenHistory={() => setHistoryModalOpenState(true)}
+                  onMarkDayComplete={
+                    dayContext ? handleMarkDayComplete : undefined
+                  }
+                />
+              </div>
+            ) : (
+              <ChatInputBlock
+                input={input}
+                onChange={setInput}
+                onSubmit={handleSubmit}
+                onPreview={() => send("preview")}
+                onStop={handleStop}
+                loading={loading}
+                stopTriggered={stopTriggered}
+                applyTargetId={applyTargetId}
+                suggestionChips={nextAction?.actionChips}
+                dayContext={dayContext}
+                onDay0Choice={
+                  dayContext?.day === 0 ? handleDay0Choice : undefined
+                }
+                showDay0ChoiceChips={!hasAnsweredBrandChoice}
+                questionContext={questionContext}
+                onQuestionChipClick={(value) => send("use", undefined, value)}
+                onResuggest={() =>
+                  send("use", undefined, "Give me different suggestions")
+                }
+                onOpenHistory={() => setHistoryModalOpenState(true)}
+                onMarkDayComplete={
+                  dayContext ? handleMarkDayComplete : undefined
+                }
+              />
+            )}
+          </div>
+        </div>
+        <AnimatePresence>
+          <ChatHistoryModal
+            open={historyModalOpenState}
+            onClose={() => setHistoryModalOpenState(false)}
+            conversations={historyList}
+            loading={historyLoading}
+            packId={packId}
+            onDelete={handleDeleteConversation}
+          />
+        </AnimatePresence>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="flex-1 flex flex-col min-h-0 w-full">
+      <NextActionBanner nextAction={nextAction} />
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="w-full max-w-4xl mx-auto flex flex-col items-start text-left">
+          <ChatMessageList
+            messages={messages}
+            streamingContent={streamingContent}
+            loading={loading}
+            onApply={(id) => send("apply", id)}
+          />
+        </div>
+      </div>
+      <div className="shrink-0">
+        <div className="max-w-4xl mx-auto flex items-center gap-2">
+          {isMobile ? (
+            <div className="w-full">
+              <ChatInputBlock
+                input={input}
+                onChange={setInput}
+                onSubmit={handleSubmit}
+                onPreview={() => send("preview")}
+                onStop={handleStop}
+                loading={loading}
+                stopTriggered={stopTriggered}
+                applyTargetId={applyTargetId}
+                suggestionChips={nextAction?.actionChips}
+                dayContext={dayContext}
+                onDay0Choice={
+                  dayContext?.day === 0 ? handleDay0Choice : undefined
+                }
+                showDay0ChoiceChips={!hasAnsweredBrandChoice}
+                questionContext={questionContext}
+                onQuestionChipClick={(value) => send("use", undefined, value)}
+                onResuggest={() =>
+                  send("use", undefined, "Give me different suggestions")
+                }
+                onOpenHistory={() => setHistoryModalOpenState(true)}
+                onMarkDayComplete={
+                  dayContext ? handleMarkDayComplete : undefined
+                }
+              />
+            </div>
+          ) : (
             <ChatInputBlock
               input={input}
               onChange={setInput}
@@ -440,59 +568,11 @@ export default function ChatPage() {
                 send("use", undefined, "Give me different suggestions")
               }
               onOpenHistory={() => setHistoryModalOpenState(true)}
+              onMarkDayComplete={dayContext ? handleMarkDayComplete : undefined}
             />
-          </div>
-        </div>
-        <AnimatePresence>
-          <ChatHistoryModal
-            open={historyModalOpenState}
-            onClose={() => setHistoryModalOpenState(false)}
-            conversations={historyList}
-            loading={historyLoading}
-            packId={packId}
-            onDelete={handleDeleteConversation}
-          />
-        </AnimatePresence>
-      </div>
-    );
-  }
-
-  return (
-    <div ref={containerRef} className="flex-1 flex flex-col min-h-0 w-full">
-      <NextActionBanner nextAction={nextAction} />
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-6">
-        <div className="w-full max-w-4xl mx-auto flex flex-col items-start text-left">
-          <ChatMessageList
-            messages={messages}
-            streamingContent={streamingContent}
-            loading={loading}
-            onApply={(id) => send("apply", id)}
-          />
+          )}
         </div>
       </div>
-      <div className="shrink-0 px-4 py-4">
-        <ChatInputBlock
-          input={input}
-          onChange={setInput}
-          onSubmit={handleSubmit}
-          onPreview={() => send("preview")}
-          onStop={handleStop}
-          loading={loading}
-          stopTriggered={stopTriggered}
-          applyTargetId={applyTargetId}
-          suggestionChips={nextAction?.actionChips}
-          dayContext={dayContext}
-          onDay0Choice={dayContext?.day === 0 ? handleDay0Choice : undefined}
-          showDay0ChoiceChips={!hasAnsweredBrandChoice}
-          questionContext={questionContext}
-          onQuestionChipClick={(value) => send("use", undefined, value)}
-          onResuggest={() =>
-            send("use", undefined, "Give me different suggestions")
-          }
-          onOpenHistory={() => setHistoryModalOpenState(true)}
-        />
-      </div>
-      <ChatFab onNewChat={startNewChat} />
       <AnimatePresence>
         <ChatHistoryModal
           open={historyModalOpenState}

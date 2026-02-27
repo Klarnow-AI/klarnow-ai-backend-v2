@@ -6,7 +6,7 @@ import { Image, Download, Trash2 } from "@/components/icons";
 // Declare html2canvas loaded from CDN so TypeScript is happy
 declare global {
   interface Window {
-    html2canvas: (
+    html2canvas?: (
       element: HTMLElement,
       options?: Record<string, unknown>,
     ) => Promise<HTMLCanvasElement>;

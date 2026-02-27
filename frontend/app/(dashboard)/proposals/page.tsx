@@ -4,7 +4,12 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Plus, Loader2, LayoutDashboard, GripVertical } from "@/components/icons";
+import {
+  Plus,
+  Loader2,
+  LayoutDashboard,
+  GripVertical,
+} from "@/components/icons";
 import { Spinner } from "@/components/ui/page-loader";
 import {
   Card,
@@ -106,7 +111,10 @@ export default function ProposalsPage() {
   const [formAmount, setFormAmount] = useState("");
   const [formCurrency, setFormCurrency] = useState("USD");
   const [formDueDate, setFormDueDate] = useState("");
-  const [formContent, setFormContent] = useState<Record<string, unknown> | null>(null);
+  const [formContent, setFormContent] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [createClientId, setCreateClientId] = useState<string | null>(null);
   const [qualifiedLeads, setQualifiedLeads] = useState<Lead[]>([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
@@ -151,14 +159,17 @@ export default function ProposalsPage() {
               r.items.map((prop) => ({
                 ...prop,
                 pack_name: p.name,
-              }))
-            )
-          )
+              })),
+            ),
+          ),
         );
-        items = results.flat().sort(
-          (a, b) =>
-            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-        );
+        items = results
+          .flat()
+          .sort(
+            (a, b) =>
+              new Date(b.updated_at).getTime() -
+              new Date(a.updated_at).getTime(),
+          );
       }
       if (!cancelled) setProposals(items);
     } catch (e) {
@@ -210,9 +221,13 @@ export default function ProposalsPage() {
     setError(null);
     try {
       const clientIdForApi = createClientId
-        ? (qualifiedLeads.find((l) => l.id === createClientId)?.client_id ?? createClientId)
+        ? (qualifiedLeads.find((l) => l.id === createClientId)?.client_id ??
+          createClientId)
         : null;
-      const res = await revenue.generateProposalDraft(createPackId, clientIdForApi ?? undefined);
+      const res = await revenue.generateProposalDraft(
+        createPackId,
+        clientIdForApi ?? undefined,
+      );
       setFormAmount(res.suggested_amount ?? "");
       setFormDueDate(res.suggested_due_date ?? "");
       setFormContent(res.content as Record<string, unknown>);
@@ -230,7 +245,8 @@ export default function ProposalsPage() {
     setError(null);
     try {
       const clientIdForApi = createClientId
-        ? (qualifiedLeads.find((l) => l.id === createClientId)?.client_id ?? null)
+        ? (qualifiedLeads.find((l) => l.id === createClientId)?.client_id ??
+          null)
         : null;
       const body: ProposalCreateBody = {
         amount: formAmount.trim(),
@@ -254,10 +270,7 @@ export default function ProposalsPage() {
     }
   };
 
-  const handleStatusChange = async (
-    proposalId: string,
-    newStatus: string
-  ) => {
+  const handleStatusChange = async (proposalId: string, newStatus: string) => {
     setEditingId(proposalId);
     setError(null);
     try {
@@ -279,7 +292,7 @@ export default function ProposalsPage() {
       try {
         await revenue.updateProposal(proposalId, { status });
         setProposals((prev) =>
-          prev.map((p) => (p.id === proposalId ? { ...p, status } : p))
+          prev.map((p) => (p.id === proposalId ? { ...p, status } : p)),
         );
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to update proposal");
@@ -287,7 +300,7 @@ export default function ProposalsPage() {
         setEditingId(null);
       }
     },
-    []
+    [],
   );
 
   const filteredProposals = useMemo(() => {
@@ -298,7 +311,7 @@ export default function ProposalsPage() {
         formatProposalId(p.id).toLowerCase().includes(q) ||
         p.amount.toLowerCase().includes(q) ||
         p.pack_name?.toLowerCase().includes(q) ||
-        p.client_name?.toLowerCase().includes(q)
+        p.client_name?.toLowerCase().includes(q),
     );
   }, [proposals, searchQuery]);
 
@@ -322,7 +335,11 @@ export default function ProposalsPage() {
   };
 
   return (
-    <div className={viewMode === "kanban" ? "p-8" : "p-8 w-full max-w-[1400px] mx-auto"}>
+    <div
+      className={
+        viewMode === "kanban" ? "w-full" : "w-full max-w-[1400px] mx-auto"
+      }
+    >
       {packFilter && packs.length > 0 && (
         <div className="mb-4 flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
@@ -369,15 +386,33 @@ export default function ProposalsPage() {
           </Button>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <div className="inline-flex rounded-lg border border-border bg-muted/30 p-0.5" role="tablist" aria-label="View mode">
-            <button type="button" onClick={() => setViewMode("table")} className={`inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === "table" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`} aria-pressed={viewMode === "table"}>
+          <div
+            className="inline-flex rounded-lg border border-border bg-muted/30 p-0.5"
+            role="tablist"
+            aria-label="View mode"
+          >
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === "table" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              aria-pressed={viewMode === "table"}
+            >
               <GripVertical className="h-4 w-4" size={16} /> Table
             </button>
-            <button type="button" onClick={() => setViewMode("kanban")} className={`inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === "kanban" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`} aria-pressed={viewMode === "kanban"}>
+            <button
+              type="button"
+              onClick={() => setViewMode("kanban")}
+              className={`inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === "kanban" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              aria-pressed={viewMode === "kanban"}
+            >
               <LayoutDashboard className="h-4 w-4" size={16} /> Kanban
             </button>
           </div>
-          <Button size="sm" className="gap-1.5" onClick={() => setCreateOpen(true)}>
+          <Button
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setCreateOpen(true)}
+          >
             <Plus className="h-4 w-4" size={16} /> New Proposal
           </Button>
         </div>
@@ -416,7 +451,9 @@ export default function ProposalsPage() {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="create-client">Client / lead (optional)</Label>
+                  <Label htmlFor="create-client">
+                    Client / lead (optional)
+                  </Label>
                   <Select
                     id="create-client"
                     value={createClientId ?? ""}
@@ -425,7 +462,9 @@ export default function ProposalsPage() {
                   >
                     <SelectItem value="">No client</SelectItem>
                     {loadingLeads ? (
-                      <SelectItem value="_loading" disabled>Loading…</SelectItem>
+                      <SelectItem value="_loading" disabled>
+                        Loading…
+                      </SelectItem>
                     ) : (
                       qualifiedLeads.map((lead) => (
                         <SelectItem key={lead.id} value={lead.id}>
@@ -442,22 +481,41 @@ export default function ProposalsPage() {
                     variant="outline"
                     size="sm"
                     onClick={handleGenerateDraft}
-                    disabled={!createPackId || generatingDraft || !canCreateForSelectedPack}
+                    disabled={
+                      !createPackId ||
+                      generatingDraft ||
+                      !canCreateForSelectedPack
+                    }
                   >
-                    {generatingDraft ? <Loader2 className="h-4 w-4 animate-spin" /> : "Generate draft"}
+                    {generatingDraft ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Generate draft"
+                    )}
                   </Button>
-                  <span className="text-xs text-muted-foreground">AI-generated content and suggested amount</span>
+                  <span className="text-xs text-muted-foreground">
+                    AI-generated content and suggested amount
+                  </span>
                 </div>
                 {formContent && (
                   <div className="rounded-md border border-border bg-muted/30 p-3 text-sm space-y-2">
                     {(formContent as ProposalGeneratedContent).description && (
-                      <p className="text-foreground">{(formContent as ProposalGeneratedContent).description}</p>
+                      <p className="text-foreground">
+                        {(formContent as ProposalGeneratedContent).description}
+                      </p>
                     )}
-                    {Array.isArray((formContent as ProposalGeneratedContent).line_items) &&
-                      (formContent as ProposalGeneratedContent).line_items!.length > 0 && (
+                    {Array.isArray(
+                      (formContent as ProposalGeneratedContent).line_items,
+                    ) &&
+                      (formContent as ProposalGeneratedContent).line_items!
+                        .length > 0 && (
                         <ul className="list-disc list-inside text-muted-foreground">
-                          {(formContent as ProposalGeneratedContent).line_items!.map((item, i) => (
-                            <li key={i}>{item.label}: {item.description}</li>
+                          {(
+                            formContent as ProposalGeneratedContent
+                          ).line_items!.map((item, i) => (
+                            <li key={i}>
+                              {item.label}: {item.description}
+                            </li>
                           ))}
                         </ul>
                       )}
@@ -501,11 +559,22 @@ export default function ProposalsPage() {
                 </div>
               </DialogBody>
               <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-                <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setCreateOpen(false)}
+                >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={submitting || !canCreateForSelectedPack}>
-                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create"}
+                <Button
+                  type="submit"
+                  disabled={submitting || !canCreateForSelectedPack}
+                >
+                  {submitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Create"
+                  )}
                 </Button>
               </div>
             </form>
@@ -514,14 +583,18 @@ export default function ProposalsPage() {
       </Dialog>
 
       {/* Edit proposal / status actions dialog */}
-      <Dialog open={!!editingProposal} onOpenChange={(open) => !open && setEditingProposal(null)}>
+      <Dialog
+        open={!!editingProposal}
+        onOpenChange={(open) => !open && setEditingProposal(null)}
+      >
         {editingProposal && (
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Update proposal</DialogTitle>
               <DialogDescription>
                 {editingProposal.amount} {editingProposal.currency}
-                {editingProposal.client_name && ` • ${editingProposal.client_name}`}
+                {editingProposal.client_name &&
+                  ` • ${editingProposal.client_name}`}
               </DialogDescription>
               <DialogClose onClose={() => setEditingProposal(null)} />
             </DialogHeader>
@@ -532,9 +605,13 @@ export default function ProposalsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    revenue.downloadProposalPdf(editingProposal.id).catch((e) =>
-                      setError(e instanceof Error ? e.message : "Download failed")
-                    );
+                    revenue
+                      .downloadProposalPdf(editingProposal.id)
+                      .catch((e) =>
+                        setError(
+                          e instanceof Error ? e.message : "Download failed",
+                        ),
+                      );
                   }}
                 >
                   Download PDF
@@ -548,7 +625,11 @@ export default function ProposalsPage() {
                     }}
                     disabled={editingId === editingProposal.id}
                   >
-                    {editingId === editingProposal.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Mark sent"}
+                    {editingId === editingProposal.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Mark sent"
+                    )}
                   </Button>
                 )}
                 {editingProposal.status === "sent" && (
@@ -556,23 +637,34 @@ export default function ProposalsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleStatusChange(editingProposal.id, "accepted")}
+                      onClick={() =>
+                        handleStatusChange(editingProposal.id, "accepted")
+                      }
                       disabled={editingId === editingProposal.id}
                     >
-                      {editingId === editingProposal.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Accept"}
+                      {editingId === editingProposal.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Accept"
+                      )}
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleStatusChange(editingProposal.id, "declined")}
+                      onClick={() =>
+                        handleStatusChange(editingProposal.id, "declined")
+                      }
                       disabled={editingId === editingProposal.id}
                     >
                       Decline
                     </Button>
                   </>
                 )}
-                {(editingProposal.status === "accepted" || editingProposal.status === "declined") && (
-                  <p className="text-sm text-muted-foreground">No further actions.</p>
+                {(editingProposal.status === "accepted" ||
+                  editingProposal.status === "declined") && (
+                  <p className="text-sm text-muted-foreground">
+                    No further actions.
+                  </p>
                 )}
               </div>
             </DialogBody>
@@ -586,104 +678,145 @@ export default function ProposalsPage() {
         </div>
       ) : viewMode === "kanban" ? (
         proposals.length === 0 ? (
-          <Card><CardContent className="py-12"><p className="text-center text-sm text-muted-foreground">No proposals yet. Create one using a pack that has at least one qualified lead.</p></CardContent></Card>
+          <Card>
+            <CardContent className="py-12">
+              <p className="text-center text-sm text-muted-foreground">
+                No proposals yet. Create one using a pack that has at least one
+                qualified lead.
+              </p>
+            </CardContent>
+          </Card>
         ) : (
-          <ProposalKanbanBoard proposals={proposals} onMoveProposal={handleMoveProposal} onEditProposal={(p) => setEditingProposal(p)} onDownloadPdf={(p) => revenue.downloadProposalPdf(p.id).catch((e) => setError(e instanceof Error ? e.message : "Download failed"))} onAddProposal={() => setCreateOpen(true)} />
+          <ProposalKanbanBoard
+            proposals={proposals}
+            onMoveProposal={handleMoveProposal}
+            onEditProposal={(p) => setEditingProposal(p)}
+            onDownloadPdf={(p) =>
+              revenue
+                .downloadProposalPdf(p.id)
+                .catch((e) =>
+                  setError(e instanceof Error ? e.message : "Download failed"),
+                )
+            }
+            onAddProposal={() => setCreateOpen(true)}
+          />
         )
       ) : (
-      <Card asMotion delay={0.1}>
-        <CardContent className="p-0">
-          {proposals.length === 0 ? (
-            <p className="py-12 px-6 text-center text-sm text-muted-foreground">
-              No proposals yet. Create one using a pack that has at least one
-              qualified lead.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox
-                        checked={allSelected}
-                        onCheckedChange={toggleSelectAll}
-                        aria-label="Select all"
-                      />
-                    </TableHead>
-                    <TableHead className="whitespace-nowrap">Proposal ID</TableHead>
-                    <TableHead className="whitespace-nowrap">Client</TableHead>
-                    <TableHead className="whitespace-nowrap">Amount</TableHead>
-                    <TableHead className="whitespace-nowrap">Product</TableHead>
-                    <TableHead className="whitespace-nowrap">Date</TableHead>
-                    <TableHead className="whitespace-nowrap">Status</TableHead>
-                    <TableHead className="text-right w-24"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProposals.map((proposal) => (
-                    <TableRow key={proposal.id}>
-                      <TableCell>
+        <Card asMotion delay={0.1}>
+          <CardContent className="p-0">
+            {proposals.length === 0 ? (
+              <p className="py-12 px-6 text-center text-sm text-muted-foreground">
+                No proposals yet. Create one using a pack that has at least one
+                qualified lead.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">
                         <Checkbox
-                          checked={selectedIds.has(proposal.id)}
-                          onCheckedChange={(checked) => {
-                            setSelectedIds((prev) => {
-                              const next = new Set(prev);
-                              if (checked) next.add(proposal.id);
-                              else next.delete(proposal.id);
-                              return next;
-                            });
-                          }}
-                          aria-label={`Select ${formatProposalId(proposal.id)}`}
+                          checked={allSelected}
+                          onCheckedChange={toggleSelectAll}
+                          aria-label="Select all"
                         />
-                      </TableCell>
-                      <TableCell className="font-mono text-muted-foreground">
-                        {formatProposalId(proposal.id)}
-                      </TableCell>
-                      <TableCell>
-                        <ProposalClientCell proposal={proposal} />
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {proposal.currency === "USD" ? "$" : ""}
-                        {Number.isNaN(Number(proposal.amount)) ? proposal.amount : Number(proposal.amount).toLocaleString()}
-                        {proposal.currency !== "USD" ? ` ${proposal.currency}` : ""}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {proposal.pack_name}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground whitespace-nowrap">
-                        {formatTableDate(proposal.due_date ?? proposal.created_at)}
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={cn(
-                            "inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium",
-                            proposal.status === "accepted" && "bg-green-500/20 text-green-700 dark:text-green-400",
-                            proposal.status === "declined" && "bg-destructive/20 text-destructive",
-                            proposal.status === "sent" && "bg-amber-500/20 text-amber-700 dark:text-amber-400",
-                            proposal.status === "draft" && "bg-muted text-muted-foreground"
-                          )}
-                        >
-                          {proposal.status === "sent" ? "Pending" : proposal.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="bg-muted/50"
-                          onClick={() => setEditingProposal(proposal)}
-                        >
-                          Manage
-                        </Button>
-                      </TableCell>
+                      </TableHead>
+                      <TableHead className="whitespace-nowrap">
+                        Proposal ID
+                      </TableHead>
+                      <TableHead className="whitespace-nowrap">
+                        Client
+                      </TableHead>
+                      <TableHead className="whitespace-nowrap">
+                        Amount
+                      </TableHead>
+                      <TableHead className="whitespace-nowrap">
+                        Product
+                      </TableHead>
+                      <TableHead className="whitespace-nowrap">Date</TableHead>
+                      <TableHead className="whitespace-nowrap">
+                        Status
+                      </TableHead>
+                      <TableHead className="text-right w-24"></TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredProposals.map((proposal) => (
+                      <TableRow key={proposal.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedIds.has(proposal.id)}
+                            onCheckedChange={(checked) => {
+                              setSelectedIds((prev) => {
+                                const next = new Set(prev);
+                                if (checked) next.add(proposal.id);
+                                else next.delete(proposal.id);
+                                return next;
+                              });
+                            }}
+                            aria-label={`Select ${formatProposalId(proposal.id)}`}
+                          />
+                        </TableCell>
+                        <TableCell className="font-mono text-muted-foreground">
+                          {formatProposalId(proposal.id)}
+                        </TableCell>
+                        <TableCell>
+                          <ProposalClientCell proposal={proposal} />
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {proposal.currency === "USD" ? "$" : ""}
+                          {Number.isNaN(Number(proposal.amount))
+                            ? proposal.amount
+                            : Number(proposal.amount).toLocaleString()}
+                          {proposal.currency !== "USD"
+                            ? ` ${proposal.currency}`
+                            : ""}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {proposal.pack_name}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground whitespace-nowrap">
+                          {formatTableDate(
+                            proposal.due_date ?? proposal.created_at,
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={cn(
+                              "inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium",
+                              proposal.status === "accepted" &&
+                                "bg-green-500/20 text-green-700 dark:text-green-400",
+                              proposal.status === "declined" &&
+                                "bg-destructive/20 text-destructive",
+                              proposal.status === "sent" &&
+                                "bg-amber-500/20 text-amber-700 dark:text-amber-400",
+                              proposal.status === "draft" &&
+                                "bg-muted text-muted-foreground",
+                            )}
+                          >
+                            {proposal.status === "sent"
+                              ? "Pending"
+                              : proposal.status}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="bg-muted/50"
+                            onClick={() => setEditingProposal(proposal)}
+                          >
+                            Manage
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   );

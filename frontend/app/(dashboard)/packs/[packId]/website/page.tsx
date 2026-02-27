@@ -12,11 +12,14 @@ import {
   Separator,
   useDefaultLayout,
 } from "react-resizable-panels";
+import { MessageSquare, Monitor, RotateCcw } from "@/components/icons";
 import { ChatPanel } from "@/components/builder/ChatPanel";
 import { PreviewPanel } from "@/components/builder/PreviewPanel";
 import { ExportButton } from "@/components/builder/ExportButton";
 import { Spinner } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { cn } from "@/lib/utils";
 import type { Pack, BrandOS } from "@/types/api-types";
 import type { BrandContext } from "@/app/api/generate/route";
 
@@ -55,6 +58,99 @@ function ResizableLayout({
         </div>
       </Panel>
     </Group>
+  );
+}
+
+function TabbedLayout({
+  brandContext,
+  packName,
+}: {
+  brandContext: BrandContext | null;
+  packName: string;
+}) {
+  const [activeTab, setActiveTab] = useState<"chat" | "preview">("chat");
+  const [refreshPreview, setRefreshPreview] = useState<(() => void) | null>(
+    null,
+  );
+  const liveUrl = useProjectStore((s) => s.liveUrl);
+
+  const handleRegisterRefresh = (refresh: () => void) => {
+    setRefreshPreview(() => refresh);
+  };
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0">
+      {/* Content area - flex-1, scrollable */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {activeTab === "chat" && (
+          <div className="h-full overflow-hidden">
+            <ChatPanel brandContext={brandContext} packName={packName} />
+          </div>
+        )}
+        {activeTab === "preview" && (
+          <div className="h-full overflow-hidden">
+            <PreviewPanel onRegisterRefresh={handleRegisterRefresh} />
+          </div>
+        )}
+      </div>
+
+      {/* Fixed bottom bar - pill tabs + browser chrome when Preview */}
+      <div
+        className={cn(
+          "shrink-0 border-t border-border bg-card",
+          "pb-[env(safe-area-inset-bottom)]",
+        )}
+      >
+        {/* Pill tabs */}
+        <div className="flex items-center gap-2 px-4 py-3">
+          <div className="flex rounded-full border border-border bg-muted/30 p-0.5">
+            <button
+              type="button"
+              onClick={() => setActiveTab("chat")}
+              className={cn(
+                "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                activeTab === "chat"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <MessageSquare className="h-4 w-4" />
+              Chat
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("preview")}
+              className={cn(
+                "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                activeTab === "preview"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Monitor className="h-4 w-4" />
+              Preview
+            </button>
+          </div>
+        </div>
+
+        {/* Browser chrome - only when Preview active */}
+        {activeTab === "preview" && (
+          <div className="flex items-center justify-between gap-2 px-4 py-2 border-t border-border/50">
+            <span className="text-xs text-muted-foreground truncate min-w-0">
+              {liveUrl ? liveUrl.replace(/^https?:\/\//, "") : "preview"}
+            </span>
+            <button
+              type="button"
+              onClick={() => refreshPreview?.()}
+              aria-label="Refresh preview"
+              className="shrink-0 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -135,6 +231,7 @@ export default function WebsiteModule() {
   const [packName, setPackName] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
 
   useEffect(() => {
     if (!packId) return;
@@ -214,7 +311,7 @@ export default function WebsiteModule() {
     <div className="absolute inset-0 flex flex-col overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card shrink-0">
         <div className="flex items-center gap-3">
-          <h1 className="text-sm  font-[600] text-foreground tracking-tight">
+          <h1 className="text-sm font-[600] text-foreground tracking-tight">
             Website Builder
           </h1>
           <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-accent">
@@ -224,7 +321,11 @@ export default function WebsiteModule() {
         <ExportButton />
       </div>
 
-      <ResizableLayout brandContext={brandContext} packName={packName} />
+      {isDesktop ? (
+        <ResizableLayout brandContext={brandContext} packName={packName} />
+      ) : (
+        <TabbedLayout brandContext={brandContext} packName={packName} />
+      )}
     </div>
   );
 }

@@ -10,20 +10,32 @@ const IMPORT_RE = /import\s+[\s\S]*?from\s+['"].*?['"]\s*;?\n?/g;
 function stripExports(code: string, fallbackName?: string): string {
   return code
     .replace(IMPORT_RE, "")
-    .replace(/^\s*export\s+\*\s*(?:as\s+\w+\s+)?from\s+['"][^'"]*['"]\s*;?\s*$/gm, "")
-    .replace(/^\s*export\s+type\s+\{[^}]*\}\s*(?:from\s+['"][^'"]*['"]\s*)?;?\s*$/gm, "")
+    .replace(
+      /^\s*export\s+\*\s*(?:as\s+\w+\s+)?from\s+['"][^'"]*['"]\s*;?\s*$/gm,
+      "",
+    )
+    .replace(
+      /^\s*export\s+type\s+\{[^}]*\}\s*(?:from\s+['"][^'"]*['"]\s*)?;?\s*$/gm,
+      "",
+    )
     .replace(/^\s*export\s+interface\s+/gm, "interface ")
     .replace(/^\s*export\s+type\s+(\w)/gm, "type $1")
     .replace(/^\s*export\s+enum\s+/gm, "enum ")
     .replace(/export\s+default\s+function\s+/, "function ")
     .replace(/export\s+default\s+class\s+/, "class ")
-    .replace(/export\s+default\s+/, fallbackName ? `const ${fallbackName} = ` : "const _default = ")
+    .replace(
+      /export\s+default\s+/,
+      fallbackName ? `const ${fallbackName} = ` : "const _default = ",
+    )
     .replace(/export\s+function\s+/g, "function ")
     .replace(/export\s+class\s+/g, "class ")
     .replace(/export\s+const\s+/g, "const ")
     .replace(/export\s+let\s+/g, "let ")
     .replace(/export\s+var\s+/g, "var ")
-    .replace(/^\s*export\s+\{[^}]*\}\s*(?:from\s+['"][^'"]*['"]\s*)?;?\s*$/gm, "");
+    .replace(
+      /^\s*export\s+\{[^}]*\}\s*(?:from\s+['"][^'"]*['"]\s*)?;?\s*$/gm,
+      "",
+    );
 }
 
 /**
@@ -38,7 +50,10 @@ function buildBundle(files: Record<string, string>): string {
   let bundle = "";
   Object.entries(files).forEach(([path, code]) => {
     if (path === "/App.tsx" || path === "App.tsx") return;
-    const name = path.split("/").pop()?.replace(/\.(tsx|jsx)$/, "");
+    const name = path
+      .split("/")
+      .pop()
+      ?.replace(/\.(tsx|jsx)$/, "");
     if (!name) return;
     bundle += stripExports(code, name) + "\n\n";
   });
@@ -50,14 +65,22 @@ function buildBundle(files: Record<string, string>): string {
 type Viewport = "mobile" | "tablet" | "desktop";
 
 const VIEWPORT_CONFIG: Record<Viewport, { label: string; width: string }> = {
-  mobile:  { label: "Mobile (375px)",  width: "375px" },
-  tablet:  { label: "Tablet (768px)",  width: "768px" },
-  desktop: { label: "Desktop",         width: "100%"  },
+  mobile: { label: "Mobile (375px)", width: "375px" },
+  tablet: { label: "Tablet (768px)", width: "768px" },
+  desktop: { label: "Desktop", width: "100%" },
 };
 
 function SmartphoneIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
       <rect x="7" y="2" width="10" height="20" rx="2" />
       <circle cx="12" cy="18.5" r="0.5" fill="currentColor" stroke="none" />
     </svg>
@@ -66,7 +89,15 @@ function SmartphoneIcon({ className }: { className?: string }) {
 
 function TabletIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
       <rect x="4" y="2" width="16" height="20" rx="2" />
       <circle cx="12" cy="18.5" r="0.5" fill="currentColor" stroke="none" />
     </svg>
@@ -75,20 +106,36 @@ function TabletIcon({ className }: { className?: string }) {
 
 function MonitorIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
       <rect x="2" y="3" width="20" height="14" rx="2" />
       <path d="M8 21h8M12 17v4" />
     </svg>
   );
 }
 
-const VIEWPORT_ICONS: Record<Viewport, (props: { className?: string }) => React.ReactElement> = {
-  mobile:  SmartphoneIcon,
-  tablet:  TabletIcon,
+const VIEWPORT_ICONS: Record<
+  Viewport,
+  (props: { className?: string }) => React.ReactElement
+> = {
+  mobile: SmartphoneIcon,
+  tablet: TabletIcon,
   desktop: MonitorIcon,
 };
 
-export function PreviewPanel() {
+type PreviewPanelProps = {
+  /** Optional callback to register a refresh function for external use (e.g. browser chrome). */
+  onRegisterRefresh?: (refresh: () => void) => void;
+};
+
+export function PreviewPanel({ onRegisterRefresh }: PreviewPanelProps = {}) {
   const files = useProjectStore((s) => s.files);
   const isGenerating = useProjectStore((s) => s.isGenerating);
   const [viewport, setViewport] = useState<Viewport>("desktop");
@@ -99,7 +146,10 @@ export function PreviewPanel() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sendBundle = useCallback((bundle: string) => {
-    iframeRef.current?.contentWindow?.postMessage({ type: "UPDATE", code: bundle }, "*");
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: "UPDATE", code: bundle },
+      "*",
+    );
   }, []);
 
   // Called once when the iframe finishes loading (all CDN scripts are ready)
@@ -116,8 +166,16 @@ export function PreviewPanel() {
     debounceRef.current = setTimeout(() => {
       sendBundle(buildBundle(files));
     }, 300);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [files, sendBundle]);
+
+  // Register refresh with parent for external triggers (e.g. mobile browser chrome)
+  useEffect(() => {
+    if (!onRegisterRefresh) return;
+    onRegisterRefresh(() => sendBundle(buildBundle(files)));
+  }, [onRegisterRefresh, sendBundle, files]);
 
   return (
     <div className="flex flex-col w-full h-full overflow-hidden">

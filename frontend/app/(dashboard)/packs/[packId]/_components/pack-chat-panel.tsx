@@ -17,10 +17,26 @@ import {
 
 type SendMode = "use" | "preview" | "apply";
 
+const PENDING_CHAT_KEY = "klarnow-pack-chat-pending";
+
 export function PackChatPanel({ packId }: { packId: string }) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+
+  useEffect(() => {
+    if (!packId || typeof window === "undefined") return;
+    try {
+      const key = `${PENDING_CHAT_KEY}-${packId}`;
+      const pending = sessionStorage.getItem(key);
+      if (pending) {
+        sessionStorage.removeItem(key);
+        setInput(pending);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [packId]);
   const [loading, setLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [previewMessageId, setPreviewMessageId] = useState<string | null>(null);
@@ -31,7 +47,9 @@ export function PackChatPanel({ packId }: { packId: string }) {
   const streamingContentRef = useRef("");
 
   useEffect(() => {
-    me.getNextAction(packId).then(setNextAction).catch(() => setNextAction(null));
+    me.getNextAction(packId)
+      .then(setNextAction)
+      .catch(() => setNextAction(null));
   }, [packId]);
 
   useEffect(() => {
@@ -60,7 +78,7 @@ export function PackChatPanel({ packId }: { packId: string }) {
         if (
           res.items.length === 0 &&
           prev.some(
-            (m) => isStreamingPlaceholder(m.id) || m.id.startsWith("user-")
+            (m) => isStreamingPlaceholder(m.id) || m.id.startsWith("user-"),
           )
         )
           return prev;
@@ -91,7 +109,7 @@ export function PackChatPanel({ packId }: { packId: string }) {
       if (
         res.items.length === 0 &&
         prev.some(
-          (m) => isStreamingPlaceholder(m.id) || m.id.startsWith("user-")
+          (m) => isStreamingPlaceholder(m.id) || m.id.startsWith("user-"),
         )
       )
         return prev;
@@ -152,12 +170,12 @@ export function PackChatPanel({ packId }: { packId: string }) {
           apply_to_message_id: applyToId ?? undefined,
         },
         true,
-        controller.signal
+        controller.signal,
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(
-          (err as { detail?: string }).detail || "Failed to send"
+          (err as { detail?: string }).detail || "Failed to send",
         );
       }
       const reader = res.body?.getReader();
@@ -213,8 +231,8 @@ export function PackChatPanel({ packId }: { packId: string }) {
                         tool_results: payload.tool_results ?? null,
                         is_preview: payload.preview ?? false,
                       }
-                    : m
-                )
+                    : m,
+                ),
               );
               setStreamingContent("");
               if (
@@ -230,7 +248,7 @@ export function PackChatPanel({ packId }: { packId: string }) {
               console.error(e);
               alert(e instanceof Error ? e.message : "Something went wrong");
               setMessages((prev) =>
-                prev.filter((m) => !isStreamingPlaceholder(m.id))
+                prev.filter((m) => !isStreamingPlaceholder(m.id)),
               );
               setStreamingContent("");
             }
@@ -244,7 +262,7 @@ export function PackChatPanel({ packId }: { packId: string }) {
               console.error(e);
               alert(e instanceof Error ? e.message : "Stream error");
               setMessages((prev) =>
-                prev.filter((m) => !isStreamingPlaceholder(m.id))
+                prev.filter((m) => !isStreamingPlaceholder(m.id)),
               );
               setStreamingContent("");
             }
@@ -264,15 +282,15 @@ export function PackChatPanel({ packId }: { packId: string }) {
                   id: `stopped-${m.id}`,
                   content: finalContent,
                 }
-              : m
-          )
+              : m,
+          ),
         );
         setStreamingContent("");
       } else {
         console.error(e);
         alert(e instanceof Error ? e.message : "Something went wrong");
         setMessages((prev) =>
-          prev.filter((m) => !isStreamingPlaceholder(m.id))
+          prev.filter((m) => !isStreamingPlaceholder(m.id)),
         );
         setStreamingContent("");
       }

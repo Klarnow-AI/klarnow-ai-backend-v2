@@ -4,7 +4,12 @@ from app.modules.agents.registry import ToolDef, register
 from app.modules.brand_os.tools import generate_brand_os, GENERATE_BRAND_OS_SCHEMA
 from app.modules.chat.tools import ask_day_question, ASK_DAY_QUESTION_SCHEMA
 from app.modules.conversion_page.tools import generate_conversion_page, GENERATE_CONVERSION_PAGE_SCHEMA
-from app.modules.packs.tools import update_pack, UPDATE_PACK_SCHEMA
+from app.modules.packs.tools import (
+    update_pack,
+    UPDATE_PACK_SCHEMA,
+    extract_brand_from_url,
+    EXTRACT_BRAND_SCHEMA,
+)
 from app.modules.sprint.tools import complete_sprint_day, COMPLETE_SPRINT_DAY_SCHEMA
 from app.modules.creative.tools import (
     render_poster,
@@ -23,8 +28,18 @@ from app.modules.revenue.tools import (
 def register_all_tools() -> None:
     register(
         ToolDef(
+            name="extract_brand_from_url",
+            description="Extract brand profile from website URL when user has existing brand (Day 0). Call when user provides a website URL after answering yes to 'Is this an existing brand?'. Merges extracted data into pack.",
+            parameters_schema=EXTRACT_BRAND_SCHEMA,
+            fn=extract_brand_from_url,
+            allowed_agents=["orchestrator"],
+            side_effects="Extracts brand from URL, merges into onboarding_answers and pack",
+        )
+    )
+    register(
+        ToolDef(
             name="update_pack",
-            description="Save extracted pack fields from Day 0-3 conversation (brand_name, primary_cta, usp_statement, offer_one_liner, primary_pain, primary_outcome, target_audience, hero_angle). Call before complete_sprint_day.",
+            description="Save pack fields from Day 0-3 (has_existing_brand, brand_url, brand_name, primary_cta, usp_statement, etc). For brand_url with has_existing_brand=yes, triggers extraction. Call before complete_sprint_day.",
             parameters_schema=UPDATE_PACK_SCHEMA,
             fn=update_pack,
             allowed_agents=["orchestrator"],

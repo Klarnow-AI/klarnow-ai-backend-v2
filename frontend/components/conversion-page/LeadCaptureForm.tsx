@@ -55,7 +55,9 @@ export function LeadCaptureForm({
   if (success) {
     return (
       <div className="rounded-2xl border border-border bg-card p-6">
-        <h3 className="text-lg font-semibold">Thanks — we’ll reach out soon.</h3>
+        <h3 className="text-lg font-semibold">
+          Thanks — we’ll reach out soon.
+        </h3>
         <p className="mt-1 text-sm text-muted-foreground">
           Your details have been sent successfully.
         </p>
@@ -115,4 +117,3 @@ export function LeadCaptureForm({
     </form>
   );
 }
-

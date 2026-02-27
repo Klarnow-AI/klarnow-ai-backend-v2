@@ -653,9 +653,9 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
       {/* ── Header ── */}
       <div className="flex items-center gap-2 px-3 py-3 shrink-0 border-b border-border">
         <Link
-          href={packId ? `/packs/${packId}` : "/dashboard"}
+          href={packId ? `/chat?pack=${packId}` : "/chat"}
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-          aria-label="Back to pack overview"
+          aria-label="Back to chat"
         >
           <ChevronLeft className="h-5 w-5" />
         </Link>

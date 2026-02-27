@@ -135,7 +135,7 @@ function TextareaWithIcon({
   return (
     <textarea
       className={cn(
-        "w-full min-h-[160px] rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none",
+        "w-full min-h-[160px] rounded-lg border border-border bg-background px-3 py-2 text-base sm:text-sm resize-none",
         className,
       )}
       {...props}
@@ -657,7 +657,7 @@ export default function BrandOSPage() {
   const primaryHex = primaryColor ? toHex(primaryColor) : undefined;
 
   return (
-    <div className="flex flex-col min-h-full w-full max-w-full min-w-0 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
+    <div className="flex flex-col min-h-full w-full max-w-full min-w-0 overflow-x-hidden">
       <div className="flex flex-1 w-full max-w-5xl mx-auto flex-col gap-6">
         {!pack ? (
           <div className="rounded-2xl border border-border bg-card p-8 text-center">
@@ -1071,7 +1071,7 @@ export default function BrandOSPage() {
                 animate={{ x: 0 }}
                 exit={{ x: "100%" }}
                 transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
-                className="pointer-events-auto w-full max-w-[400px] m-10 rounded-2xl border border-border bg-card/95 backdrop-blur-2xl shadow shadow-black/5 dark:shadow-black/15 flex flex-col overflow-hidden"
+                className="pointer-events-auto w-full max-w-[400px] rounded-2xl border border-border bg-card/95 backdrop-blur-2xl shadow shadow-black/5 dark:shadow-black/15 flex flex-col overflow-hidden"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="edit-drawer-title"

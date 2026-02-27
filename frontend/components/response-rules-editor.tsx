@@ -116,7 +116,7 @@ export function ResponseRulesEditor({
                     )}
                   </div>
                   <textarea
-                    className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm"
                     value={rule.response_template}
                     onChange={(e) =>
                       setRules((prev) =>

@@ -15,13 +15,13 @@ export default function OnboardingPage() {
   const state = useOnboardingChat({
     initialPackId: packId,
     onComplete: (id) => {
-      router.push(`/packs/${id}`);
+      router.push(`/chat?pack=${id}`);
       router.refresh();
     },
   });
 
   return (
-    <div className="p-8 max-w-2xl mx-auto min-h-[80vh] flex flex-col justify-center">
+    <div className="w-full max-w-2xl mx-auto min-h-[80vh] flex flex-col justify-center">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}

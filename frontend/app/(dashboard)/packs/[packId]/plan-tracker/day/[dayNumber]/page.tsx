@@ -19,7 +19,7 @@ export default function PlanTrackerDayRedirect() {
   }, [packId, dayNumber, router]);
 
   return (
-    <div className="p-8 flex items-center justify-center">
+    <div className="flex items-center justify-center min-h-[40vh]">
       <p className="text-sm text-muted-foreground">Opening day…</p>
     </div>
   );

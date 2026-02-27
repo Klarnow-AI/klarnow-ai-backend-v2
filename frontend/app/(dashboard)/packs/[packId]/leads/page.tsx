@@ -222,7 +222,7 @@ export default function LeadsPage() {
   const closedCount = leads.filter((l) => l.pipeline_stage === "closed").length;
 
   return (
-    <div className="p-8">
+    <div className="w-full">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}

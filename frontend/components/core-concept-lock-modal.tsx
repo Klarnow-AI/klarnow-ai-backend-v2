@@ -82,7 +82,7 @@ export function CoreConceptLockModal({
               onChange={(e) => setValue(e.target.value)}
               placeholder={PLACEHOLDER}
               rows={3}
-              className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-muted-foreground transition-all focus:outline-none focus:scale-[1.02] resize-none"
+              className="w-full px-4 py-3 rounded-xl border border-border bg-background text-base sm:text-sm text-foreground placeholder:text-muted-foreground transition-all focus:outline-none focus:scale-[1.02] resize-none"
               disabled={loading}
               aria-label="Core concept"
             />

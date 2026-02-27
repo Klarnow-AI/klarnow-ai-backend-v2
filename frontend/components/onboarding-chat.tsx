@@ -422,7 +422,7 @@ export function useOnboardingChat(options: {
       setShowCoreConceptModal(false);
       setCompletedPack(null);
       if (options.onComplete) options.onComplete(completedPack.id);
-      else router.push(`/packs/${completedPack.id}`);
+      else router.push(`/chat?pack=${completedPack.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -871,7 +871,9 @@ export function OnboardingSlideView({
                     disabled={isDisabled}
                     className={cn(
                       "text-left p-4 rounded-xl border border-border bg-background transition-colors",
-                      isSubmitting ? "border-primary/50 bg-muted/30" : "hover:bg-muted/50",
+                      isSubmitting
+                        ? "border-primary/50 bg-muted/30"
+                        : "hover:bg-muted/50",
                     )}
                     aria-busy={isSubmitting}
                   >

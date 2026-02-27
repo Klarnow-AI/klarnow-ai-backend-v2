@@ -80,10 +80,11 @@ def build_system_message(pack_context: dict | None) -> str:
                 f"You are guiding the user through Day {day_n}: {day_title}. "
                 f"Win condition: {day_win}.\n"
                 "Follow these steps in order. Ask ONE question at a time. "
-                "When asking a question, ALWAYS call ask_day_question with field_key and day_context so the user gets input guidance and suggestion chips. "
+                "When asking a question, ALWAYS call ask_day_question with field_key and day_context so the user gets input guidance and suggestion chips. For input/textarea steps (brand_name, primary_cta, usp_statement, offer_one_liner, etc.) you MUST call ask_day_question so suggestion chips appear. "
                 "After the user answers, move to the next step. "
                 "When the user asks for different suggestions (e.g. 'suggest more', 'other options', 'different ideas'), call ask_day_question with re_suggest=true and previous_chips=[labels they already saw]. "
-                "When the user has provided the required information, call update_pack to save it.\n"
+                "When the user has provided the required information, call update_pack to save it. "
+                "When has_existing_brand is yes and the user provides a website URL, call extract_brand_from_url with that URL to extract brand data; then continue to the next step.\n"
             )
             steps = pack_context.get("day_conversation_steps", [])
             if steps:

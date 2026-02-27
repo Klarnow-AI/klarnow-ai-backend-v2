@@ -16,6 +16,8 @@ export interface SearchInputProps extends Omit<
   wrapperClassName?: string;
   /** Whether to use subtle focus scale effect */
   focusScale?: boolean;
+  /** "default" = bordered card style, "minimal" = no background/border */
+  variant?: "default" | "minimal";
 }
 
 const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
@@ -26,20 +28,26 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
       rightAdornment,
       wrapperClassName,
       focusScale = true,
+      variant = "default",
       ...props
     },
     ref,
   ) => {
-    const Wrapper = focusScale ? motion.div : "div";
-    const wrapperProps = focusScale
-      ? { whileFocus: { scale: 1.01 } as const }
-      : {};
+    const Wrapper = focusScale && variant === "default" ? motion.div : "div";
+    const wrapperProps =
+      focusScale && variant === "default"
+        ? { whileFocus: { scale: 1.01 } as const }
+        : {};
+
+    const isMinimal = variant === "minimal";
 
     return (
       <Wrapper
         className={cn(
-          "relative flex items-center gap-3 w-full rounded-full border border-border bg-card px-5 py-4",
-          "focus-within:border-foreground/30 focus-within:scale-[1.02] transition-all",
+          "relative flex items-center gap-3 w-full px-5 py-4 transition-all",
+          isMinimal
+            ? "border-0 border-b border-border/50 bg-transparent rounded-none focus-within:border-foreground/40 focus-within:scale-100"
+            : "rounded-full border border-border bg-card focus-within:border-foreground/30 focus-within:scale-[1.02]",
           wrapperClassName,
         )}
         {...wrapperProps}

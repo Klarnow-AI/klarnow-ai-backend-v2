@@ -6,7 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 interface Day2FormProps {
-  onSubmit: (selections: { primary_pain: string; primary_outcome: string }) => Promise<void>;
+  onSubmit: (selections: {
+    primary_pain: string;
+    primary_outcome: string;
+  }) => Promise<void>;
   isSubmitting: boolean;
 }
 
@@ -31,7 +34,8 @@ export function Day2Form({ onSubmit, isSubmitting }: Day2FormProps) {
         <div className="space-y-1">
           <h3 className="text-lg font-semibold">Day 2: Audience Lock</h3>
           <p className="text-sm text-muted-foreground">
-            Define the primary pain point your audience faces and the outcome they desire.
+            Define the primary pain point your audience faces and the outcome
+            they desire.
           </p>
         </div>
 
@@ -50,7 +54,8 @@ export function Day2Form({ onSubmit, isSubmitting }: Day2FormProps) {
               disabled={isSubmitting}
             />
             <p className="text-xs text-muted-foreground">
-              Example: "Struggling to generate consistent leads for their business"
+              Example: "Struggling to generate consistent leads for their
+              business"
             </p>
           </div>
 

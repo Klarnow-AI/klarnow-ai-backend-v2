@@ -48,7 +48,11 @@ export interface BentoItemProps {
   children: React.ReactNode;
 }
 
-export function BentoItem({ size = "small", className, children }: BentoItemProps) {
+export function BentoItem({
+  size = "small",
+  className,
+  children,
+}: BentoItemProps) {
   return (
     <div
       className={cn(

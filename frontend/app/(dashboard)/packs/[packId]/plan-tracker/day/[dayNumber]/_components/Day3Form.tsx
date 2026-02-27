@@ -88,11 +88,14 @@ export function Day3Form({ onSubmit, isSubmitting }: Day3FormProps) {
 
         <div className="pt-4 border-t">
           <Button type="submit" disabled={!heroAngle || isSubmitting}>
-            {isSubmitting ? "Completing Day 3..." : "Complete Day 3 & Generate Page"}
+            {isSubmitting
+              ? "Completing Day 3..."
+              : "Complete Day 3 & Generate Page"}
           </Button>
           {heroAngle && (
             <p className="text-xs text-muted-foreground mt-2">
-              Completing Day 3 will automatically generate your website based on your selections.
+              Completing Day 3 will automatically generate your website based on
+              your selections.
             </p>
           )}
         </div>

@@ -86,6 +86,15 @@ html {
   @apply rounded-full bg-muted-foreground/20 hover:bg-muted-foreground/30;
 }
 
+/* Hide scrollbar while keeping scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Landing page background: dot pattern (purple accent) */
 .landing-dots {
   background-image: radial-gradient(
@@ -105,3 +114,16 @@ html {
   background-size: 28px 28px;
 }
 
+/* Safe area insets for iOS notch and home indicator */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.pr-safe {
+  padding-right: env(safe-area-inset-right, 0);
+}
+.pl-safe {
+  padding-left: env(safe-area-inset-left, 0);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0);
+}

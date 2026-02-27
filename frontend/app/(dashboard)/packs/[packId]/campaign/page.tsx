@@ -12,7 +12,7 @@ import {
 
 export default function CampaignPage() {
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="w-full max-w-4xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}

@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground p-8 max-w-2xl mx-auto">
+    <div className="min-h-screen bg-background/95 backdrop-blur-sm text-foreground max-w-2xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
