@@ -30,11 +30,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
   const hideMobileNav =
     pathname?.endsWith("/posters") || pathname?.endsWith("/ad-factory");
+  const isWebsiteBuilder = pathname?.endsWith("/website");
 
   return (
     <MobileInputNavProvider>
       <div className="flex h-dvh overflow-hidden bg-background">
-        <Sidebar />
+        {!isWebsiteBuilder && <Sidebar />}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden min-w-0 w-full">
           <div className="lg:hidden">
             <MobileHeaderBar />

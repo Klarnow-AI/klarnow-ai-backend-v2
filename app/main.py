@@ -72,10 +72,15 @@ def _generic_exception_handler(request: Request, exc: Exception) -> JSONResponse
         detail = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
     else:
         detail = "Internal server error"
-    return JSONResponse(
+    response = JSONResponse(
         status_code=500,
         content={"detail": detail, "request_id": getattr(request.state, "request_id", None)},
     )
+    # Add CORS headers so browser doesn't report CORS instead of 500
+    origin = request.headers.get("origin")
+    if origin and origin in settings.cors_allow_origins:
+        response.headers["Access-Control-Allow-Origin"] = origin
+    return response
 
 
 app.add_exception_handler(Exception, _generic_exception_handler)

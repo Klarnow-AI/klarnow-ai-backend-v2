@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   User,
   LogOut,
-  HelpCircle,
   Sun,
   Moon,
   Monitor,
@@ -84,14 +83,6 @@ export function ProfileDropdown({
       >
         <User className="h-4 w-4 shrink-0 text-muted-foreground" />
         View account
-      </Link>
-      <Link
-        href="/help"
-        className="flex items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-white/5 hover:scale-[1.02] transition-all focus-visible:outline-none focus-visible:ring-0"
-        onClick={() => onOpenChange(false)}
-      >
-        <HelpCircle className="h-4 w-4 shrink-0 text-muted-foreground" />
-        Help
       </Link>
       <button
         type="button"

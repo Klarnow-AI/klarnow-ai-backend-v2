@@ -63,6 +63,8 @@ export function PublicHeader({
             width={28}
             height={28}
             className="object-contain"
+            loading="eager"
+            priority
           />
         </div>
         {/* <span className="font-semibold text-base sm:text-lg text-foreground whitespace-nowrap truncate">

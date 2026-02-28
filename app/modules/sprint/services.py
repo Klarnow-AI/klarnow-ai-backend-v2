@@ -91,7 +91,7 @@ def create_sprint_for_pack(db: Session, pack_id: UUID, started_at: datetime | No
     db.flush()
     _create_day_cards(db, sprint.id)
     db.commit()
-    if day_number == 3:
+    if sprint.current_day == 3:
         try:
             _seed_ad_factory_videos_after_day_3(db, sprint)
         except Exception as exc:

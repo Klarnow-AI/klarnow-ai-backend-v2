@@ -234,31 +234,6 @@ export default function LandingPage() {
         </motion.div>
       </main>
 
-      {/* Footer: terms/privacy */}
-      <motion.footer
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="py-6 flex flex-col items-end gap-4"
-      >
-        <p className="w-full text-center text-sm text-muted-foreground">
-          By using Klarnow AI, you agree to our{" "}
-          <Link
-            href="/terms"
-            className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
-          >
-            Terms
-          </Link>{" "}
-          and{" "}
-          <Link
-            href="/privacy"
-            className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
-          >
-            Privacy Policy
-          </Link>
-          .
-        </p>
-      </motion.footer>
     </div>
   );
 }
