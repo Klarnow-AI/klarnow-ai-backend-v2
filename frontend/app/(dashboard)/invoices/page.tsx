@@ -412,7 +412,7 @@ export default function InvoicesPage() {
                       />
                     </div>
                   </DialogBody>
-                  <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
+                  <div className="flex justify-end gap-2 bg-border/20 px-6 py-4">
                     <Button
                       type="button"
                       variant="ghost"
@@ -706,7 +706,7 @@ export default function InvoicesPage() {
                     in Settings to create payment links.
                   </p>
                 )}
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                <div className="flex flex-wrap gap-2 pt-2">
                   {manageInvoice.status === "draft" && (
                     <Button
                       variant="outline"

@@ -1,10 +1,9 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import {
   useOnboardingChat,
-  OnboardingSlideView,
+  OnboardingSharedStepLayout,
 } from "@/components/onboarding-chat";
 import { CoreConceptLockModal } from "@/components/core-concept-lock-modal";
 
@@ -21,45 +20,25 @@ export default function OnboardingPage() {
   });
 
   return (
-    <div className="w-full max-w-2xl mx-auto min-h-[80vh] flex flex-col justify-center">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <h1 className="text-2xl  font-[600] tracking-tight">
-          Set up your pack
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Answer a few questions so Klaro can set up your Brand Identity and
-          pack.
-        </p>
-      </motion.div>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="rounded-2xl border border-border bg-card shadow shadow-black/10 p-7 sm:p-9"
-      >
-        <OnboardingSlideView
-          step={state.step}
-          answers={state.answers}
-          answerTimes={state.answerTimes}
-          loading={state.loading}
-          error={state.error}
-          selectedPackType={state.selectedPackType}
-          botMessageTimesRef={state.botMessageTimesRef}
-          onChoice={state.handleChoice}
-          onPathAInputType={state.handlePathAInputType}
-          onPathBVibeToggle={state.handlePathBVibeToggle}
-          onPackTypeChoose={state.handlePackTypeChoice}
-          input={state.input}
-          setInput={state.setInput}
-          onSubmit={state.handleSend}
-          interactiveOnly
-          onboardingProgress={state.onboardingProgress}
-          retryFailedStep={state.retryFailedStep}
-        />
-      </motion.div>
+    <div className="w-full max-w-2xl mx-auto min-h-[80vh] flex flex-col justify-center px-4">
+      <OnboardingSharedStepLayout
+        step={state.step}
+        answers={state.answers}
+        answerTimes={state.answerTimes}
+        loading={state.loading}
+        error={state.error}
+        selectedPackType={state.selectedPackType}
+        botMessageTimesRef={state.botMessageTimesRef}
+        onChoice={state.handleChoice}
+        onPathAInputType={state.handlePathAInputType}
+        onPathBVibeToggle={state.handlePathBVibeToggle}
+        onPackTypeChoose={state.handlePackTypeChoice}
+        input={state.input}
+        setInput={state.setInput}
+        onSubmit={state.handleSend}
+        onboardingProgress={state.onboardingProgress}
+        retryFailedStep={state.retryFailedStep}
+      />
 
       <CoreConceptLockModal
         open={state.showCoreConceptModal}

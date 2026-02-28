@@ -188,7 +188,7 @@ export function MobileNavContent({ inline, className }: MobileNavContentProps) {
               exit={{ opacity: 0, y: 8 }}
               transition={{ duration: 0.15 }}
               className={cn(
-                "fixed left-[0.5rem] right-[0.5rem] w-full max-w-[250px] mx-auto max-h-[min(70vh,calc(100dvh-6rem))] overflow-y-auto rounded-xl border border-border bg-card shadow-lg p-2 z-50 grid grid-cols-4 gap-1",
+                "fixed left-[0.5rem] right-[0.5rem] w-full max-w-[250px] mx-auto max-h-[min(70vh,calc(100dvh-6rem))] overflow-y-auto rounded-xl border-0 bg-border/40 backdrop-blur-xl shadow-lg p-2 z-50 grid grid-cols-4 gap-1",
                 inline
                   ? "bottom-[calc(5rem+env(safe-area-inset-bottom,0px))]"
                   : "bottom-[calc(5rem+env(safe-area-inset-bottom,0px))]",
@@ -221,7 +221,7 @@ export function MobileNavContent({ inline, className }: MobileNavContentProps) {
     return (
       <div
         className={cn(
-          "flex items-stretch w-full rounded-full border border-border bg-card/95 backdrop-blur-xl shadow-lg",
+          "flex items-stretch w-full rounded-full border-0 bg-border/40 backdrop-blur-xl shadow-lg",
           className,
         )}
       >
@@ -233,7 +233,7 @@ export function MobileNavContent({ inline, className }: MobileNavContentProps) {
   return (
     <nav
       className={cn(
-        "mx-auto max-w-xs flex items-stretch h-[4.5rem] rounded-full border border-border bg-card/95 backdrop-blur-xl shadow-lg",
+        "mx-auto max-w-xs flex items-stretch h-[4.5rem] rounded-full border-0 bg-border/40 backdrop-blur-xl shadow-lg",
         className,
       )}
       aria-label="Bottom navigation"

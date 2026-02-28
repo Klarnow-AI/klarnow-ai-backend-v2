@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     # Optional: Resend
     resend_api_key: str = ""
     resend_from_email: str = "noreply@example.com"
+    support_email: str = "sooreoluwa@klarnow.co.uk"
 
     # Optional: Storage (S3)
     storage_provider: str = "s3"

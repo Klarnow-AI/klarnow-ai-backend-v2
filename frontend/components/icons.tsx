@@ -43,6 +43,9 @@ import {
   FolderAddIcon,
   Menu01Icon,
   PanelLeftCloseIcon,
+  PanelRightCloseIcon,
+  PanelLeftIcon,
+  PanelRightIcon,
   MenuCollapseIcon,
   ChatFeedback01Icon,
   Mic01Icon,
@@ -99,7 +102,7 @@ export const HelpCircle = createIcon(HelpCircleIcon, "HelpCircle");
 export const LogOut = createIcon(Logout01Icon, "LogOut");
 export const LayoutDashboard = createIcon(
   DashboardSquare01Icon,
-  "LayoutDashboard"
+  "LayoutDashboard",
 );
 export const Target = createIcon(Target01Icon, "Target");
 export const FileText = createIcon(File01Icon, "FileText");
@@ -132,6 +135,12 @@ export const FolderPlus = createIcon(FolderAddIcon, "FolderPlus");
 export const GripVertical = createIcon(Menu01Icon, "GripVertical");
 export const Menu = createIcon(Menu01Icon, "Menu");
 export const PanelLeftClose = createIcon(PanelLeftCloseIcon, "PanelLeftClose");
+export const PanelRightClose = createIcon(
+  PanelRightCloseIcon,
+  "PanelRightClose",
+);
+export const PanelLeft = createIcon(PanelLeftIcon, "PanelLeft");
+export const PanelRight = createIcon(PanelRightIcon, "PanelRight");
 export const MenuCollapse = createIcon(MenuCollapseIcon, "MenuCollapse");
 export const Feedback = createIcon(ChatFeedback01Icon, "Feedback");
 export const Mic = createIcon(Mic01Icon, "Mic");

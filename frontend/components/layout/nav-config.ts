@@ -10,7 +10,6 @@ import {
   FileCheck,
   Receipt,
   HelpCircle,
-  Feedback,
   Settings,
 } from "@/components/icons";
 
@@ -91,7 +90,6 @@ export const resultItems: NavItem[] = [
 ];
 
 export const footerItems: NavItem[] = [
-  { key: "feedback", href: "/feedback", label: "Feedback", icon: Feedback, pathMatch: "/feedback", global: true },
   { key: "help", href: "/help", label: "Help", icon: HelpCircle, pathMatch: "/help", global: true },
   { key: "settings", href: "/settings", label: "Account", icon: Settings, pathMatch: "/settings", global: true },
 ];

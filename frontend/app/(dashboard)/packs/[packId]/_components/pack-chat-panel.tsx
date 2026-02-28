@@ -224,12 +224,10 @@ export function PackChatPanel({ packId }: { packId: string }) {
             input={input}
             onChange={setInput}
             onSubmit={handleSubmit}
-            onPreview={() => send("preview")}
             onStop={handleStop}
             loading={loading}
             stopTriggered={stopTriggered}
             applyTargetId={applyTargetId}
-            suggestionChips={nextAction?.actionChips}
           />
         </div>
       </div>

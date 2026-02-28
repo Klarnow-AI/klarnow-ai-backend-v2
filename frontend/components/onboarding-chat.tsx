@@ -44,6 +44,11 @@ import {
 } from "@/components/onboarding-chat-steps";
 
 const DEFAULT_PACK_NAME = "My first pack";
+const ONBOARDING_INPUT_WRAPPER_CLASS =
+  "min-h-[50px] gap-2 px-4 py-2 focus-within:scale-[1.02]";
+const ONBOARDING_INPUT_ROW_CLASS =
+  "mx-auto flex w-full max-w-[460px] items-center gap-2";
+const ONBOARDING_INPUT_CLASS = "text-sm";
 
 export function formatMessageTime() {
   return new Date().toLocaleTimeString("en-US", {
@@ -470,7 +475,7 @@ export function OnboardingPathAInputType({
   loading: boolean;
 }) {
   return (
-    <form onSubmit={onSubmit}>
+    <form onSubmit={onSubmit} className={ONBOARDING_INPUT_ROW_CLASS}>
       <SearchInput
         type="text"
         placeholder="e.g. example.com"
@@ -478,16 +483,17 @@ export function OnboardingPathAInputType({
         onChange={(e) => setInput(e.target.value)}
         disabled={loading}
         aria-label="Website URL"
-        rightAdornment={
-          <Button type="submit" disabled={loading || !input.trim()} size="md">
-            {loading ? (
-              <Spinner className="h-5 w-5" />
-            ) : (
-              <ChevronRight className="h-5 w-5" />
-            )}
-          </Button>
-        }
+        wrapperClassName={ONBOARDING_INPUT_WRAPPER_CLASS}
+        className={ONBOARDING_INPUT_CLASS}
       />
+      <Button
+        type="submit"
+        disabled={loading || !input.trim()}
+        size="sm"
+        className="h-[50px] w-[50px] rounded-full p-0 shrink-0"
+      >
+        {loading ? <Spinner className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+      </Button>
     </form>
   );
 }
@@ -522,6 +528,45 @@ export function OnboardingPathBVibes({
   );
 }
 
+function getOnboardingTotalSteps(mvpOnly: boolean) {
+  return mvpOnly ? MVP_STEP_COUNT : 4 + BLOCKER_COUNT + 1;
+}
+
+function getOnboardingStepIndex(step: number, mvpOnly: boolean) {
+  if (mvpOnly) {
+    return Math.min(Math.max(step, 0), MVP_STEP_COUNT - 1);
+  }
+  const maxIndex = getOnboardingTotalSteps(false) - 1;
+  return Math.min(Math.max(step, 0), maxIndex);
+}
+
+export function OnboardingStepIndicators({
+  step,
+  mvpOnly = false,
+  className,
+}: {
+  step: number;
+  mvpOnly?: boolean;
+  className?: string;
+}) {
+  const totalSteps = getOnboardingTotalSteps(mvpOnly);
+  const activeIndex = getOnboardingStepIndex(step, mvpOnly);
+
+  return (
+    <div className={cn("flex items-center justify-center gap-2", className)}>
+      {Array.from({ length: totalSteps }).map((_, index) => (
+        <span
+          key={index}
+          className={cn(
+            "h-1.5 w-1.5 rounded-full transition-all",
+            index === activeIndex ? "bg-foreground/90" : "bg-foreground/25",
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
 /** Single-slide view: current step only. For modal use. */
 export function OnboardingSlideView({
   step,
@@ -541,6 +586,7 @@ export function OnboardingSlideView({
   className,
   modalContentOnly,
   interactiveOnly,
+  questionOnly,
   mvpOnly = false,
   onboardingProgress = "",
   retryFailedStep = null,
@@ -562,6 +608,7 @@ export function OnboardingSlideView({
   className?: string;
   modalContentOnly?: boolean;
   interactiveOnly?: boolean;
+  questionOnly?: boolean;
   mvpOnly?: boolean;
   onboardingProgress?: string;
   retryFailedStep?: (() => Promise<void>) | null;
@@ -575,7 +622,7 @@ export function OnboardingSlideView({
   const selectedVibes = (
     answers.vibe_chips ? JSON.parse(answers.vibe_chips) : []
   ) as string[];
-  const totalSteps = mvpOnly ? MVP_STEP_COUNT : 4 + BLOCKER_COUNT + 1; // pack name + brand question + path steps + blockers + pack type
+  const totalSteps = getOnboardingTotalSteps(mvpOnly); // pack name + brand question + path steps + blockers + pack type
   const progressPercent =
     totalSteps > 0 ? Math.round(((step + 1) / totalSteps) * 100) : 0;
 
@@ -656,6 +703,32 @@ export function OnboardingSlideView({
                   ? selectedVibes.join(", ")
                   : null;
 
+  if (questionOnly) {
+    return (
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={step}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.2 }}
+          className="text-center space-y-4"
+        >
+          <h4 className="text-2xl sm:text-3xl font-semibold text-foreground">
+            {mvpOnly && step < MVP_STEP_COUNT
+              ? MVP_QUESTIONS[step].label
+              : getQuestionContent(step, hasExistingBrand).question}
+          </h4>
+          {!mvpOnly && getQuestionContent(step, hasExistingBrand).helper && (
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              {getQuestionContent(step, hasExistingBrand).helper}
+            </p>
+          )}
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
+
   // If only interactive content is requested, return just that
   if (interactiveOnly) {
     return (
@@ -668,51 +741,45 @@ export function OnboardingSlideView({
           transition={{ duration: 0.2 }}
         >
           {showMvpInput && (
-            <form onSubmit={onSubmit}>
+            <form onSubmit={onSubmit} className={ONBOARDING_INPUT_ROW_CLASS}>
               <SearchInput
                 placeholder={MVP_QUESTIONS[step].placeholder}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={loading}
                 aria-label={MVP_QUESTIONS[step].label}
-                rightAdornment={
-                  <Button
-                    type="submit"
-                    disabled={loading || !input.trim()}
-                    size="md"
-                  >
-                    {loading ? (
-                      <Spinner className="h-5 w-5" />
-                    ) : (
-                      <ChevronRight className="h-5 w-5" />
-                    )}
-                  </Button>
-                }
+                wrapperClassName={ONBOARDING_INPUT_WRAPPER_CLASS}
+                className={ONBOARDING_INPUT_CLASS}
               />
+              <Button
+                type="submit"
+                disabled={loading || !input.trim()}
+                size="sm"
+                className="h-[50px] w-[50px] rounded-full p-0 shrink-0"
+              >
+                {loading ? <Spinner className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+              </Button>
             </form>
           )}
           {showPackNameInput && (
-            <form onSubmit={onSubmit}>
+            <form onSubmit={onSubmit} className={ONBOARDING_INPUT_ROW_CLASS}>
               <SearchInput
                 placeholder="My Campaign Pack"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={loading}
                 aria-label="Pack name"
-                rightAdornment={
-                  <Button
-                    type="submit"
-                    disabled={loading || !input.trim()}
-                    size="md"
-                  >
-                    {loading ? (
-                      <Spinner className="h-5 w-5" />
-                    ) : (
-                      <ChevronRight className="h-5 w-5" />
-                    )}
-                  </Button>
-                }
+                wrapperClassName={ONBOARDING_INPUT_WRAPPER_CLASS}
+                className={ONBOARDING_INPUT_CLASS}
               />
+              <Button
+                type="submit"
+                disabled={loading || !input.trim()}
+                size="sm"
+                className="h-[50px] w-[50px] rounded-full p-0 shrink-0"
+              >
+                {loading ? <Spinner className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+              </Button>
             </form>
           )}
           {showChoiceButtons && (
@@ -732,27 +799,23 @@ export function OnboardingSlideView({
             />
           )}
           {showPathBNameInput && (
-            <form onSubmit={onSubmit}>
+            <form onSubmit={onSubmit} className={ONBOARDING_INPUT_ROW_CLASS}>
               <SearchInput
                 placeholder="e.g. Acme Co"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={loading}
-                rightAdornment={
-                  <Button
-                    type="submit"
-                    disabled={loading || !input.trim()}
-                    size="md"
-                    className="shrink-0"
-                  >
-                    {loading ? (
-                      <Spinner className="h-5 w-5" />
-                    ) : (
-                      <Send className="h-5 w-5" />
-                    )}
-                  </Button>
-                }
+                wrapperClassName={ONBOARDING_INPUT_WRAPPER_CLASS}
+                className={ONBOARDING_INPUT_CLASS}
               />
+              <Button
+                type="submit"
+                disabled={loading || !input.trim()}
+                size="sm"
+                className="h-[50px] w-[50px] rounded-full p-0 shrink-0"
+              >
+                {loading ? <Spinner className="h-5 w-5" /> : <Send className="h-5 w-5" />}
+              </Button>
             </form>
           )}
           {showPathBVibes && (
@@ -782,27 +845,23 @@ export function OnboardingSlideView({
             </div>
           )}
           {showBlockerInput && (
-            <form onSubmit={onSubmit}>
+            <form onSubmit={onSubmit} className={ONBOARDING_INPUT_ROW_CLASS}>
               <SearchInput
                 placeholder="Type your answer…"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={loading}
-                rightAdornment={
-                  <Button
-                    type="submit"
-                    disabled={loading || !input.trim()}
-                    size="md"
-                    className="shrink-0"
-                  >
-                    {loading ? (
-                      <Spinner className="h-5 w-5" />
-                    ) : (
-                      <Send className="h-5 w-5" />
-                    )}
-                  </Button>
-                }
+                wrapperClassName={ONBOARDING_INPUT_WRAPPER_CLASS}
+                className={ONBOARDING_INPUT_CLASS}
               />
+              <Button
+                type="submit"
+                disabled={loading || !input.trim()}
+                size="sm"
+                className="h-[50px] w-[50px] rounded-full p-0 shrink-0"
+              >
+                {loading ? <Spinner className="h-5 w-5" /> : <Send className="h-5 w-5" />}
+              </Button>
             </form>
           )}
           {showPackTypeChoice && onPackTypeChoose && (
@@ -898,7 +957,7 @@ export function OnboardingSlideView({
             transition={{ duration: 0.2 }}
             className="text-center space-y-4"
           >
-            <h4 className="text-4xl font-semibold text-foreground">
+            <h4 className="text-3xl sm:text-4xl font-semibold text-foreground">
               {mvpOnly && step < MVP_STEP_COUNT
                 ? MVP_QUESTIONS[step].label
                 : getQuestionContent(step, hasExistingBrand).question}
@@ -999,5 +1058,97 @@ export function OnboardingChat({
         loading={state.loading}
       />
     </>
+  );
+}
+
+export function OnboardingSharedStepLayout({
+  step,
+  answers,
+  answerTimes,
+  loading,
+  error,
+  selectedPackType = null,
+  botMessageTimesRef,
+  onChoice,
+  onPathAInputType,
+  onPathBVibeToggle,
+  onPackTypeChoose,
+  input,
+  setInput,
+  onSubmit,
+  className,
+  mvpOnly = false,
+  onboardingProgress = "",
+  retryFailedStep = null,
+}: {
+  step: number;
+  answers: Record<string, string>;
+  answerTimes: Record<string, string>;
+  loading: boolean;
+  error: string;
+  selectedPackType?: string | null;
+  botMessageTimesRef: React.MutableRefObject<Record<number, string>>;
+  onChoice: (value: string) => void;
+  onPathAInputType: (type: "url" | "paste" | "logo") => void;
+  onPathBVibeToggle: (vibe: string) => void;
+  onPackTypeChoose?: (packType: string) => void;
+  input: string;
+  setInput: (v: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  className?: string;
+  mvpOnly?: boolean;
+  onboardingProgress?: string;
+  retryFailedStep?: (() => Promise<void>) | null;
+}) {
+  return (
+    <div className={cn("w-full max-w-[600px] mx-auto", className)}>
+      <div className="min-h-[340px] flex flex-col justify-center">
+        <div className="px-4 sm:px-6">
+          <OnboardingSlideView
+            step={step}
+            answers={answers}
+            answerTimes={answerTimes}
+            loading={loading}
+            error={error}
+            selectedPackType={selectedPackType}
+            botMessageTimesRef={botMessageTimesRef}
+            onChoice={onChoice}
+            onPathAInputType={onPathAInputType}
+            onPathBVibeToggle={onPathBVibeToggle}
+            onPackTypeChoose={onPackTypeChoose}
+            input={input}
+            setInput={setInput}
+            onSubmit={onSubmit}
+            mvpOnly={mvpOnly}
+            questionOnly
+          />
+        </div>
+
+        <div className="mt-6 px-2 sm:px-4">
+          <OnboardingSlideView
+            step={step}
+            answers={answers}
+            answerTimes={answerTimes}
+            loading={loading}
+            error={error}
+            selectedPackType={selectedPackType}
+            botMessageTimesRef={botMessageTimesRef}
+            onChoice={onChoice}
+            onPathAInputType={onPathAInputType}
+            onPathBVibeToggle={onPathBVibeToggle}
+            onPackTypeChoose={onPackTypeChoose}
+            input={input}
+            setInput={setInput}
+            onSubmit={onSubmit}
+            mvpOnly={mvpOnly}
+            interactiveOnly
+            onboardingProgress={onboardingProgress}
+            retryFailedStep={retryFailedStep}
+          />
+        </div>
+      </div>
+
+      <OnboardingStepIndicators step={step} mvpOnly={mvpOnly} className="mt-8" />
+    </div>
   );
 }

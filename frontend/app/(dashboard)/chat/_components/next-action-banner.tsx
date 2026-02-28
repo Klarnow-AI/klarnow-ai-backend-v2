@@ -18,14 +18,14 @@ export function NextActionBanner({
 
   return (
     <div
-      className="shrink-0 lg:py-10 py-6"
+      className="shrink-0 w-full min-w-0 lg:py-10 py-6"
       style={{ background: "unset", backgroundColor: "unset" }}
     >
-      <div className="max-w-[660px] mx-auto rounded-2xl border-0 bg-border/40 px-4 py-3 flex items-center gap-4">
+      <div className="w-full min-w-0 max-w-full rounded-2xl border-0 bg-border/40 px-3 py-3 flex items-center gap-2 sm:gap-4 sm:px-4 overflow-hidden">
         <div className="rounded-full border-0 bg-border/50 p-2 shrink-0">
           <Target className="h-4 w-4 text-muted-foreground" size={16} />
         </div>
-        <div className="flex-1 min-w-0 space-y-0.5">
+        <div className="flex-1 min-w-0 space-y-0.5 overflow-hidden">
           <p className="text-sm font-medium text-foreground truncate">
             {nextAction.actionText}
           </p>
@@ -44,7 +44,11 @@ export function NextActionBanner({
         </div>
         {primaryChip && (
           <Link href={primaryChip.href!} className="shrink-0">
-            <Button variant="secondary" size="sm" className="rounded-full">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="rounded-full text-xs sm:text-sm whitespace-nowrap px-2.5 sm:px-3"
+            >
               {primaryChip.label}
             </Button>
           </Link>

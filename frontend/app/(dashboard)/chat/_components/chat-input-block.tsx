@@ -1,21 +1,18 @@
 "use client";
 
-import Link from "next/link";
 import { Eye, Target } from "@/components/icons";
 import { Chip } from "@/components/ui/chip";
 import { ComposeInput } from "@/components/ui/compose-input";
-import type { DayQuestionContext, NextActionChip } from "@/types/api-types";
+import type { DayQuestionContext } from "@/types/api-types";
 
 export type ChatInputBlockProps = {
   input: string;
   onChange: (value: string) => void;
   onSubmit: (e: React.FormEvent) => void;
-  onPreview: () => void;
   onStop: () => void;
   loading: boolean;
   stopTriggered: boolean;
   applyTargetId: string | null;
-  suggestionChips?: NextActionChip[] | null;
   dayContext?: { day: number; title: string } | null;
   onDay0Choice?: (message: string) => void;
   showDay0ChoiceChips?: boolean;
@@ -33,12 +30,10 @@ export function ChatInputBlock({
   input,
   onChange,
   onSubmit,
-  onPreview,
   onStop,
   loading,
   stopTriggered,
   applyTargetId,
-  suggestionChips,
   dayContext,
   onDay0Choice,
   showDay0ChoiceChips = true,
@@ -60,7 +55,7 @@ export function ChatInputBlock({
         </div>
       )}
       {dayContext?.day === 0 && onDay0Choice && showDay0ChoiceChips && (
-        <div className="mb-2 flex items-center justify-start gap-2 w-full">
+        <div className="mb-2 flex items-center justify-center gap-2 w-full">
           <Chip
             size="md"
             onClick={() => onDay0Choice(DAY0_CHOICE_YES)}
@@ -95,33 +90,7 @@ export function ChatInputBlock({
         onStop={onStop}
         stopTriggered={stopTriggered}
         onOpenHistory={onOpenHistory}
-        wrapperClassName="mb-4"
       />
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        <Chip
-          size="md"
-          icon={<Eye className="h-4 w-4" />}
-          disabled={loading || !input.trim()}
-          onClick={onPreview}
-        >
-          Preview
-        </Chip>
-        {!questionContext &&
-          suggestionChips?.map((chip) =>
-            chip.href ? (
-              <Link key={chip.label} href={chip.href}>
-                <Chip size="md" className="cursor-pointer">
-                  {chip.label}
-                </Chip>
-              </Link>
-            ) : (
-              <Chip key={chip.label} size="md">
-                {chip.label}
-              </Chip>
-            )
-          )
-        }
-      </div>
     </div>
   );
 }

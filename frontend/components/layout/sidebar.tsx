@@ -46,7 +46,7 @@ export function Sidebar() {
           opacity: 1,
         }}
         transition={{ duration: 0.25, ease: "easeInOut" }}
-        className="hidden lg:flex fixed left-4 top-4 bottom-4 rounded-2xl border border-border bg-card/95 backdrop-blur-2xl flex-col shadow shadow-black/5 dark:shadow-black/15 overflow-hidden z-20"
+        className="hidden lg:flex fixed left-4 top-4 bottom-4 rounded-2xl border-0 bg-border/40 backdrop-blur-2xl flex-col shadow shadow-black/5 dark:shadow-black/15 overflow-hidden z-20"
       >
         <SidebarContent
           variant="desktop"

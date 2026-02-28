@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
@@ -9,11 +9,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   FolderKanban,
   HelpCircle,
-  MenuCollapse,
-  ChevronRight,
+  FileText,
+  PanelLeft,
+  PanelRight,
   ChevronDown,
   LogOut,
-  Feedback,
+  AlertCircle,
   Lock,
   Plus,
   X,
@@ -28,9 +29,22 @@ import {
   subscriptionApi,
   type SubscriptionRead,
 } from "@/api_requests/subscription";
+import { feedbackApi } from "@/api_requests/feedback";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { usePackGates } from "@/hooks/use-pack-gates";
 import { buildItems, resultItems, navToSection } from "./nav-config";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogBody,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 const STORAGE_KEY_LAST_PACK = "sidebar-last-pack-id";
 
@@ -73,6 +87,10 @@ export function SidebarContent({
     null,
   );
   const [packDropdownOpen, setPackDropdownOpen] = useState(false);
+  const [helpMenuOpen, setHelpMenuOpen] = useState(false);
+  const [bugDialogOpen, setBugDialogOpen] = useState(false);
+  const [bugMessage, setBugMessage] = useState("");
+  const [submittingBug, setSubmittingBug] = useState(false);
 
   const {
     refs: packDropdownRefs,
@@ -81,6 +99,15 @@ export function SidebarContent({
   } = useDynamicPopover({
     open: packDropdownOpen,
     placement: "bottom-start",
+  });
+  const {
+    refs: helpMenuRefs,
+    floatingStyles: helpMenuStyles,
+    isPositioned: helpMenuPositioned,
+  } = useDynamicPopover({
+    open: helpMenuOpen,
+    placement: "top-start",
+    offset: 10,
   });
 
   const resolvedPackId =
@@ -170,6 +197,29 @@ export function SidebarContent({
   }, [packDropdownOpen, packDropdownRefs.reference, packDropdownRefs.floating]);
 
   useEffect(() => {
+    if (!helpMenuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as Node;
+      const ref = helpMenuRefs.reference.current;
+      if (
+        (ref instanceof Element && ref.contains(target)) ||
+        helpMenuRefs.floating.current?.contains(target)
+      )
+        return;
+      setHelpMenuOpen(false);
+    }
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") setHelpMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [helpMenuOpen, helpMenuRefs.reference, helpMenuRefs.floating]);
+
+  useEffect(() => {
     subscriptionApi
       .get()
       .then((s) => setSubscription(s))
@@ -204,10 +254,40 @@ export function SidebarContent({
     onNavigate?.();
   };
 
+  const canSubmitBug = useMemo(
+    () => bugMessage.trim().length >= 10,
+    [bugMessage],
+  );
+
+  async function submitBugReport(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!canSubmitBug || submittingBug) return;
+    setSubmittingBug(true);
+    try {
+      await feedbackApi.sendBugReport({
+        message: bugMessage.trim(),
+        path: pathname,
+      });
+      toast.success("Bug report sent");
+      setBugDialogOpen(false);
+      setBugMessage("");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to send bug report";
+      toast.error(message);
+    } finally {
+      setSubmittingBug(false);
+    }
+  }
+
+  useEffect(() => {
+    setHelpMenuOpen(false);
+  }, [pathname]);
+
   const header = (
     <div
       className={cn(
-        "border-b border-border flex items-center min-w-0 relative",
+        "flex items-center min-w-0 relative bg-border/30",
         variant === "sheet"
           ? "gap-2 p-4"
           : collapsed
@@ -259,19 +339,15 @@ export function SidebarContent({
                       ref={packDropdownRefs.setFloating}
                       style={{
                         ...packDropdownStyles,
-                        visibility: packDropdownPositioned
-                          ? "visible"
-                          : "hidden",
+                        zIndex: 90,
                       }}
                     >
                       <motion.div
                         initial={{ opacity: 0 }}
-                        animate={{
-                          opacity: packDropdownPositioned ? 1 : 0,
-                        }}
+                        animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.15 }}
-                        className="z-50 mt-1 w-[200px] max-h-64 overflow-y-auto rounded-2xl border border-border bg-card/95 backdrop-blur-2xl shadow shadow-black/5 dark:shadow-black/15 py-1"
+                        className="z-50 mt-1 w-[200px] max-h-64 overflow-y-auto rounded-2xl border-0 bg-border/40 backdrop-blur-2xl shadow shadow-black/5 dark:shadow-black/15 py-1"
                       >
                         {packList.map((pack) => (
                           <Link
@@ -298,7 +374,7 @@ export function SidebarContent({
                             <span className="truncate">{pack.name}</span>
                           </Link>
                         ))}
-                        <div className="border-t border-border mt-1 pt-1">
+                        <div className="mt-1 pt-1">
                           <button
                             type="button"
                             onClick={() => {
@@ -351,7 +427,7 @@ export function SidebarContent({
             title="Expand sidebar"
             className="absolute inset-0 flex items-center justify-center rounded-xl opacity-0 transition-all duration-150 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
           >
-            <ChevronRight className="h-5 w-5" />
+            <PanelRight className="h-5 w-5" />
           </button>
         </div>
       ) : (
@@ -397,19 +473,15 @@ export function SidebarContent({
                       ref={packDropdownRefs.setFloating}
                       style={{
                         ...packDropdownStyles,
-                        visibility: packDropdownPositioned
-                          ? "visible"
-                          : "hidden",
+                        zIndex: 90,
                       }}
                     >
                       <motion.div
                         initial={{ opacity: 0 }}
-                        animate={{
-                          opacity: packDropdownPositioned ? 1 : 0,
-                        }}
+                        animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.15 }}
-                        className="z-50 mt-1 w-[200px] max-h-64 overflow-y-auto rounded-2xl border border-border bg-card/95 backdrop-blur-2xl shadow shadow-black/5 dark:shadow-black/15 py-1"
+                        className="z-50 mt-1 w-[200px] max-h-64 overflow-y-auto rounded-2xl border-0 bg-border/40 backdrop-blur-2xl shadow shadow-black/5 dark:shadow-black/15 py-1"
                       >
                         {packList.map((pack) => (
                           <Link
@@ -435,7 +507,7 @@ export function SidebarContent({
                             <span className="truncate">{pack.name}</span>
                           </Link>
                         ))}
-                        <div className="border-t border-border mt-1 pt-1">
+                        <div className="mt-1 pt-1">
                           <button
                             type="button"
                             onClick={() => {
@@ -462,7 +534,7 @@ export function SidebarContent({
               title="Collapse sidebar"
               className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all"
             >
-              <MenuCollapse className="h-5 w-5" />
+              <PanelLeft className="h-5 w-5" />
             </button>
           )}
         </>
@@ -612,24 +684,30 @@ export function SidebarContent({
             {subscription.credits_remaining}
           </div>
         )}
-        <Link
-          href="/feedback"
-          onClick={handleLinkClick}
-          className={navLinkClass(pathname === "/feedback", isCollapsed)}
-          title="Feedback"
+        <div
+          className={cn("relative", isCollapsed && "w-full")}
+          ref={helpMenuRefs.setReference}
         >
-          <Feedback className="h-5 w-5 shrink-0" />
-          {!isCollapsed && <span>Feedback</span>}
-        </Link>
-        <Link
-          href="/help"
-          onClick={handleLinkClick}
-          className={navLinkClass(pathname === "/help", isCollapsed)}
-          title="Help"
-        >
-          <HelpCircle className="h-5 w-5 shrink-0" />
-          {!isCollapsed && <span>Help</span>}
-        </Link>
+          <button
+            type="button"
+            onClick={() => setHelpMenuOpen((open) => !open)}
+            className={cn(
+              navLinkClass(
+                helpMenuOpen ||
+                  pathname === "/help" ||
+                  pathname === "/terms-policies",
+                isCollapsed,
+              ),
+              "w-full",
+            )}
+            title="Help"
+            aria-haspopup="menu"
+            aria-expanded={helpMenuOpen}
+          >
+            <HelpCircle className="h-5 w-5 shrink-0" />
+            {!isCollapsed && <span>Help</span>}
+          </button>
+        </div>
         <Link
           href="/settings"
           onClick={handleLinkClick}
@@ -655,6 +733,117 @@ export function SidebarContent({
           {!isCollapsed && <span>Sign out</span>}
         </button>
       </div>
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {helpMenuOpen && (
+              <div
+                ref={helpMenuRefs.setFloating}
+                style={{
+                  ...helpMenuStyles,
+                  zIndex: 80,
+                  visibility: helpMenuPositioned ? "visible" : "hidden",
+                }}
+              >
+                <motion.div
+                  role="menu"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{
+                    opacity: helpMenuPositioned ? 1 : 0,
+                    y: helpMenuPositioned ? 0 : 6,
+                  }}
+                  exit={{ opacity: 0, y: 6 }}
+                  transition={{ duration: 0.15 }}
+                  className="relative z-[80] w-[250px] rounded-3xl border-0 bg-border/40 p-2 shadow-xl backdrop-blur-2xl"
+                >
+                  <Link
+                    href="/help"
+                    onClick={() => {
+                      setHelpMenuOpen(false);
+                      handleLinkClick();
+                    }}
+                    className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-foreground/90 transition-colors hover:bg-muted/60 hover:text-foreground"
+                  >
+                    <HelpCircle className="h-5 w-5 shrink-0" />
+                    <span>Help center</span>
+                  </Link>
+                  <Link
+                    href="/terms-policies"
+                    onClick={() => {
+                      setHelpMenuOpen(false);
+                      handleLinkClick();
+                    }}
+                    className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-foreground/90 transition-colors hover:bg-muted/60 hover:text-foreground"
+                  >
+                    <FileText className="h-5 w-5 shrink-0" />
+                    <span>Terms &amp; policies</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHelpMenuOpen(false);
+                      setBugDialogOpen(true);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm text-foreground/90 transition-colors hover:bg-muted/60 hover:text-foreground"
+                  >
+                    <AlertCircle className="h-5 w-5 shrink-0" />
+                    <span>Report Bug</span>
+                  </button>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
+      <Dialog
+        open={bugDialogOpen}
+        onOpenChange={(open) => {
+          setBugDialogOpen(open);
+          if (!open) setBugMessage("");
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <div>
+              <DialogTitle>Report Bug</DialogTitle>
+              <DialogDescription>
+                Tell us what happened and where you noticed it.
+              </DialogDescription>
+            </div>
+            <DialogClose onClose={() => setBugDialogOpen(false)} />
+          </DialogHeader>
+          <DialogBody>
+            <form onSubmit={submitBugReport} className="space-y-4">
+              <Textarea
+                value={bugMessage}
+                onChange={(e) => setBugMessage(e.target.value)}
+                placeholder="Describe the bug with as much detail as possible..."
+                rows={6}
+                disabled={submittingBug}
+              />
+              <p className="text-xs text-muted-foreground">
+                Minimum 10 characters.
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setBugDialogOpen(false);
+                    setBugMessage("");
+                  }}
+                  disabled={submittingBug}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={!canSubmitBug || submittingBug}>
+                  {submittingBug ? "Sending..." : "Send report"}
+                </Button>
+              </div>
+            </form>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

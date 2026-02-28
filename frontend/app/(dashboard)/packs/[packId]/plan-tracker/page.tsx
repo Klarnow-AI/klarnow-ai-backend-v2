@@ -12,11 +12,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/page-loader";
 import { sprintApi } from "@/api_requests/sprint";
 import type { SprintRead } from "@/types/api-types";
-import { SprintCalendar } from "@/components/sprint-calendar";
+import { SprintTimelineView } from "@/components/sprint-dashboard/sprint-timeline-view";
+import { SprintPhaseView } from "@/components/sprint-dashboard/sprint-phase-view";
+import { SprintAnalyticsView } from "@/components/sprint-dashboard/sprint-analytics-view";
 import { DayDetailModal } from "@/components/day-detail-modal";
+import { cn } from "@/lib/utils";
 
 export default function PlanTrackerPage() {
   const params = useParams();
@@ -27,6 +31,7 @@ export default function PlanTrackerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dayModalOpen, setDayModalOpen] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<"timeline" | "phase" | "analytics">("timeline");
   const cancelRef = useRef<(() => void) | undefined>(undefined);
 
   const loadSprint = useCallback(() => {
@@ -134,15 +139,21 @@ export default function PlanTrackerPage() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
+        className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4"
       >
-        <h1 className="text-3xl  font-[600] tracking-tight">
-          Sprint Plan & Tracker
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Your 14-day sprint mapped to a calendar. Click any sprint day to view
-          details and take action.
-        </p>
+        <div>
+          <h1 className="text-3xl font-[600] tracking-tight">
+            Sprint Dashboard
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            14-day structured sprint from clarity to revenue
+          </p>
+        </div>
+        {sprint && (
+          <Button variant="secondary" size="md" className="shrink-0">
+            Sprint 1
+          </Button>
+        )}
       </motion.div>
 
       {error && (
@@ -171,8 +182,48 @@ export default function PlanTrackerPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
+          className="space-y-6"
         >
-          <SprintCalendar sprint={sprint} onDayClick={handleDayClick} />
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Overall Progress</p>
+            <div className="flex items-center gap-4">
+              <Progress
+                value={(sprint.day_cards.filter((c) => c.completed_at).length / 15) * 100}
+                className="flex-1 h-2"
+              />
+              <span className="text-sm text-muted-foreground shrink-0">
+                {sprint.day_cards.filter((c) => c.completed_at).length} of 15 days
+              </span>
+            </div>
+          </div>
+
+          <div className="flex gap-2 border-b border-border pb-2">
+            {(["timeline", "phase", "analytics"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+                  activeTab === tab
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                )}
+              >
+                {tab === "timeline" && "Timeline"}
+                {tab === "phase" && "By Phase"}
+                {tab === "analytics" && "Analytics"}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === "timeline" && (
+            <SprintTimelineView sprint={sprint} onDayClick={handleDayClick} />
+          )}
+          {activeTab === "phase" && (
+            <SprintPhaseView sprint={sprint} onDayClick={handleDayClick} />
+          )}
+          {activeTab === "analytics" && <SprintAnalyticsView sprint={sprint} />}
         </motion.div>
       )}
 

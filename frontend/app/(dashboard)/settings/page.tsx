@@ -276,7 +276,7 @@ export default function SettingsPage() {
 
       {/* Mobile: Horizontal scrollable tabs */}
       {!isDesktop && (
-        <div className="shrink-0 sticky top-0 z-10 bg-background border-b border-border -mx-4 px-4 pt-2 pb-2">
+        <div className="shrink-0 sticky top-0 z-10 bg-background -mx-4 px-4 pt-2 pb-2">
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide min-h-[44px]">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -353,13 +353,13 @@ export default function SettingsPage() {
                     })}
                   </div>
                 </div>
-                <div className="pt-4 border-t border-border">
+                <div className="pt-4">
                   <Label className="text-sm font-medium">Language</Label>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Display language (coming soon)
                   </p>
                 </div>
-                <div className="pt-4 border-t border-border">
+                <div className="pt-4">
                   <Label className="text-sm font-medium">
                     API keys & integrations
                   </Label>
@@ -536,7 +536,7 @@ export default function SettingsPage() {
                     </Button>
                   </div>
                 </div>
-                <div className="pt-6 border-t border-border">
+                <div className="pt-6">
                   <Button variant="outline" onClick={logout} className="gap-2">
                     <LogOut className="h-4 w-4" />
                     Sign out
@@ -599,7 +599,7 @@ export default function SettingsPage() {
                     </p>
                   )}
                 </div>
-                <div className="pt-6 border-t border-border">
+                <div className="pt-6">
                   <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Stripe Connect
                   </Label>
@@ -711,7 +711,7 @@ export default function SettingsPage() {
                     {packs.map((pack) => (
                       <li
                         key={pack.id}
-                        className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3"
+                        className="flex items-center justify-between gap-4 rounded-lg border-0 bg-border/40 px-4 py-3"
                       >
                         <div className="min-w-0 flex-1 flex items-center gap-3">
                           <Link

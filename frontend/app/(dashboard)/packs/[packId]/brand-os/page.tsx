@@ -135,7 +135,7 @@ function TextareaWithIcon({
   return (
     <textarea
       className={cn(
-        "w-full min-h-[160px] rounded-lg border border-border bg-background px-3 py-2 text-base sm:text-sm resize-none",
+        "w-full min-h-[160px] rounded-lg border-0 bg-border/40 px-3 py-2 text-base sm:text-sm resize-none",
         className,
       )}
       {...props}
@@ -158,7 +158,7 @@ function ColorSwatch({ value }: { value: string }) {
     : `#${value.replace(/^#/, "")}`;
   return (
     <div
-      className="h-8 w-8 rounded-md border border-border shrink-0 shadow-sm"
+      className="h-8 w-8 rounded-md border-0 bg-border/40 shrink-0 shadow-sm"
       style={{ backgroundColor: cssColor }}
       title={value}
     />
@@ -185,8 +185,8 @@ function SectionCard({
     (typeof children === "string" && !children.trim()) ||
     (Array.isArray(children) && children.length === 0);
   return (
-    <div className="rounded-2xl border border-border bg-card text-card-foreground shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/30 px-5 py-3">
+    <div className="rounded-2xl border-0 bg-border/40 text-card-foreground shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between gap-2 bg-border/30 px-5 py-3">
         <div className="flex items-center gap-2 min-w-0">
           <div
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${iconBg} text-white`}
@@ -660,7 +660,7 @@ export default function BrandOSPage() {
     <div className="flex flex-col min-h-full w-full max-w-full min-w-0 overflow-x-hidden">
       <div className="flex flex-1 w-full max-w-5xl mx-auto flex-col gap-6">
         {!pack ? (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center">
+          <div className="rounded-2xl border-0 bg-border/40 p-8 text-center">
             <p className="text-muted-foreground mb-4">
               No Brand Identity yet. Complete onboarding or open Brand Identity
               to add your logo, fonts, and colours.
@@ -683,7 +683,7 @@ export default function BrandOSPage() {
             {/* Preview strip */}
             {(brandName || primaryHex || headlineFont) && (
               <div
-                className="rounded-xl border border-border bg-card overflow-hidden"
+                className="rounded-xl border-0 bg-border/40 overflow-hidden"
                 style={
                   primaryHex
                     ? { backgroundColor: `${primaryHex}12` }
@@ -746,7 +746,7 @@ export default function BrandOSPage() {
                     <button
                       type="button"
                       onClick={() => setLogoDrawerOpen(true)}
-                      className="w-full rounded-xl border border-border bg-card p-8 flex items-center justify-center min-h-[140px] cursor-pointer hover:border-muted-foreground/50 transition-colors"
+                      className="w-full rounded-xl border-0 bg-border/40 p-8 flex items-center justify-center min-h-[140px] cursor-pointer hover:bg-border/50 transition-colors"
                       aria-label="Change logo"
                     >
                       {typeof wordmarkSvgOrUrl === "string" &&
@@ -814,7 +814,7 @@ export default function BrandOSPage() {
                           type="button"
                           onClick={() => hex && copyToClipboard(hex, id)}
                           className={cn(
-                            "h-16 w-16 rounded-xl border border-border shadow-sm shrink-0 transition-transform",
+                            "h-16 w-16 rounded-xl border-0 bg-border/40 shadow-sm shrink-0 transition-transform",
                             hex && "cursor-pointer hover:scale-105",
                           )}
                           style={
@@ -850,7 +850,7 @@ export default function BrandOSPage() {
                     </button>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-xl border border-border bg-card p-4">
+                    <div className="rounded-xl border-0 bg-border/40 p-4">
                       <span className="text-xs text-muted-foreground block mb-1">
                         Headlines
                       </span>
@@ -874,7 +874,7 @@ export default function BrandOSPage() {
                         )}
                       </button>
                     </div>
-                    <div className="rounded-xl border border-border bg-card p-4">
+                    <div className="rounded-xl border-0 bg-border/40 p-4">
                       <span className="text-xs text-muted-foreground block mb-1">
                         Body
                       </span>
@@ -924,7 +924,7 @@ export default function BrandOSPage() {
                     </Button>
                   )}
                 </div>
-                <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+                <div className="rounded-xl border-0 bg-border/40 p-5 space-y-4">
                   {mv?.mission && (
                     <div>
                       <span className="text-xs font-medium text-muted-foreground block mb-1">
@@ -975,7 +975,7 @@ export default function BrandOSPage() {
                     </div>
                   )}
                   {(pack.primary_cta || pack.usp_statement) && (
-                    <div className="pt-2 border-t border-border space-y-3">
+                    <div className="pt-2 space-y-3">
                       {pack.primary_cta && (
                         <div>
                           <span className="text-xs font-medium text-muted-foreground block mb-1">
@@ -1024,7 +1024,7 @@ export default function BrandOSPage() {
 
             {/* Footer: used across + edit links */}
             {hasBrandIdentity && (
-              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border">
+              <div className="flex flex-wrap items-center gap-2 pt-2">
                 <span className="text-sm text-muted-foreground">
                   Your brand identity is used across Website, Ads, and Posters.
                 </span>
@@ -1071,13 +1071,13 @@ export default function BrandOSPage() {
                 animate={{ x: 0 }}
                 exit={{ x: "100%" }}
                 transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
-                className="pointer-events-auto w-full max-w-[400px] rounded-2xl border border-border bg-card/95 backdrop-blur-2xl shadow shadow-black/5 dark:shadow-black/15 flex flex-col overflow-hidden"
+                className="pointer-events-auto w-full max-w-[400px] rounded-2xl border-0 bg-border/40 backdrop-blur-2xl shadow shadow-black/5 dark:shadow-black/15 flex flex-col overflow-hidden"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="edit-drawer-title"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3 shrink-0">
+                <div className="flex items-center justify-between gap-2 bg-border/30 px-4 py-3 shrink-0">
                   <h2
                     id="edit-drawer-title"
                     className="font-semibold text-lg text-foreground truncate"
@@ -1207,7 +1207,7 @@ export default function BrandOSPage() {
                             name="logo_brand_name"
                             placeholder="Brand name"
                             defaultValue={brandName || ""}
-                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            className="w-full rounded-lg border-0 bg-border/40 px-3 py-2 text-sm"
                           />
                           <div>
                             <p className="text-xs font-medium text-muted-foreground mb-1.5">
@@ -1307,7 +1307,7 @@ export default function BrandOSPage() {
                               {suggested.map((url, i) => (
                                 <div
                                   key={i}
-                                  className="relative group rounded-lg border border-border overflow-hidden bg-muted/30 hover:border-primary/50 aspect-square flex items-center justify-center p-1"
+                                  className="relative group rounded-lg border-0 overflow-hidden bg-border/40 aspect-square flex items-center justify-center p-1 hover:bg-border/50"
                                 >
                                   <button
                                     type="button"
@@ -1382,7 +1382,7 @@ export default function BrandOSPage() {
                                         );
                                       }
                                     }}
-                                    className="absolute top-1 right-1 p-1 rounded-md bg-background/90 border border-border text-muted-foreground hover:text-destructive hover:border-destructive/50 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                    className="absolute top-1 right-1 p-1 rounded-md bg-background/90 border-0 bg-border/40 text-muted-foreground hover:text-destructive hover:bg-destructive/20 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                                     aria-label="Remove from suggested"
                                   >
                                     <X className="h-3.5 w-3.5" />
@@ -1394,7 +1394,7 @@ export default function BrandOSPage() {
                         })()}
                       </div>
                       {wordmarkSvgOrUrl && (
-                        <div className="pt-2 border-t border-border">
+                        <div className="pt-2">
                           <Button
                             type="button"
                             variant="outline"
@@ -1549,7 +1549,7 @@ export default function BrandOSPage() {
                             {editDraft.audience_personas.map((p, idx) => (
                               <div
                                 key={idx}
-                                className="p-3 rounded-xl border border-border space-y-2"
+                                className="p-3 rounded-xl border-0 bg-border/40 space-y-2"
                               >
                                 <div className="flex justify-between items-center">
                                   <span className="text-sm font-medium">
@@ -1601,7 +1601,7 @@ export default function BrandOSPage() {
                                   }
                                 />
                                 <input
-                                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm min-h-[44px]"
+                                  className="w-full rounded-lg border-0 bg-border/40 px-3 py-2.5 text-sm min-h-[44px]"
                                   placeholder="Persona name"
                                   value={p.persona}
                                   onChange={(e) => {
@@ -1845,7 +1845,7 @@ export default function BrandOSPage() {
                               }
                             />
                             <input
-                              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm min-h-[44px]"
+                              className="w-full rounded-lg border-0 bg-border/40 px-3 py-2.5 text-sm min-h-[44px]"
                               value={editDraft.voice_personality.archetype}
                               onChange={(e) =>
                                 setEditDraft((prev) => ({
@@ -2104,7 +2104,7 @@ export default function BrandOSPage() {
                               }
                             />
                             <input
-                              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm min-h-[44px]"
+                              className="w-full rounded-lg border-0 bg-border/40 px-3 py-2.5 text-sm min-h-[44px]"
                               value={editDraft.style_direction_seeds.typography}
                               onChange={(e) =>
                                 setEditDraft((prev) => ({
@@ -2213,7 +2213,7 @@ export default function BrandOSPage() {
                   )}
                 </div>
                 {!logoDrawerOpen && (
-                  <div className="border-t border-border px-4 py-3 shrink-0 flex flex-col gap-2">
+                  <div className="px-4 py-3 shrink-0 flex flex-col gap-2 bg-border/30">
                     {saveError && (
                       <p className="text-sm text-destructive">{saveError}</p>
                     )}

@@ -140,7 +140,7 @@ export function AuthModal({
               role="dialog"
               aria-modal="true"
               aria-labelledby="auth-modal-title"
-              className="pointer-events-auto w-full max-w-[420px] rounded-2xl border border-border bg-card shadow shadow-black/10"
+              className="pointer-events-auto w-full max-w-[420px] rounded-2xl border-0 bg-border/40 backdrop-blur-xl shadow shadow-black/10"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="relative p-6 sm:p-8">
@@ -156,7 +156,7 @@ export function AuthModal({
                   id="auth-modal-title"
                   className="font-heading text-2xl  font-[600] text-foreground pr-10"
                 >
-                  Log in or sign up
+                  Log In or Get Started
                 </h2>
                 <p className="mt-2 text-sm text-muted-foreground">
                   You&apos;ll get smarter responses and can upload files,
@@ -175,16 +175,16 @@ export function AuthModal({
                       <Button
                         type="button"
                         variant="outline"
-                        className="w-full justify-center gap-3 rounded-full border-border bg-muted/30 hover:bg-muted/50 text-foreground"
+                        className="w-full justify-center gap-3 rounded-full border-0 bg-border/40 text-foreground"
                         onClick={() => setView("code-email")}
                       >
-                        Continue with email sign-in code
+                        Continue with email Log In code
                       </Button>
 
                       {/* OR */}
                       <div className="relative">
                         <div className="absolute inset-0 flex items-center">
-                          <div className="w-full border-t border-border" />
+                          <div className="w-full h-px bg-border/40" />
                         </div>
                         <div className="relative flex justify-center text-xs uppercase tracking-wider">
                           <span className="bg-card px-3 text-muted-foreground">
@@ -203,7 +203,7 @@ export function AuthModal({
                             {error}
                           </p>
                         )}
-                        <div className="space-y-2">
+                        <div className="space-y-2 mb-2">
                           <label htmlFor="auth-email" className="sr-only">
                             Email address
                           </label>
@@ -295,9 +295,9 @@ export function AuthModal({
                         {loading ? (
                           <Spinner className="h-5 w-5" />
                         ) : passwordMode === "login" ? (
-                          "Log in"
+                          "Log In"
                         ) : (
-                          "Sign up"
+                          "Get Started"
                         )}
                       </Button>
                       <p className="text-center text-sm text-muted-foreground">
@@ -309,7 +309,7 @@ export function AuthModal({
                               onClick={() => setPasswordMode("register")}
                               className="font-medium text-foreground underline-offset-2 hover:no-underline hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black rounded px-1 -mx-1 transition-colors"
                             >
-                              Sign up
+                              Get Started
                             </button>
                           </>
                         ) : (
@@ -320,7 +320,7 @@ export function AuthModal({
                               onClick={() => setPasswordMode("login")}
                               className="font-medium text-foreground underline-offset-2 hover:no-underline hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black rounded px-1 -mx-1 transition-colors"
                             >
-                              Log in
+                              Log In
                             </button>
                           </>
                         )}
@@ -328,13 +328,13 @@ export function AuthModal({
                       <Button
                         type="button"
                         variant="outline"
-                        className="w-full justify-center rounded-full border-border bg-muted/30 text-foreground"
+                        className="w-full justify-center rounded-full border-0 bg-border/40 text-foreground"
                         onClick={() => {
                           setView("main");
                           setError("");
                         }}
                       >
-                        Use a different email
+                        Use a different email address
                       </Button>
                     </motion.form>
                   ) : view === "code-email" ? (
@@ -355,13 +355,13 @@ export function AuthModal({
                       <Button
                         type="button"
                         variant="outline"
-                        className="w-full justify-center rounded-full border-border bg-muted/30 text-foreground"
+                        className="w-full justify-center rounded-full border-0 bg-border/40 text-foreground"
                         onClick={() => {
                           setView("main");
                           setError("");
                         }}
                       >
-                        Log in with email and password
+                        Log In with email and password
                       </Button>
                       <div className="space-y-2">
                         <label htmlFor="auth-code-email" className="sr-only">
@@ -443,7 +443,7 @@ export function AuthModal({
                         }}
                         className="w-full text-sm text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors rounded-lg py-2"
                       >
-                        Use a different email
+                        Use a different email address
                       </button>
                     </motion.form>
                   )}

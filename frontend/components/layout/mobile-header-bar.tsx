@@ -140,18 +140,18 @@ export function MobileHeaderBar() {
                   ref={packDropdownRefs.setFloating}
                   style={{
                     ...packDropdownStyles,
-                    visibility: packDropdownPositioned ? "visible" : "hidden",
+                    zIndex: 90,
                   }}
                 >
                   <motion.div
                     initial={{ opacity: 0 }}
-                    animate={{ opacity: packDropdownPositioned ? 1 : 0 }}
+                    animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.15 }}
-                    className="z-50 mt-1 w-[min(20rem,calc(100vw-2rem))] max-h-64 overflow-y-auto rounded-2xl border border-border bg-card/95 backdrop-blur-2xl shadow shadow-black/5 dark:shadow-black/15 py-1"
+                    className="z-50 mt-1 w-[min(20rem,calc(100vw-2rem))] max-h-64 overflow-y-auto rounded-2xl border-0 bg-border/40 backdrop-blur-2xl shadow shadow-black/5 dark:shadow-black/15 py-1"
                   >
                     {packsError && (
-                      <div className="px-3 py-2 text-xs text-destructive border-b border-border/70">
+                      <div className="px-3 py-2 text-xs text-destructive bg-border/20">
                         <p>{packsError}</p>
                         <button
                           type="button"
@@ -188,7 +188,7 @@ export function MobileHeaderBar() {
                         <span className="truncate">{pack.name}</span>
                       </Link>
                     ))}
-                  <div className="border-t border-border mt-1 pt-1">
+                  <div className="mt-1 pt-1">
                     <button
                       type="button"
                       onClick={() => {

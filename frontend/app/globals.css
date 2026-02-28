@@ -95,11 +95,11 @@ html {
   display: none;
 }
 
-/* Landing page background: dot pattern (purple accent) */
+/* Landing page background: dot pattern (neutral gray) */
 .landing-dots {
   background-image: radial-gradient(
     circle at center,
-    hsl(270 55% 55% / 0.2) 1px,
+    hsl(0 0% 50% / 0.15) 1px,
     transparent 1px
   );
   background-size: 28px 28px;
@@ -108,7 +108,7 @@ html {
 .light .landing-dots {
   background-image: radial-gradient(
     circle at center,
-    hsl(270 50% 45% / 0.25) 1px,
+    hsl(0 0% 40% / 0.2) 1px,
     transparent 1px
   );
   background-size: 28px 28px;

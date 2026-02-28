@@ -31,6 +31,7 @@ from app.modules.tasks.routes import router as tasks_router
 from app.modules.response_rules.routes import router as response_rules_router
 from app.modules.builder.routes import router as builder_router, public_router as builder_public_router
 from app.modules.builder.subdomain_routes import router as builder_subdomain_router
+from app.modules.feedback.routes import router as feedback_router
 
 
 @asynccontextmanager
@@ -134,5 +135,6 @@ app.include_router(tasks_router, tags=["tasks"])
 app.include_router(response_rules_router, tags=["response-rules"])
 app.include_router(builder_router, prefix="/api/v1/builder", tags=["builder"])
 app.include_router(builder_public_router, prefix="/p", tags=["sites"])
+app.include_router(feedback_router, tags=["feedback"])
 # Subdomain site serving: GET / and POST /lead when Host is *.sites_domain
 app.include_router(builder_subdomain_router, prefix="", tags=["sites-subdomain"])

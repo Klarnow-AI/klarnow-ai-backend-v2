@@ -17,7 +17,7 @@ import { ProfileAvatar } from "@/components/profile-avatar";
 type PublicHeaderProps = {
   /** When authenticated, called when user clicks Dashboard. If not provided, navigates to /packs */
   onDashboardClick?: (e: React.MouseEvent) => void;
-  /** When not authenticated, called when user clicks Sign in or Sign up */
+  /** When not authenticated, called when user clicks Log In or Get Started */
   onAuthClick?: () => void;
   /** Whether to show Install and About links in the center. Default true */
   showInstallAbout?: boolean;
@@ -65,9 +65,9 @@ export function PublicHeader({
             className="object-contain"
           />
         </div>
-        <span className="font-semibold text-base sm:text-lg text-foreground whitespace-nowrap truncate">
+        {/* <span className="font-semibold text-base sm:text-lg text-foreground whitespace-nowrap truncate">
           Klarnow.ai
-        </span>
+        </span> */}
       </Link>
       {showInstallAbout && !isLoading && (
         <nav
@@ -103,7 +103,7 @@ export function PublicHeader({
                 <ProfileDropdown
                   open={profileOpen}
                   onOpenChange={setProfileOpen}
-                  className="flex h-11 w-11 items-center justify-center rounded-full border-[0.2px] border-border bg-card overflow-hidden"
+                  className="flex h-11 w-11 items-center justify-center rounded-full border-0 bg-border/40 overflow-hidden"
                 >
                   <ProfileAvatar className="h-full w-full" />
                 </ProfileDropdown>
@@ -127,17 +127,17 @@ export function PublicHeader({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-border bg-card"
+                  className="border-0 bg-border/40"
                   onClick={onAuthClick}
                 >
-                  Sign in
+                  Log In
                 </Button>
                 <Button
                   size="sm"
                   className="bg-foreground text-background hover:bg-foreground/90"
                   onClick={onAuthClick}
                 >
-                  Sign up
+                  Get Started
                 </Button>
               </>
             )}

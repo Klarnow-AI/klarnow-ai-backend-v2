@@ -25,12 +25,25 @@ import { useChatStore } from "./_store/chat-store";
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
 import { useChatStream } from "@/hooks/use-chat-stream";
+import { cn } from "@/lib/utils";
 
 const STARTER_PROMPTS = [
-  "Give me 3 campaign ideas I can ship this week.",
-  "What's the highest-impact next step for this pack?",
-  "Draft a quick ad angle I can test today.",
-];
+  { text: "Give me 3 campaign ideas I can ship this week.", variant: "amber" },
+  {
+    text: "What's the highest-impact next step for this pack?",
+    variant: "emerald",
+  },
+  { text: "Draft a quick ad angle I can test today.", variant: "violet" },
+] as const;
+
+const PROMPT_VARIANT_CLASSES = {
+  amber:
+    "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 hover:border-amber-500/40",
+  emerald:
+    "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 hover:border-emerald-500/40",
+  violet:
+    "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300 hover:bg-violet-500/20 hover:border-violet-500/40",
+} as const;
 
 export default function ChatPage() {
   const router = useRouter();
@@ -251,28 +264,17 @@ export default function ChatPage() {
   if (!hasCompletedAssistant) {
     return (
       <div ref={containerRef} className="w-full">
-        <NextActionBanner nextAction={nextAction} />
-        <div className="w-full max-w-[840px] mx-auto">
+        <div className="w-full max-w-[840px] mx-auto flex flex-col items-center">
+          <NextActionBanner nextAction={nextAction} />
+          <div className="w-full">
             {messages.length === 0 && !loading ? (
-              <div className="flex min-h-[320px] flex-col items-center justify-center px-4 py-6 text-center">
-                <h2 className="text-4xl font-[600] text-foreground max-w-lg mx-auto mb-3">
+              <div className="flex flex-col items-center justify-center px-4 pt-20 lg:min-h-[320px] text-center">
+                <h3 className="text-2xl sm:text-5xl font-[600] text-foreground max-w-lg mx-auto mb-3">
                   What are we shipping today?
-                </h2>
-                <p className="text-sm text-muted-foreground max-w-md mb-5">
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-md">
                   Start with one of these prompts or type your own idea.
                 </p>
-                <div className="flex flex-wrap items-center justify-center gap-2 max-w-xl">
-                  {STARTER_PROMPTS.map((prompt) => (
-                    <button
-                      key={prompt}
-                      type="button"
-                      onClick={() => send("use", undefined, prompt)}
-                      className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground hover:bg-muted"
-                    >
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
               </div>
             ) : (
               <div className="w-full mx-auto flex flex-col items-start text-left py-4">
@@ -294,36 +296,48 @@ export default function ChatPage() {
                 />
               </div>
             )}
-        </div>
-        <div className="mt-2">
-          <div className="w-full max-w-[840px] mx-auto flex items-center gap-2">
-            <div className="w-full">
-              <ChatInputBlock
-                input={input}
-                onChange={setInput}
-                onSubmit={handleSubmit}
-                onPreview={() => send("preview")}
-                onStop={handleStop}
-                loading={loading}
-                stopTriggered={stopTriggered}
-                applyTargetId={applyTargetId}
-                suggestionChips={nextAction?.actionChips}
-                dayContext={dayContext}
-                onDay0Choice={
-                  dayContext?.day === 0 ? handleDay0Choice : undefined
-                }
-                showDay0ChoiceChips={!hasAnsweredBrandChoice}
-                questionContext={questionContext}
-                onQuestionChipClick={(value) => send("use", undefined, value)}
-                onResuggest={() =>
-                  send("use", undefined, "Give me different suggestions")
-                }
-                onOpenHistory={() => setHistoryModalOpenState(true)}
-                onMarkDayComplete={
-                  dayReadyToComplete ? handleMarkDayComplete : undefined
-                }
-              />
-            </div>
+          </div>
+          <div className="mt-2 w-full">
+            <ChatInputBlock
+              input={input}
+              onChange={setInput}
+              onSubmit={handleSubmit}
+              onStop={handleStop}
+              loading={loading}
+              stopTriggered={stopTriggered}
+              applyTargetId={applyTargetId}
+              dayContext={dayContext}
+              onDay0Choice={
+                dayContext?.day === 0 ? handleDay0Choice : undefined
+              }
+              showDay0ChoiceChips={!hasAnsweredBrandChoice}
+              questionContext={questionContext}
+              onQuestionChipClick={(value) => send("use", undefined, value)}
+              onResuggest={() =>
+                send("use", undefined, "Give me different suggestions")
+              }
+              onOpenHistory={() => setHistoryModalOpenState(true)}
+              onMarkDayComplete={
+                dayReadyToComplete ? handleMarkDayComplete : undefined
+              }
+            />
+            {messages.length === 0 && !loading && (
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-2 max-w-xl mx-auto">
+                {STARTER_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt.text}
+                    type="button"
+                    onClick={() => send("use", undefined, prompt.text)}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-xs transition-colors",
+                      PROMPT_VARIANT_CLASSES[prompt.variant],
+                    )}
+                  >
+                    {prompt.text}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <AnimatePresence>
@@ -342,8 +356,9 @@ export default function ChatPage() {
 
   return (
     <div ref={containerRef} className="w-full">
-      <NextActionBanner nextAction={nextAction} />
-      <div className="w-full max-w-[840px] mx-auto flex flex-col items-start text-left">
+      <div className="w-full max-w-[840px] mx-auto flex flex-col items-center">
+        <NextActionBanner nextAction={nextAction} />
+        <div className="w-full flex flex-col items-start text-left">
           <ChatMessageList
             messages={messages}
             streamingContent={streamingContent}
@@ -361,20 +376,17 @@ export default function ChatPage() {
             }
           />
         </div>
-      <div className="mt-2">
-        <div className="w-full max-w-[840px] mx-auto flex items-center gap-2">
+        <div className="mt-2 w-full">
           {isMobile ? (
             <div className="w-full">
               <ChatInputBlock
                 input={input}
                 onChange={setInput}
                 onSubmit={handleSubmit}
-                onPreview={() => send("preview")}
                 onStop={handleStop}
                 loading={loading}
                 stopTriggered={stopTriggered}
                 applyTargetId={applyTargetId}
-                suggestionChips={nextAction?.actionChips}
                 dayContext={dayContext}
                 onDay0Choice={
                   dayContext?.day === 0 ? handleDay0Choice : undefined
@@ -396,12 +408,10 @@ export default function ChatPage() {
               input={input}
               onChange={setInput}
               onSubmit={handleSubmit}
-              onPreview={() => send("preview")}
               onStop={handleStop}
               loading={loading}
               stopTriggered={stopTriggered}
               applyTargetId={applyTargetId}
-              suggestionChips={nextAction?.actionChips}
               dayContext={dayContext}
               onDay0Choice={
                 dayContext?.day === 0 ? handleDay0Choice : undefined
@@ -417,6 +427,23 @@ export default function ChatPage() {
                 dayReadyToComplete ? handleMarkDayComplete : undefined
               }
             />
+          )}
+          {messages.length === 0 && !loading && (
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 max-w-xl mx-auto">
+              {STARTER_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt.text}
+                  type="button"
+                  onClick={() => send("use", undefined, prompt.text)}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-xs transition-colors",
+                    PROMPT_VARIANT_CLASSES[prompt.variant],
+                  )}
+                >
+                  {prompt.text}
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </div>

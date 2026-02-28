@@ -15,7 +15,7 @@ const STAGE_LABEL: Record<ProposalStatus, string> = {
 };
 
 const STAGE_HEADER_CLASS: Record<ProposalStatus, string> = {
-  draft: "bg-purple-100 dark:bg-purple-950/50",
+  draft: "bg-muted",
   sent: "bg-amber-100 dark:bg-amber-950/50",
   accepted: "bg-emerald-100 dark:bg-emerald-950/50",
   declined: "bg-muted",

@@ -387,7 +387,7 @@ export default function ProposalsPage() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <div
-            className="inline-flex rounded-lg border border-border bg-muted/30 p-0.5"
+            className="inline-flex rounded-lg border-0 bg-border/40 p-0.5"
             role="tablist"
             aria-label="View mode"
           >
@@ -498,7 +498,7 @@ export default function ProposalsPage() {
                   </span>
                 </div>
                 {formContent && (
-                  <div className="rounded-md border border-border bg-muted/30 p-3 text-sm space-y-2">
+                  <div className="rounded-md border-0 bg-border/40 p-3 text-sm space-y-2">
                     {(formContent as ProposalGeneratedContent).description && (
                       <p className="text-foreground">
                         {(formContent as ProposalGeneratedContent).description}
@@ -558,7 +558,7 @@ export default function ProposalsPage() {
                   />
                 </div>
               </DialogBody>
-              <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
+              <div className="flex justify-end gap-2 bg-border/20 px-6 py-4">
                 <Button
                   type="button"
                   variant="ghost"
