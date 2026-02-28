@@ -21,8 +21,8 @@ export function NextActionBanner({
       className="shrink-0 lg:py-10 py-6"
       style={{ background: "unset", backgroundColor: "unset" }}
     >
-      <div className="max-w-[660px] mx-auto rounded-2xl border border-border bg-card px-4 py-3 flex items-center gap-4">
-        <div className="rounded-full border border-border bg-muted/50 p-2 shrink-0">
+      <div className="max-w-[660px] mx-auto rounded-2xl border-0 bg-border/40 px-4 py-3 flex items-center gap-4">
+        <div className="rounded-full border-0 bg-border/50 p-2 shrink-0">
           <Target className="h-4 w-4 text-muted-foreground" size={16} />
         </div>
         <div className="flex-1 min-w-0 space-y-0.5">

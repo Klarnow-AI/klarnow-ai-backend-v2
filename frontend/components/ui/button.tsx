@@ -12,13 +12,13 @@ const buttonVariants = cva(
         default:
           "bg-primary text-primary-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black",
         secondary:
-          "bg-secondary text-secondary-foreground border border-border hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black",
+          "border-0 bg-border/40 text-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black",
         ghost:
           "hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black",
         outline:
-          "border border-border bg-transparent text-primary hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black",
+          "border-0 bg-border/40 text-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black",
         destructive:
-          "bg-white/20 text-foreground border border-border hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black",
+          "border-0 bg-border/50 text-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black",
       },
       size: {
         sm: "h-9 px-4 text-sm",

@@ -56,7 +56,7 @@ export function ChatMessageItem({
       )}
     >
       {message.role === "user" ? (
-        <div className="rounded-2xl rounded-tr-md px-4 py-3 max-w-[85%] bg-primary text-primary-foreground">
+        <div className="rounded-2xl rounded-tr-md px-4 py-3 max-w-[85%] bg-border/40 text-foreground">
           {message.content && (
             <p className="text-sm whitespace-pre-wrap">{message.content}</p>
           )}

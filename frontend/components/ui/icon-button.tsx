@@ -12,9 +12,9 @@ const iconButtonVariants = cva(
         ghost:
           "text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black",
         solid:
-          "bg-foreground text-background hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black",
+          "bg-foreground text-background hover:bg-foreground/90 hover:text-background",
         outline:
-          "border-2 border-border bg-card text-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black",
+          "border-0 bg-border/40 text-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black",
       },
       size: {
         sm: "h-9 w-9 [&>svg]:h-4 [&>svg]:w-4",

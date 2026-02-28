@@ -47,7 +47,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           "relative flex items-center gap-3 w-full px-5 py-4 transition-all",
           isMinimal
             ? "border-0 border-b border-border/50 bg-transparent rounded-none focus-within:border-foreground/40 focus-within:scale-100"
-            : "rounded-full border border-border bg-card focus-within:border-foreground/30 focus-within:scale-[1.02]",
+            : "rounded-full border-0 bg-border/40 focus-within:bg-border/60 focus-within:ring-1 focus-within:ring-foreground/20 focus-within:scale-[1.02]",
           wrapperClassName,
         )}
         {...wrapperProps}

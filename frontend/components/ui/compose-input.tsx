@@ -195,63 +195,63 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
                     animate={{ opacity: isPositioned ? 1 : 0 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.15 }}
-                    className="z-[100] w-56 rounded-xl border border-border bg-card/100 p-2 shadow shadow-black/10"
+                    className="z-[100] w-56 rounded-xl border-0 bg-border/80 backdrop-blur-xl p-2 shadow shadow-black/10"
                   >
-                  <button
-                    type="button"
-                    onClick={handleAttachClick}
-                    className="flex w-full min-w-0 items-center gap-2 overflow-hidden rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
-                  >
-                    <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 truncate">
-                      Attach photo, video, docx
-                    </span>
-                  </button>
-                  <div className="my-2 border-t border-border" />
-                  <button
-                    type="button"
-                    onClick={() => handleMenuAction(onCreateImage)}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
-                  >
-                    <Image className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span>Create image</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleMenuAction(onThinking)}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
-                  >
-                    <Lightbulb className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span>Thinking</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleMenuAction(onDeepResearch)}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
-                  >
-                    <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span>Deep Research</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleMenuAction(onShoppingResearch)}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
-                  >
-                    <ShoppingBag className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span>Shopping research</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleMenuAction(onMore)}
-                    className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <MoreVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span>More</span>
-                    </div>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  </button>
-                </motion.div>
+                    <button
+                      type="button"
+                      onClick={handleAttachClick}
+                      className="flex w-full min-w-0 items-center gap-2 overflow-hidden rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
+                    >
+                      <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 truncate">
+                        Attach photo, video, docx
+                      </span>
+                    </button>
+                    <div className="my-2 h-px bg-border/60" />
+                    <button
+                      type="button"
+                      onClick={() => handleMenuAction(onCreateImage)}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
+                    >
+                      <Image className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span>Create image</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMenuAction(onThinking)}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
+                    >
+                      <Lightbulb className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span>Thinking</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMenuAction(onDeepResearch)}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
+                    >
+                      <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span>Deep Research</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMenuAction(onShoppingResearch)}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
+                    >
+                      <ShoppingBag className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span>Shopping research</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMenuAction(onMore)}
+                      className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <MoreVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span>More</span>
+                      </div>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    </button>
+                  </motion.div>
                 </div>
               )}
             </AnimatePresence>,
@@ -295,8 +295,8 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
       <form onSubmit={onSubmit} className={cn("w-full", wrapperClassName)}>
         <div
           className={cn(
-            "relative flex flex-col w-full rounded-3xl border border-border bg-card",
-            "focus-within:border-foreground/30 transition-all",
+            "relative flex flex-col w-full rounded-3xl border-0 bg-border/40",
+            "focus-within:bg-border/60 focus-within:ring-1 focus-within:ring-foreground/20 transition-all",
             !popoverOpen && "focus-within:scale-[1.02]",
           )}
         >
@@ -351,7 +351,7 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
                   size="md"
                   aria-label="Send"
                   disabled={disabled || !value.trim()}
-                  className="bg-muted text-muted-foreground hover:bg-muted/90 hover:text-foreground disabled:opacity-50"
+                  className="disabled:opacity-50"
                 >
                   <Send className="h-4 w-4" />
                 </IconButton>
