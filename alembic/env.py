@@ -18,6 +18,7 @@ from app.modules.revenue import models as revenue_models  # noqa: F401
 from app.modules.proof_vault import models as proof_vault_models  # noqa: F401
 from app.modules.chat import models as chat_models  # noqa: F401
 from app.modules.builder import models as builder_models  # noqa: F401
+from app.modules.ad_factory import models as ad_factory_models  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

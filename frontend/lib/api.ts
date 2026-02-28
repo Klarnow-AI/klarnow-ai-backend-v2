@@ -10,6 +10,7 @@ export { me } from "@/api_requests/me";
 export { packs } from "@/api_requests/packs";
 export { chat } from "@/api_requests/chat";
 export { creative } from "@/api_requests/creative";
+export { adFactory } from "@/api_requests/ad-factory";
 
 export type {
   AuthAccessToken,
