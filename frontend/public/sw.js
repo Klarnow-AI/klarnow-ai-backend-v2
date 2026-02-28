@@ -21,15 +21,28 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Bypass SW for subresources — lets images, fonts, etc. load natively.
-  // Fixes poster thumbnails and other images not loading in PWA.
-  const dest = event.request.destination;
-  if (dest && dest !== "document" && event.request.mode !== "navigate") {
+  // Only handle top-level/document GET requests in this minimal SW.
+  // All API/subresource requests are left to the browser/network stack.
+  if (event.request.method !== "GET") {
     return;
   }
+  const dest = event.request.destination;
+  const isDocumentRequest =
+    event.request.mode === "navigate" || dest === "document";
+  if (!isDocumentRequest) return;
+
   event.respondWith(
     fetch(event.request)
       .then((response) => response)
-      .catch(() => caches.match(event.request)),
+      .catch(async () => {
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) return cachedResponse;
+
+        return new Response("Offline", {
+          status: 503,
+          statusText: "Service Unavailable",
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
+      }),
   );
 });
