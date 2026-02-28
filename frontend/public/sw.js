@@ -3,6 +3,20 @@
 
 const CACHE_NAME = "klarnow-v1";
 
+const OFFLINE_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Klarnow AI - Offline</title>
+</head>
+<body style="font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#fafafa;color:#333">
+  <h1 style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem">You're offline</h1>
+  <p style="color:#666;margin-bottom:1rem">Check your connection and try again.</p>
+  <button onclick="location.reload()" style="padding:0.5rem 1rem;font-size:1rem;cursor:pointer;background:#000;color:#fff;border:none;border-radius:0.25rem">Retry</button>
+</body>
+</html>`;
+
 self.addEventListener("install", () => {
   self.skipWaiting();
 });
@@ -33,15 +47,21 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(
     fetch(event.request)
-      .then((response) => response)
+      .then((response) => {
+        const clone = response.clone();
+        if (response.ok && response.status === 200) {
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      })
       .catch(async () => {
         const cachedResponse = await caches.match(event.request);
         if (cachedResponse) return cachedResponse;
 
-        return new Response("Offline", {
+        return new Response(OFFLINE_HTML, {
           status: 503,
           statusText: "Service Unavailable",
-          headers: { "Content-Type": "text/plain; charset=utf-8" },
+          headers: { "Content-Type": "text/html; charset=utf-8" },
         });
       }),
   );

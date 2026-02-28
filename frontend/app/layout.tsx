@@ -49,10 +49,9 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <link rel="manifest" href="/site.webmanifest" />
         <meta name="theme-color" content="#FFFFFF" />
-        <script src="https://unpkg.com/ios-pwa-splash@1.0.0/cdn.min.js" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `iosPWASplash('/apple-touch-icon.png', '#FFFFFF');`,
+            __html: `(function(){var s=document.createElement('script');s.src='https://unpkg.com/ios-pwa-splash@1.0.0/cdn.min.js';s.async=true;s.onload=function(){try{if(typeof iosPWASplash==='function')iosPWASplash('/apple-touch-icon.png','#FFFFFF');}catch(e){}};s.onerror=function(){};document.head.appendChild(s);})();`,
           }}
         />
         <script

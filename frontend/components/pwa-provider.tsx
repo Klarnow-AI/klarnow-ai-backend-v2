@@ -39,8 +39,12 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
       (reg) => {
         registrationRef.current = reg;
       },
-      () => {
-        // Registration failed - app may still work, install prompt just won't appear
+      (err) => {
+        // Registration failed - app may still work, install prompt just won't appear.
+        // Log for debugging (e.g. 404, content blockers, CORS).
+        if (process.env.NODE_ENV === "production") {
+          console.warn("[PWA] Service worker registration failed:", err?.message ?? err);
+        }
       },
     );
 

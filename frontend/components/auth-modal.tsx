@@ -127,7 +127,7 @@ export function AuthModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-black/50"
             onClick={() => onOpenChange(false)}
             aria-hidden
           />
@@ -140,7 +140,7 @@ export function AuthModal({
               role="dialog"
               aria-modal="true"
               aria-labelledby="auth-modal-title"
-              className="pointer-events-auto w-full max-w-[420px] rounded-2xl border-0 bg-border/40 backdrop-blur-xl shadow shadow-black/10"
+              className="pointer-events-auto w-full max-w-[420px] rounded-2xl border bg-card shadow-lg"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="relative p-6 sm:p-8">
