@@ -57,7 +57,7 @@ export default function PackLayout({
 
   return (
     <PackLayoutProvider value={layoutContextValue}>
-      <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
         {children}
       </div>
       {showFab && packId && (

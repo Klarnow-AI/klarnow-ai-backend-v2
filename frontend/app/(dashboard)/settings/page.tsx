@@ -255,7 +255,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className={cn("flex flex-1 min-h-0", !isDesktop && "flex-col")}>
+    <div className={cn("flex flex-1", !isDesktop && "flex-col")}>
       {/* Desktop: Sidebar nav */}
       {isDesktop && (
         <aside className="shrink-0 w-56 p-4 pt-60 flex flex-col items-start">
@@ -308,7 +308,7 @@ export default function SettingsPage() {
       {/* Scrollable content */}
       <main
         className={cn(
-          "flex-1 min-w-0 overflow-y-auto px-4",
+          "flex-1 min-w-0 px-4",
           isDesktop ? "pt-20" : "pt-6",
         )}
       >

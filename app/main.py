@@ -1,13 +1,17 @@
 import logging
+import time
 import traceback
+import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
 from app.core.errors import AppError, app_error_handler
+from app.core.metrics import record_request, snapshot
+from app.core.request_context import set_correlation_id
 from app.core.auth.routes import router as auth_router
 from app.modules.packs.routes import router as packs_router
 from app.modules.brand_os.routes import router as brand_os_router
@@ -32,7 +36,9 @@ from app.modules.builder.subdomain_routes import router as builder_subdomain_rou
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.modules.agents.register_tools import register_all_tools
+    from app.modules.packs.onboarding_jobs import recover_pending_onboarding_jobs
     register_all_tools()
+    recover_pending_onboarding_jobs()
     yield
 
 
@@ -43,11 +49,9 @@ app = FastAPI(
 )
 
 settings = get_settings()
-# Allow all origins; credentials=False required when using allow_origins=["*"]
-# Auth uses Bearer token in Authorization header (not cookies), so this is fine
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_allow_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -65,16 +69,50 @@ def _generic_exception_handler(request: Request, exc: Exception) -> JSONResponse
         detail = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
     else:
         detail = "Internal server error"
-    return JSONResponse(status_code=500, content={"detail": detail})
+    return JSONResponse(
+        status_code=500,
+        content={"detail": detail, "request_id": getattr(request.state, "request_id", None)},
+    )
 
 
 app.add_exception_handler(Exception, _generic_exception_handler)
+
+
+@app.middleware("http")
+async def request_observability_middleware(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+    request.state.request_id = request_id
+    set_correlation_id(request_id)
+    start = time.perf_counter()
+    response: Response | None = None
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        duration_ms = (time.perf_counter() - start) * 1000
+        status_code = response.status_code if response else 500
+        record_request(request.url.path, status_code, duration_ms)
+        if response is not None:
+            response.headers["X-Request-ID"] = request_id
+        set_correlation_id("-")
 
 
 @app.get("/health")
 def health():
     """Health check for load balancers and monitoring."""
     return {"status": "ok"}
+
+
+@app.get("/metrics")
+def metrics():
+    """Simple JSON metrics for request volume and latency."""
+    snap = snapshot()
+    return {
+        "total_requests": snap.total_requests,
+        "error_requests": snap.error_requests,
+        "avg_duration_ms": snap.avg_duration_ms,
+        "routes": snap.routes,
+    }
 
 
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])

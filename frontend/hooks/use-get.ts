@@ -61,5 +61,9 @@ export function useGet<T>(
     };
   }, [run]);
 
-  return { data, isLoading, error, refetch: run };
+  const refetch = useCallback(() => {
+    run();
+  }, [run]);
+
+  return { data, isLoading, error, refetch };
 }

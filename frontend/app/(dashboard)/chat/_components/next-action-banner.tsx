@@ -17,8 +17,11 @@ export function NextActionBanner({
   const isBlocker = !!nextAction.blockerMessage;
 
   return (
-    <div className="shrink-0 lg:py-10 py-6">
-        <div className="max-w-[840px] mx-auto rounded-2xl border border-border bg-card px-4 py-3 flex items-center gap-4">
+    <div
+      className="shrink-0 lg:py-10 py-6"
+      style={{ background: "unset", backgroundColor: "unset" }}
+    >
+      <div className="max-w-[840px] mx-auto rounded-2xl border border-border bg-card px-4 py-3 flex items-center gap-4">
         <div className="rounded-full border border-border bg-muted/50 p-2 shrink-0">
           <Target className="h-4 w-4 text-muted-foreground" size={16} />
         </div>

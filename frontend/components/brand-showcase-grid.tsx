@@ -115,7 +115,7 @@ export function BrandShowcaseGrid({
             size={size}
             className={cn(
               isLogo &&
-                "flex-col items-center justify-center bg-[#faf8f5] dark:bg-zinc-800/80",
+                "flex-col items-center justify-center bg-[#faf8f5] dark:bg-black",
               item.type === "image" && "p-0",
               item.type === "text" && "flex-col justify-center p-4",
             )}

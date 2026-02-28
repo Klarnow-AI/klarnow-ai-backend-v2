@@ -57,6 +57,8 @@ export default function NewPackPage() {
             setInput={state.setInput}
             onSubmit={state.handleSend}
             mvpOnly={true}
+            onboardingProgress={state.onboardingProgress}
+            retryFailedStep={state.retryFailedStep}
           />
           <div className="mt-6">
             <OnboardingSlideView
@@ -76,6 +78,8 @@ export default function NewPackPage() {
               onSubmit={state.handleSend}
               mvpOnly={true}
               interactiveOnly={true}
+              onboardingProgress={state.onboardingProgress}
+              retryFailedStep={state.retryFailedStep}
             />
           </div>
         </div>

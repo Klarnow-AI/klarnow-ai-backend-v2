@@ -28,6 +28,9 @@ export function PWAInstallOverlay() {
   const [installPromptEvent, setInstallPromptEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
+  const isDevEnvironment =
+    process.env.NODE_ENV !== "production" ||
+    process.env.NEXT_PUBLIC_ENVIRONMENT === "development";
 
   const handleInstall = useCallback(async () => {
     if (installPromptEvent) {
@@ -47,6 +50,7 @@ export function PWAInstallOverlay() {
 
   useEffect(() => {
     if (!mounted || typeof window === "undefined") return;
+    if (isDevEnvironment) return;
 
     const check = () => {
       if (!isMobile) return;
@@ -76,12 +80,12 @@ export function PWAInstallOverlay() {
       );
       window.removeEventListener("appinstalled", handleAppInstalled);
     };
-  }, [mounted, isMobile]);
+  }, [mounted, isMobile, isDevEnvironment]);
 
   if (
     !mounted ||
     !showOverlay ||
-    process.env.NEXT_PUBLIC_ENVIRONMENT === "development"
+    isDevEnvironment
   )
     return null;
 
@@ -90,7 +94,7 @@ export function PWAInstallOverlay() {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/95 backdrop-blur-sm p-6"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/95 dark:bg-black/95 backdrop-blur-sm p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="pwa-install-title"

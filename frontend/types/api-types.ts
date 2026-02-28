@@ -137,6 +137,19 @@ export type OnboardingCompleteResponse = {
 export type OnboardingCompleteAccepted = {
   status: "processing";
   pack_id: string;
+  job_id?: string | null;
+};
+
+/** Response from GET .../onboarding/status. */
+export type OnboardingJobStatus = {
+  status: "not_started" | "queued" | "running" | "completed" | "failed";
+  job_id?: string | null;
+  attempt: number;
+  max_attempts: number;
+  queued_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  last_error?: string | null;
 };
 
 /** Brand OS domain types (match backend domain_schema). */

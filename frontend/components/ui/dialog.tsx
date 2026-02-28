@@ -11,28 +11,76 @@ interface DialogProps {
 }
 
 export function Dialog({ open, onOpenChange, children }: DialogProps) {
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+  const previousFocusedElementRef = React.useRef<HTMLElement | null>(null);
+
+  const getFocusableElements = React.useCallback(() => {
+    if (!dialogRef.current) return [] as HTMLElement[];
+    return Array.from(
+      dialogRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter(
+      (el) =>
+        !el.hasAttribute("disabled") &&
+        !el.getAttribute("aria-hidden") &&
+        el.offsetParent !== null,
+    );
+  }, []);
+
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && open) {
         onOpenChange(false);
       }
     };
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || !open) return;
+      const focusable = getFocusableElements();
+      if (focusable.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
 
     if (open) {
+      previousFocusedElementRef.current = document.activeElement as HTMLElement;
       document.addEventListener("keydown", handleEscape);
+      document.addEventListener("keydown", handleTab);
       document.body.style.overflow = "hidden";
+      requestAnimationFrame(() => {
+        const focusable = getFocusableElements();
+        (focusable[0] ?? dialogRef.current)?.focus();
+      });
     }
 
     return () => {
       document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("keydown", handleTab);
       document.body.style.overflow = "unset";
     };
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, getFocusableElements]);
+
+  React.useEffect(() => {
+    if (!open) {
+      previousFocusedElementRef.current?.focus();
+    }
+  }, [open]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50">
+    <div ref={dialogRef} className="fixed inset-0 z-50" tabIndex={-1}>
       {/* Overlay */}
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-sm"

@@ -6,6 +6,7 @@ import type {
   PackGatesResponse,
   OnboardingCompleteResponse,
   OnboardingCompleteAccepted,
+  OnboardingJobStatus,
   ExtractBrandBody,
   ExtractBrandResponse,
   GenerateStarterBrandBody,
@@ -24,12 +25,33 @@ const ONBOARDING_POLL_TIMEOUT_MS = 120000; // 2 min
 /** Poll GET pack until onboarding_background_completed_at is set (after 202 from complete). */
 export async function pollPackUntilOnboardingReady(
   packId: string,
-  options?: { intervalMs?: number; timeoutMs?: number }
+  options?: {
+    intervalMs?: number;
+    timeoutMs?: number;
+    onProgress?: (progress: { elapsedMs: number; attempt: number }) => void;
+  }
 ): Promise<Pack> {
   const intervalMs = options?.intervalMs ?? ONBOARDING_POLL_INTERVAL_MS;
   const timeoutMs = options?.timeoutMs ?? ONBOARDING_POLL_TIMEOUT_MS;
   const deadline = Date.now() + timeoutMs;
+  const startedAt = Date.now();
+  let attempt = 0;
   while (Date.now() < deadline) {
+    attempt += 1;
+    options?.onProgress?.({
+      elapsedMs: Date.now() - startedAt,
+      attempt,
+    });
+    const status = await packs.getOnboardingStatus(packId).catch(() => null);
+    if (status?.status === "failed") {
+      throw new Error(
+        status.last_error ||
+          "Onboarding failed in background processing. Please retry.",
+      );
+    }
+    if (status?.status === "completed") {
+      return packs.get(packId);
+    }
     const pack = await packs.get(packId);
     if (pack.onboarding_background_completed_at) return pack;
     await new Promise((r) => setTimeout(r, intervalMs));
@@ -47,6 +69,10 @@ export const packs = {
     api<PackSummaryResponse>(`${PACKS_PREFIX}/${id}/summary`),
   gates: (id: string) =>
     api<PackGatesResponse>(`${PACKS_PREFIX}/${id}/gates`),
+  getDayReadiness: (packId: string, day: number) =>
+    api<{ ready: boolean }>(
+      `${PACKS_PREFIX}/${packId}/day-readiness?day=${day}`
+    ),
   create: (name: string) =>
     api<Pack>(`${PACKS_PREFIX}`, {
       method: "POST",
@@ -97,6 +123,8 @@ export const packs = {
       `${PACKS_PREFIX}/${packId}/onboarding/complete`,
       { method: "POST" }
     ),
+  getOnboardingStatus: (packId: string) =>
+    api<OnboardingJobStatus>(`${PACKS_PREFIX}/${packId}/onboarding/status`),
   extractBrand: (packId: string, body: ExtractBrandBody) =>
     api<ExtractBrandResponse>(
       `${PACKS_PREFIX}/${packId}/onboarding/extract-brand`,

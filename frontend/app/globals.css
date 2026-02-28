@@ -4,20 +4,20 @@
 
 @layer base {
   :root {
-    /* Black and white palette - dark (default), background lifted so plain bg isn’t too dark */
-    --background: 0 0% 5%;
+    /* Black and white palette - dark (default), pure black surfaces */
+    --background: 0 0% 0%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 10%;
+    --card: 0 0% 0%;
     --card-foreground: 0 0% 98%;
     --primary: 0 0% 98%;
     --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 10%;
+    --secondary: 0 0% 0%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 9%;
+    --muted: 0 0% 0%;
     --muted-foreground: 0 0% 55%;
-    --accent: 0 0% 14%;
+    --accent: 0 0% 0%;
     --accent-foreground: 0 0% 98%;
-    --border: 0 0% 14%;
+    --border: 0 0% 18%;
     --ring: 0 0% 70%;
   }
 

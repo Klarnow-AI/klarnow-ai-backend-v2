@@ -1,0 +1,39 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - "app/**"
+      - "tests/**"
+      - "requirements.txt"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "app/**"
+      - "tests/**"
+      - "requirements.txt"
+      - ".github/workflows/backend-ci.yml"
+
+jobs:
+  backend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile app
+        run: python -m compileall app
+      - name: Run tests
+        run: |
+          if ls tests/*.py >/dev/null 2>&1; then
+            pytest -q
+          else
+            echo "No tests found; skipping pytest"
+          fi
+

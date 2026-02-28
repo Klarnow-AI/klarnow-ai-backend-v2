@@ -5,13 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import { chat as chatApi } from "@/api_requests/chat";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import type { Message } from "@/types/api-types";
 import {
   buildChatUrl,
   buildNewChatUrl,
   getQuestionContextFromMessage,
   isStreamingPlaceholder,
-  streamingPlaceholderId,
 } from "./helpers";
 import { dayGuides } from "@/app/(dashboard)/packs/[packId]/plan-tracker/day/[dayNumber]/_data/dayGuides";
 import {
@@ -20,13 +18,19 @@ import {
   ChatHistoryModal,
   NextActionBanner,
 } from "./_components";
+import { packs } from "@/api_requests/packs";
 import { me } from "@/api_requests/me";
 import type { NextAction } from "@/types/api-types";
 import { useChatStore } from "./_store/chat-store";
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
+import { useChatStream } from "@/hooks/use-chat-stream";
 
-type SendMode = "use" | "preview" | "apply";
+const STARTER_PROMPTS = [
+  "Give me 3 campaign ideas I can ship this week.",
+  "What's the highest-impact next step for this pack?",
+  "Draft a quick ad angle I can test today.",
+];
 
 export default function ChatPage() {
   const router = useRouter();
@@ -47,6 +51,9 @@ export default function ChatPage() {
       : undefined;
   const [historyModalOpenState, setHistoryModalOpenState] = useState(false);
   const [nextAction, setNextAction] = useState<NextAction | null>(null);
+  const [dayReadyToComplete, setDayReadyToComplete] = useState<boolean | null>(
+    null,
+  );
 
   useEffect(() => {
     if (packId) {
@@ -103,8 +110,6 @@ export default function ChatPage() {
     ]),
   );
   const containerRef = useRef<HTMLDivElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const streamingContentRef = useRef("");
   const isMobile = !useMediaQuery("(min-width: 1024px)");
   useEffect(() => {
     if (!historyModalOpenState) return;
@@ -126,6 +131,17 @@ export default function ChatPage() {
       .then(setNextAction)
       .catch(() => setNextAction(null));
   }, [packId]);
+
+  useEffect(() => {
+    if (!packId || !dayContext || dayContext.day < 0 || dayContext.day > 3) {
+      setDayReadyToComplete(null);
+      return;
+    }
+    packs
+      .getDayReadiness(packId, dayContext.day)
+      .then((res) => setDayReadyToComplete(res.ready))
+      .catch(() => setDayReadyToComplete(false));
+  }, [packId, dayContext?.day, messages, loading]);
 
   async function ensureConversation() {
     if (conversationId) return conversationId;
@@ -161,197 +177,20 @@ export default function ChatPage() {
     loadMessages(conversationId);
   }, [conversationId]);
 
-  async function send(
-    mode: SendMode,
-    applyToId?: string | null,
-    contentOverride?: string,
-  ) {
-    const cid = await ensureConversation();
-    if (!cid) return;
-    const content =
-      contentOverride ??
-      (mode === "apply" && !input.trim() ? "Apply the changes." : input);
-    if (mode !== "apply" && !content.trim()) return;
-
-    setStopTriggered(false);
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    streamingContentRef.current = "";
-
-    const userMsg: Message = {
-      id: `user-${Date.now()}`,
-      conversation_id: cid,
-      role: "user",
-      content,
-      tool_calls: null,
-      tool_results: null,
-      is_preview: false,
-      created_at: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    if (!contentOverride) setInput("");
-    setLoading(true);
-    setStreamingContent("");
-
-    const assistantPlaceholder: Message = {
-      id: streamingPlaceholderId(),
-      conversation_id: cid,
-      role: "assistant",
-      content: "",
-      tool_calls: null,
-      tool_results: null,
-      is_preview: false,
-      created_at: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, assistantPlaceholder]);
-
-    try {
-      const res = await chatApi.sendMessage(
-        cid,
-        {
-          content,
-          mode,
-          apply_to_message_id: applyToId ?? undefined,
-        },
-        true,
-        controller.signal,
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(
-          (err as { detail?: string }).detail || "Failed to send",
-        );
-      }
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      if (!reader) throw new Error("No response body");
-      let buffer = "";
-      let accumulated = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() ?? "";
-        for (const part of parts) {
-          let event: string | null = null;
-          let data: string | null = null;
-          for (const line of part.split("\n")) {
-            if (line.startsWith("event:")) event = line.slice(6).trim();
-            if (line.startsWith("data:")) data = line.slice(5).trim();
-          }
-          if (event === "chunk" && data) {
-            try {
-              const parsed = JSON.parse(data) as { delta?: string };
-              if (typeof parsed.delta === "string") {
-                accumulated += parsed.delta;
-                streamingContentRef.current = accumulated;
-                setStreamingContent(accumulated);
-              }
-            } catch {
-              /* ignore */
-            }
-          }
-          if (event === "done" && data) {
-            try {
-              const payload = JSON.parse(data) as {
-                message_id?: string;
-                assistant_content?: string;
-                tool_calls?: unknown;
-                tool_results?: unknown;
-                preview?: boolean;
-                error?: string;
-              };
-              if (payload.error) throw new Error(payload.error);
-              const finalContent = payload.assistant_content ?? accumulated;
-              setMessages((prev) =>
-                prev.map((m) =>
-                  isStreamingPlaceholder(m.id)
-                    ? {
-                        ...m,
-                        id: payload.message_id ?? m.id,
-                        content: finalContent,
-                        tool_calls: payload.tool_calls ?? null,
-                        tool_results: payload.tool_results ?? null,
-                        is_preview: payload.preview ?? false,
-                      }
-                    : m,
-                ),
-              );
-              setStreamingContent("");
-              if (
-                payload.preview &&
-                Array.isArray(payload.tool_calls) &&
-                payload.tool_calls.length
-              ) {
-                setPreviewMessageId(payload.message_id ?? null);
-                setApplyTargetId(payload.message_id ?? null);
-                await loadMessages(cid);
-              }
-            } catch (e) {
-              console.error(e);
-              toast.error(
-                e instanceof Error ? e.message : "Something went wrong",
-              );
-              setMessages((prev) =>
-                prev.filter((m) => !isStreamingPlaceholder(m.id)),
-              );
-              setStreamingContent("");
-            }
-            break;
-          }
-          if (event === "error" && data) {
-            try {
-              const parsed = JSON.parse(data) as { error?: string };
-              throw new Error(parsed.error ?? "Stream error");
-            } catch (e) {
-              console.error(e);
-              toast.error(e instanceof Error ? e.message : "Stream error");
-              setMessages((prev) =>
-                prev.filter((m) => !isStreamingPlaceholder(m.id)),
-              );
-              setStreamingContent("");
-            }
-            break;
-          }
-        }
-      }
-    } catch (e) {
-      const isAbort = e instanceof Error && e.name === "AbortError";
-      if (isAbort) {
-        const finalContent = streamingContentRef.current || "(stopped)";
-        setMessages((prev) =>
-          prev.map((m) =>
-            isStreamingPlaceholder(m.id)
-              ? {
-                  ...m,
-                  id: `stopped-${m.id}`,
-                  content: finalContent,
-                }
-              : m,
-          ),
-        );
-        setStreamingContent("");
-      } else {
-        console.error(e);
-        toast.error(e instanceof Error ? e.message : "Something went wrong");
-        setMessages((prev) =>
-          prev.filter((m) => !isStreamingPlaceholder(m.id)),
-        );
-        setStreamingContent("");
-      }
-    } finally {
-      abortControllerRef.current = null;
-      setLoading(false);
-      setStopTriggered(false);
-    }
-  }
-
-  function handleStop() {
-    if (stopTriggered) return;
-    setStopTriggered(true);
-    abortControllerRef.current?.abort();
-  }
+  const { send, handleStop } = useChatStream({
+    input,
+    setInput,
+    setMessages,
+    setLoading,
+    setStreamingContent,
+    stopTriggered,
+    setStopTriggered,
+    setPreviewMessageId,
+    setApplyTargetId,
+    ensureConversation,
+    loadMessages,
+    onError: (message) => toast.error(message),
+  });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -386,7 +225,7 @@ export default function ChatPage() {
       setHistoryList((prev) => prev.filter((c) => c.id !== convId));
       if (conversationId === convId) startNewChat();
     } catch {
-      /* e.g. network error or 404 */
+      toast.error("Could not delete conversation. Please try again.");
     }
   }
 
@@ -403,6 +242,7 @@ export default function ChatPage() {
   const lastAssistantMessage = [...messages]
     .reverse()
     .find((m) => m.role === "assistant" && !isStreamingPlaceholder(m.id));
+  const lastAssistantMessageId = lastAssistantMessage?.id ?? null;
   const questionContext =
     dayContext && lastAssistantMessage
       ? getQuestionContextFromMessage(lastAssistantMessage)
@@ -410,59 +250,54 @@ export default function ChatPage() {
 
   if (!hasCompletedAssistant) {
     return (
-      <div
-        ref={containerRef}
-        className="flex-1 flex flex-col min-h-0 lg:items-center overflow-y-auto"
-      >
-        <div className="flex-1 lg:relative lg:top-[0%] lg:items-center lg:translate-y-[0%] w-[100vw] lg:w-[840px] px-[18px] left-[0px] translate-y-[-50%] flex flex-col min-h-screen justify-center items-center fixed top-[50%]">
-          <div className="w-full px-[18px] lg:px-0 lg:fixed top-[0px]">
-            <NextActionBanner nextAction={nextAction} />
-          </div>
-          <div className="w-full max-w-[840px] flex flex-col items-center text-center mx-auto">
-            {messages.length === 0 && !loading && (
-              <h2 className="text-4xl font-[600] text-foreground max-w-lg mx-auto mb-6">
-                What are we shipping today?
-              </h2>
-            )}
-            {messages.length > 0 && (
-              <div className="w-full max-w-[840px] mx-auto flex flex-col items-start text-left mb-6">
+      <div ref={containerRef} className="w-full">
+        <NextActionBanner nextAction={nextAction} />
+        <div className="w-full max-w-[840px] mx-auto">
+            {messages.length === 0 && !loading ? (
+              <div className="flex min-h-[320px] flex-col items-center justify-center px-4 py-6 text-center">
+                <h2 className="text-4xl font-[600] text-foreground max-w-lg mx-auto mb-3">
+                  What are we shipping today?
+                </h2>
+                <p className="text-sm text-muted-foreground max-w-md mb-5">
+                  Start with one of these prompts or type your own idea.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-2 max-w-xl">
+                  {STARTER_PROMPTS.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      onClick={() => send("use", undefined, prompt)}
+                      className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground hover:bg-muted"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="w-full mx-auto flex flex-col items-start text-left py-4">
                 <ChatMessageList
                   messages={messages}
                   streamingContent={streamingContent}
                   loading={loading}
                   onApply={(id) => send("apply", id)}
-                />
-              </div>
-            )}
-            {isMobile ? (
-              <div className="w-full max-w-[840px] mx-auto">
-                <ChatInputBlock
-                  input={input}
-                  onChange={setInput}
-                  onSubmit={handleSubmit}
-                  onPreview={() => send("preview")}
-                  onStop={handleStop}
-                  loading={loading}
-                  stopTriggered={stopTriggered}
-                  applyTargetId={applyTargetId}
-                  suggestionChips={nextAction?.actionChips}
-                  dayContext={dayContext}
-                  onDay0Choice={
-                    dayContext?.day === 0 ? handleDay0Choice : undefined
-                  }
-                  showDay0ChoiceChips={!hasAnsweredBrandChoice}
                   questionContext={questionContext}
+                  lastQuestionMessageId={lastAssistantMessageId}
                   onQuestionChipClick={(value) => send("use", undefined, value)}
                   onResuggest={() =>
                     send("use", undefined, "Give me different suggestions")
                   }
-                  onOpenHistory={() => setHistoryModalOpenState(true)}
+                  showMarkDayComplete={dayReadyToComplete ?? false}
                   onMarkDayComplete={
-                    dayContext ? handleMarkDayComplete : undefined
+                    dayReadyToComplete ? handleMarkDayComplete : undefined
                   }
                 />
               </div>
-            ) : (
+            )}
+        </div>
+        <div className="mt-2">
+          <div className="w-full max-w-[840px] mx-auto flex items-center gap-2">
+            <div className="w-full">
               <ChatInputBlock
                 input={input}
                 onChange={setInput}
@@ -485,10 +320,10 @@ export default function ChatPage() {
                 }
                 onOpenHistory={() => setHistoryModalOpenState(true)}
                 onMarkDayComplete={
-                  dayContext ? handleMarkDayComplete : undefined
+                  dayReadyToComplete ? handleMarkDayComplete : undefined
                 }
               />
-            )}
+            </div>
           </div>
         </div>
         <AnimatePresence>
@@ -506,19 +341,27 @@ export default function ChatPage() {
   }
 
   return (
-    <div ref={containerRef} className="flex-1 flex flex-col min-h-0 w-full">
+    <div ref={containerRef} className="w-full">
       <NextActionBanner nextAction={nextAction} />
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="w-full max-w-[840px] mx-auto flex flex-col items-start text-left">
+      <div className="w-full max-w-[840px] mx-auto flex flex-col items-start text-left">
           <ChatMessageList
             messages={messages}
             streamingContent={streamingContent}
             loading={loading}
             onApply={(id) => send("apply", id)}
+            questionContext={questionContext}
+            lastQuestionMessageId={lastAssistantMessageId}
+            onQuestionChipClick={(value) => send("use", undefined, value)}
+            onResuggest={() =>
+              send("use", undefined, "Give me different suggestions")
+            }
+            showMarkDayComplete={dayReadyToComplete ?? false}
+            onMarkDayComplete={
+              dayReadyToComplete ? handleMarkDayComplete : undefined
+            }
           />
         </div>
-      </div>
-      <div className="shrink-0">
+      <div className="mt-2">
         <div className="w-full max-w-[840px] mx-auto flex items-center gap-2">
           {isMobile ? (
             <div className="w-full">
@@ -544,7 +387,7 @@ export default function ChatPage() {
                 }
                 onOpenHistory={() => setHistoryModalOpenState(true)}
                 onMarkDayComplete={
-                  dayContext ? handleMarkDayComplete : undefined
+                  dayReadyToComplete ? handleMarkDayComplete : undefined
                 }
               />
             </div>
@@ -570,7 +413,9 @@ export default function ChatPage() {
                 send("use", undefined, "Give me different suggestions")
               }
               onOpenHistory={() => setHistoryModalOpenState(true)}
-              onMarkDayComplete={dayContext ? handleMarkDayComplete : undefined}
+              onMarkDayComplete={
+                dayReadyToComplete ? handleMarkDayComplete : undefined
+              }
             />
           )}
         </div>

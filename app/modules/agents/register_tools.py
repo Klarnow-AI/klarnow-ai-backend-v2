@@ -39,7 +39,7 @@ def register_all_tools() -> None:
     register(
         ToolDef(
             name="update_pack",
-            description="Save pack fields from Day 0-3 (has_existing_brand, brand_url, brand_name, primary_cta, usp_statement, etc). For brand_url with has_existing_brand=yes, triggers extraction. Call before complete_sprint_day.",
+            description="Save pack fields from Day 0-3 (has_existing_brand, brand_url, brand_name, primary_cta, usp_statement, pitch_script, voice_notes_sent, etc). For brand_url with has_existing_brand=yes, triggers extraction. Call before complete_sprint_day.",
             parameters_schema=UPDATE_PACK_SCHEMA,
             fn=update_pack,
             allowed_agents=["orchestrator"],

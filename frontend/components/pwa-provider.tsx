@@ -9,8 +9,12 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
 
   useEffect(() => {
+    const isDevEnvironment =
+      process.env.NODE_ENV !== "production" ||
+      process.env.NEXT_PUBLIC_ENVIRONMENT === "development";
     if (typeof window === "undefined" || !("serviceWorker" in navigator))
       return;
+    if (isDevEnvironment) return;
 
     const onControllerChange = () => {
       if (updateToastShownRef.current) return;

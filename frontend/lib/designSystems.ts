@@ -33,7 +33,7 @@ export const designSystems: Record<DesignSystemKey, DesignSystem> = {
   dark: {
     name: "Bold & Dark",
     description: "Dark background, high contrast",
-    preview: "bg-gray-950 border border-gray-800",
+    preview: "bg-black border border-gray-800",
     dot: "bg-violet-500",
     tokens: `
       - Background: #0a0a0a or #111
@@ -61,7 +61,7 @@ export const designSystems: Record<DesignSystemKey, DesignSystem> = {
   corporate: {
     name: "Corporate & Trust",
     description: "Professional, navy, structured",
-    preview: "bg-slate-900 border border-slate-700",
+    preview: "bg-black border border-slate-700",
     dot: "bg-blue-400",
     tokens: `
       - Background: white with navy accents

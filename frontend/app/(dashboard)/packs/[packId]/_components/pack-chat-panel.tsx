@@ -1,23 +1,27 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { chat as chatApi } from "@/api_requests/chat";
 import { me } from "@/api_requests/me";
 import type { Message } from "@/types/api-types";
 import type { NextAction } from "@/types/api-types";
+import { toast } from "sonner";
 import {
   ChatMessageList,
   ChatInputBlock,
 } from "@/app/(dashboard)/chat/_components";
 import {
-  streamingPlaceholderId,
   isStreamingPlaceholder,
 } from "@/app/(dashboard)/chat/helpers";
-
-type SendMode = "use" | "preview" | "apply";
+import { useChatStream } from "@/hooks/use-chat-stream";
 
 const PENDING_CHAT_KEY = "klarnow-pack-chat-pending";
+const EMPTY_STATE_PROMPTS = [
+  "Summarize this pack's biggest opportunity.",
+  "Give me 3 ad angles for this campaign.",
+  "What should I do next to launch faster?",
+];
 
 export function PackChatPanel({ packId }: { packId: string }) {
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -43,8 +47,6 @@ export function PackChatPanel({ packId }: { packId: string }) {
   const [applyTargetId, setApplyTargetId] = useState<string | null>(null);
   const [stopTriggered, setStopTriggered] = useState(false);
   const [nextAction, setNextAction] = useState<NextAction | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const streamingContentRef = useRef("");
 
   useEffect(() => {
     me.getNextAction(packId)
@@ -122,190 +124,20 @@ export function PackChatPanel({ packId }: { packId: string }) {
     }
   }
 
-  async function send(mode: SendMode, applyToId?: string | null) {
-    const cid = await ensureConversation();
-    if (!cid) return;
-    const content =
-      mode === "apply" && !input.trim() ? "Apply the changes." : input;
-    if (mode !== "apply" && !content.trim()) return;
-
-    setStopTriggered(false);
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    streamingContentRef.current = "";
-
-    const userMsg: Message = {
-      id: `user-${Date.now()}`,
-      conversation_id: cid,
-      role: "user",
-      content,
-      tool_calls: null,
-      tool_results: null,
-      is_preview: false,
-      created_at: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setLoading(true);
-    setStreamingContent("");
-
-    const assistantPlaceholder: Message = {
-      id: streamingPlaceholderId(),
-      conversation_id: cid,
-      role: "assistant",
-      content: "",
-      tool_calls: null,
-      tool_results: null,
-      is_preview: false,
-      created_at: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, assistantPlaceholder]);
-
-    try {
-      const res = await chatApi.sendMessage(
-        cid,
-        {
-          content,
-          mode,
-          apply_to_message_id: applyToId ?? undefined,
-        },
-        true,
-        controller.signal,
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(
-          (err as { detail?: string }).detail || "Failed to send",
-        );
-      }
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      if (!reader) throw new Error("No response body");
-      let buffer = "";
-      let accumulated = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() ?? "";
-        for (const part of parts) {
-          let event: string | null = null;
-          let data: string | null = null;
-          for (const line of part.split("\n")) {
-            if (line.startsWith("event:")) event = line.slice(6).trim();
-            if (line.startsWith("data:")) data = line.slice(5).trim();
-          }
-          if (event === "chunk" && data) {
-            try {
-              const parsed = JSON.parse(data) as { delta?: string };
-              if (typeof parsed.delta === "string") {
-                accumulated += parsed.delta;
-                streamingContentRef.current = accumulated;
-                setStreamingContent(accumulated);
-              }
-            } catch {
-              /* ignore */
-            }
-          }
-          if (event === "done" && data) {
-            try {
-              const payload = JSON.parse(data) as {
-                message_id?: string;
-                assistant_content?: string;
-                tool_calls?: unknown;
-                tool_results?: unknown;
-                preview?: boolean;
-                error?: string;
-              };
-              if (payload.error) throw new Error(payload.error);
-              const finalContent = payload.assistant_content ?? accumulated;
-              setMessages((prev) =>
-                prev.map((m) =>
-                  isStreamingPlaceholder(m.id)
-                    ? {
-                        ...m,
-                        id: payload.message_id ?? m.id,
-                        content: finalContent,
-                        tool_calls: payload.tool_calls ?? null,
-                        tool_results: payload.tool_results ?? null,
-                        is_preview: payload.preview ?? false,
-                      }
-                    : m,
-                ),
-              );
-              setStreamingContent("");
-              if (
-                payload.preview &&
-                Array.isArray(payload.tool_calls) &&
-                payload.tool_calls.length
-              ) {
-                setPreviewMessageId(payload.message_id ?? null);
-                setApplyTargetId(payload.message_id ?? null);
-                await loadMessages(cid);
-              }
-            } catch (e) {
-              console.error(e);
-              alert(e instanceof Error ? e.message : "Something went wrong");
-              setMessages((prev) =>
-                prev.filter((m) => !isStreamingPlaceholder(m.id)),
-              );
-              setStreamingContent("");
-            }
-            break;
-          }
-          if (event === "error" && data) {
-            try {
-              const parsed = JSON.parse(data) as { error?: string };
-              throw new Error(parsed.error ?? "Stream error");
-            } catch (e) {
-              console.error(e);
-              alert(e instanceof Error ? e.message : "Stream error");
-              setMessages((prev) =>
-                prev.filter((m) => !isStreamingPlaceholder(m.id)),
-              );
-              setStreamingContent("");
-            }
-            break;
-          }
-        }
-      }
-    } catch (e) {
-      const isAbort = e instanceof Error && e.name === "AbortError";
-      if (isAbort) {
-        const finalContent = streamingContentRef.current || "(stopped)";
-        setMessages((prev) =>
-          prev.map((m) =>
-            isStreamingPlaceholder(m.id)
-              ? {
-                  ...m,
-                  id: `stopped-${m.id}`,
-                  content: finalContent,
-                }
-              : m,
-          ),
-        );
-        setStreamingContent("");
-      } else {
-        console.error(e);
-        alert(e instanceof Error ? e.message : "Something went wrong");
-        setMessages((prev) =>
-          prev.filter((m) => !isStreamingPlaceholder(m.id)),
-        );
-        setStreamingContent("");
-      }
-    } finally {
-      abortControllerRef.current = null;
-      setLoading(false);
-      setStopTriggered(false);
-    }
-  }
-
-  function handleStop() {
-    if (stopTriggered) return;
-    setStopTriggered(true);
-    abortControllerRef.current?.abort();
-  }
+  const { send, handleStop } = useChatStream({
+    input,
+    setInput,
+    setMessages,
+    setLoading,
+    setStreamingContent,
+    stopTriggered,
+    setStopTriggered,
+    setPreviewMessageId,
+    setApplyTargetId,
+    ensureConversation,
+    loadMessages,
+    onError: (message) => toast.error(message),
+  });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -365,6 +197,18 @@ export function PackChatPanel({ packId }: { packId: string }) {
                 Ask Klaro anything about this pack—get suggestions, update your
                 campaign, or plan your next steps.
               </p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2 max-w-[360px]">
+                {EMPTY_STATE_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => send("use", undefined, prompt)}
+                    className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground hover:bg-muted"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             <ChatMessageList

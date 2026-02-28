@@ -56,6 +56,8 @@ export default function OnboardingPage() {
           setInput={state.setInput}
           onSubmit={state.handleSend}
           interactiveOnly
+          onboardingProgress={state.onboardingProgress}
+          retryFailedStep={state.retryFailedStep}
         />
       </motion.div>
 

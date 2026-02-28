@@ -5,10 +5,24 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from app.core.logging import log_service_action
+from app.core.logging import get_logger, log_service_action
 from app.modules.sprint.models import Sprint, DayCard, SPRINT_STATUS_ACTIVE, SPRINT_STATUS_COMPLETED
 from app.modules.sprint.mode_detection import detect_sprint_mode
 from app.modules.packs.models import Pack
+
+logger = get_logger()
+
+
+def _seed_ad_factory_videos_after_day_3(db: Session, sprint: Sprint) -> None:
+    """Seed starter videos for Ad Factory once Day 3 is completed."""
+    from app.modules.creative.services import list_assets_for_pack
+    from app.modules.creative.tools import render_video
+
+    assets = list_assets_for_pack(db, sprint.pack_id)
+    has_video_assets = any(getattr(asset, "type", None) == "video" for asset in assets)
+    if has_video_assets:
+        return
+    render_video(db=db, pack_id=sprint.pack_id, count=4, sprint_day=4)
 
 
 @log_service_action()
@@ -77,6 +91,17 @@ def create_sprint_for_pack(db: Session, pack_id: UUID, started_at: datetime | No
     db.flush()
     _create_day_cards(db, sprint.id)
     db.commit()
+    if day_number == 3:
+        try:
+            _seed_ad_factory_videos_after_day_3(db, sprint)
+        except Exception as exc:
+            # Day completion should succeed even if starter video seeding fails.
+            logger.warning(
+                "day3_video_seed_failed | sprint_id=%s | pack_id=%s | error=%s",
+                sprint.id,
+                sprint.pack_id,
+                str(exc),
+            )
     db.refresh(sprint)
     return sprint
 

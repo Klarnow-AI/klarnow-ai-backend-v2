@@ -1,5 +1,8 @@
 """Application configuration from environment."""
 
+from functools import lru_cache
+
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +16,7 @@ class Settings(BaseSettings):
     # App
     app_env: str = "development"
     secret_key: str = ""
+    cors_allow_origins: list[str] = ["http://localhost:3000"]
     access_token_expiry_time: int = 60  # minutes
     frontend_url: str = "http://localhost:3000"
     # Optional: when set, published sites use subdomains (e.g. sites.klarnow.com → acme.sites.klarnow.com)
@@ -20,6 +24,9 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = ""
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+    db_pool_timeout_seconds: int = 30
 
     # Optional: onboarding∑
     onboarding_session_expiry_days: int = 1
@@ -50,5 +57,24 @@ class Settings(BaseSettings):
     max_tool_chain_length: int = 5
     retry_cap_per_tool: int = 2
 
+    @model_validator(mode="after")
+    def validate_required_settings(self):
+        if not self.database_url:
+            raise ValueError("DATABASE_URL is required")
+
+        if self.app_env in {"production", "staging"}:
+            missing: list[str] = []
+            if not self.secret_key:
+                missing.append("SECRET_KEY")
+            if not self.cors_allow_origins:
+                missing.append("CORS_ALLOW_ORIGINS")
+            if missing:
+                raise ValueError(
+                    f"Missing required settings for {self.app_env}: {', '.join(missing)}"
+                )
+        return self
+
+
+@lru_cache
 def get_settings() -> Settings:
     return Settings()

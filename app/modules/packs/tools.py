@@ -26,6 +26,8 @@ UPDATE_PACK_SCHEMA = {
         "primary_pain": {"type": "string", "description": "Primary pain point (Day 2)"},
         "primary_outcome": {"type": "string", "description": "Primary outcome (Day 2)"},
         "hero_angle": {"type": "string", "description": "Hero angle (Day 3)"},
+        "pitch_script": {"type": "string", "description": "Day 3: pitch script (under 60 seconds)"},
+        "voice_notes_sent": {"type": "string", "description": "Day 3: 'Yes' or 'Not yet'"},
     },
     "required": ["pack_id"],
 }
@@ -110,6 +112,8 @@ def update_pack(
     primary_pain: str | None = None,
     primary_outcome: str | None = None,
     hero_angle: str | None = None,
+    pitch_script: str | None = None,
+    voice_notes_sent: str | None = None,
     **kwargs: object,
 ) -> dict:
     """
@@ -172,6 +176,12 @@ def update_pack(
     if hero_angle is not None:
         pack.hero_angle = (hero_angle or "").strip() or None
         updates["hero_angle"] = pack.hero_angle
+    if pitch_script is not None:
+        merge_onboarding_answers(db, pack, {"pitch_script": (pitch_script or "").strip() or ""})
+        updates["pitch_script"] = pitch_script
+    if voice_notes_sent is not None:
+        merge_onboarding_answers(db, pack, {"voice_notes_sent": (voice_notes_sent or "").strip() or ""})
+        updates["voice_notes_sent"] = voice_notes_sent
 
     if pack.primary_cta and not pack.active_campaign_id:
         from app.modules.campaign.services import get_active_for_pack as get_active_campaign

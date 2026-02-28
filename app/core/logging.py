@@ -7,8 +7,18 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.core.request_context import get_correlation_id
+
 # Logger used for all service action events
 SERVICE_LOGGER_NAME = "klarnow.services"
+
+
+class CorrelationIdFilter(logging.Filter):
+    """Inject request correlation ID into all log records."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.correlation_id = get_correlation_id()
+        return True
 
 
 def get_logger(name: str = SERVICE_LOGGER_NAME) -> logging.Logger:
@@ -18,10 +28,11 @@ def get_logger(name: str = SERVICE_LOGGER_NAME) -> logging.Logger:
         handler = logging.StreamHandler()
         handler.setFormatter(
             logging.Formatter(
-                "%(asctime)s | %(levelname)-5s | %(name)s | %(message)s",
+                "%(asctime)s | %(levelname)-5s | %(name)s | corr=%(correlation_id)s | %(message)s",
                 datefmt="%Y-%m-%d %H:%M:%S",
             )
         )
+        handler.addFilter(CorrelationIdFilter())
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
         logger.propagate = False

@@ -308,14 +308,14 @@ MINIMAL PATTERN GUIDE:
 
     dark: `
 DARK PATTERN GUIDE:
-- Palette: bg-[#0a0a0a] or bg-gray-950, text-white/text-gray-300/text-gray-500
+- Palette: bg-black, text-white/text-gray-300/text-gray-500
 - Gradient overlay: bg-gradient-to-br from-violet-950/50 to-transparent
 - Buttons primary: px-6 py-3 bg-violet-600 text-white rounded-xl hover:bg-violet-500 transition-all font-semibold
 - Buttons secondary: px-6 py-3 bg-white/10 text-white rounded-xl border border-white/20 hover:bg-white/20 transition-all backdrop-blur-sm font-semibold
 - Cards: bg-gray-900 border border-gray-800 rounded-2xl p-8 hover:border-gray-700 transition-colors
 - Glow effect on key elements: shadow-lg shadow-violet-500/25
 - Gradient text: text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-pink-400
-- Section alternating: bg-[#0a0a0a] and bg-gray-950
+- Section alternating: bg-black and bg-black
 - Accent colors: violet-400, violet-500, violet-600
 - Typography: font-black for headings, tracking-tight, large (5xl-7xl for h1)
 - Glassy elements: bg-white/10 backdrop-blur-md border border-white/20`,
@@ -335,7 +335,7 @@ PLAYFUL PATTERN GUIDE:
 
     corporate: `
 CORPORATE PATTERN GUIDE:
-- Palette: bg-white main, bg-slate-900 dark sections, bg-blue-700 CTA sections
+- Palette: bg-white main, bg-black dark sections, bg-blue-700 CTA sections
 - Primary: blue-700 or blue-800, slate-900
 - Buttons primary: px-6 py-3 bg-blue-700 text-white rounded-md hover:bg-blue-800 transition-colors font-semibold
 - Buttons secondary: px-6 py-3 border-2 border-blue-700 text-blue-700 rounded-md hover:bg-blue-50 transition-colors font-semibold
@@ -665,7 +665,7 @@ CTA SECTION (high-converting):
 
 FOOTER (comprehensive):
 \`\`\`tsx
-<footer className="bg-gray-950 text-gray-400 py-16 px-6">
+<footer className="bg-black text-gray-400 py-16 px-6">
   <div className="max-w-6xl mx-auto">
     <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
       <div className="col-span-2 md:col-span-1">

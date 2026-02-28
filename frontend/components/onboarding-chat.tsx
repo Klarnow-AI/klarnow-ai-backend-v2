@@ -29,6 +29,19 @@ import { Input } from "@/components/ui/input";
 import { SearchInput } from "@/components/ui/search-input";
 import { Chip } from "@/components/ui/chip";
 import { cn } from "@/lib/utils";
+import {
+  STEP_PACK_NAME,
+  STEP_BRAND_QUESTION,
+  STEP_PATH_FIRST,
+  STEP_PATH_SECOND,
+  STEP_BLOCKERS_START,
+  STEP_BLOCKERS_END,
+  STEP_PACK_TYPE,
+  MVP_STEP_KEYS,
+  MVP_QUESTIONS,
+  MVP_STEP_COUNT,
+  getQuestionContent,
+} from "@/components/onboarding-chat-steps";
 
 const DEFAULT_PACK_NAME = "My first pack";
 
@@ -65,99 +78,10 @@ export type OnboardingChatState = {
   showPreviewModal: boolean;
   showCoreConceptModal: boolean;
   completedPack: import("@/types/api-types").Pack | null;
+  onboardingProgress: string;
+  retryFailedStep: (() => Promise<void>) | null;
 };
 
-const STEP_PACK_NAME = 0;
-const STEP_BRAND_QUESTION = 1;
-const STEP_PATH_FIRST = 2;
-const STEP_PATH_SECOND = 3;
-const STEP_BLOCKERS_START = 4;
-const STEP_BLOCKERS_END = STEP_BLOCKERS_START + BLOCKER_COUNT - 1;
-const STEP_PACK_TYPE = STEP_BLOCKERS_END + 1;
-
-/** MVP flow: 4 steps only (pack name + 3 questions). Keys match landing-complete API. */
-const MVP_STEP_KEYS = [
-  "pack_name",
-  "what_do_you_sell",
-  "who_is_it_for",
-  "where_are_you_based",
-] as const;
-const MVP_QUESTIONS: { label: string; placeholder: string }[] = [
-  {
-    label: "What would you like to name this campaign pack?",
-    placeholder: "e.g. My Campaign",
-  },
-  {
-    label: "What do you sell? Say it in one sentence.",
-    placeholder: "e.g. I help small shops get more foot traffic",
-  },
-  { label: "Who is it for?", placeholder: "e.g. Local retail owners" },
-  {
-    label: "Where are you based? City + country.",
-    placeholder: "e.g. Lagos, Nigeria",
-  },
-];
-const MVP_STEP_COUNT = MVP_QUESTIONS.length;
-
-/** Extract question and helper text for form-focused UI */
-function getQuestionContent(
-  step: number,
-  hasExistingBrand: boolean,
-  brandInputType?: "url" | "paste" | "logo",
-  answers?: Record<string, string>,
-): { question: string; helper?: string } {
-  if (step === STEP_PACK_NAME) {
-    return {
-      question: "What would you like to name this campaign pack?",
-      helper: "You can change this later",
-    };
-  }
-
-  if (step === STEP_BRAND_QUESTION) {
-    return {
-      question: "Do you already have a brand?",
-      helper: "Let's get you more calls and bookings",
-    };
-  }
-
-  if (step === STEP_PATH_FIRST) {
-    if (hasExistingBrand) {
-      return {
-        question: "Enter your website URL",
-        helper: "We'll extract your brand information from your website",
-      };
-    } else {
-      return {
-        question: "What's your brand name?",
-      };
-    }
-  }
-
-  if (step === STEP_PATH_SECOND) {
-    // Only Path B (new brand) uses STEP_PATH_SECOND now
-    return {
-      question: "Pick words that describe your brand vibe",
-      helper: "We'll use these for look and feel",
-    };
-  }
-
-  if (step >= STEP_BLOCKERS_START && step <= STEP_BLOCKERS_END) {
-    const blockerIndex = step - STEP_BLOCKERS_START;
-    return {
-      question: BLOCKER_QUESTIONS[blockerIndex].label,
-    };
-  }
-
-  if (step === STEP_PACK_TYPE) {
-    return {
-      question: PACK_TYPE_STEP_LABEL,
-      helper:
-        "This determines your pack flow: enquiries, quotes, or direct sales.",
-    };
-  }
-
-  return { question: "Loading..." };
-}
 
 export function useOnboardingChat(options: {
   onComplete?: (packId: string) => void;
@@ -184,6 +108,10 @@ export function useOnboardingChat(options: {
     import("@/types/api-types").Pack | null
   >(null);
   const [selectedPackType, setSelectedPackType] = useState<string | null>(null);
+  const [onboardingProgress, setOnboardingProgress] = useState("");
+  const [retryFailedStep, setRetryFailedStep] = useState<
+    (() => Promise<void>) | null
+  >(null);
   const botMessageTimesRef = useRef<Record<number, string>>({});
   const packTypeSubmittingRef = useRef(false);
 
@@ -384,6 +312,8 @@ export function useOnboardingChat(options: {
     if (packTypeSubmittingRef.current) return;
     packTypeSubmittingRef.current = true;
     setError("");
+    setRetryFailedStep(null);
+    setOnboardingProgress("");
     setSelectedPackType(packType);
     setLoading(true);
     try {
@@ -398,12 +328,23 @@ export function useOnboardingChat(options: {
         res.status === "processing" &&
         res.pack_id
       ) {
-        const pack = await pollPackUntilOnboardingReady(res.pack_id);
+        setOnboardingProgress("Finalizing your brand setup...");
+        const pack = await pollPackUntilOnboardingReady(res.pack_id, {
+          onProgress: ({ elapsedMs }) => {
+            const seconds = Math.max(1, Math.floor(elapsedMs / 1000));
+            setOnboardingProgress(
+              `Finalizing your brand setup... about ${seconds}s elapsed`,
+            );
+          },
+        });
         setCompletedPack(pack);
       }
+      setOnboardingProgress("");
       setShowCoreConceptModal(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
+      setRetryFailedStep(() => () => handlePackTypeChoice(packType));
+      setOnboardingProgress("");
     } finally {
       packTypeSubmittingRef.current = false;
       setLoading(false);
@@ -457,6 +398,8 @@ export function useOnboardingChat(options: {
     loading,
     error,
     selectedPackType,
+    onboardingProgress,
+    retryFailedStep,
     handleSend,
     handleChoice,
     handlePathAInputType,
@@ -599,6 +542,8 @@ export function OnboardingSlideView({
   modalContentOnly,
   interactiveOnly,
   mvpOnly = false,
+  onboardingProgress = "",
+  retryFailedStep = null,
 }: {
   step: number;
   answers: Record<string, string>;
@@ -618,6 +563,8 @@ export function OnboardingSlideView({
   modalContentOnly?: boolean;
   interactiveOnly?: boolean;
   mvpOnly?: boolean;
+  onboardingProgress?: string;
+  retryFailedStep?: (() => Promise<void>) | null;
 }) {
   const hasExistingBrand = answers.has_existing_brand === "yes";
   const brandInputType = answers.brand_input_type as
@@ -896,8 +843,27 @@ export function OnboardingSlideView({
             </div>
           )}
           {error && (
-            <p className="text-sm text-red-400 bg-red-500/10 rounded-xl px-4 py-3 border border-red-500/20">
-              {error}
+            <div className="space-y-2">
+              <p className="text-sm text-red-400 bg-red-500/10 rounded-xl px-4 py-3 border border-red-500/20">
+                {error}
+              </p>
+              {retryFailedStep && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void retryFailedStep()}
+                  disabled={loading}
+                >
+                  Retry last step
+                </Button>
+              )}
+            </div>
+          )}
+          {onboardingProgress && (
+            <p className="text-sm text-foreground/90 bg-muted rounded-xl px-4 py-3 border border-border flex items-center justify-center gap-2">
+              <Spinner className="h-4 w-4" />
+              {onboardingProgress}
             </p>
           )}
         </motion.div>
@@ -935,34 +901,45 @@ export function OnboardingSlideView({
             <h4 className="text-4xl font-semibold text-foreground">
               {mvpOnly && step < MVP_STEP_COUNT
                 ? MVP_QUESTIONS[step].label
-                : getQuestionContent(
-                    step,
-                    hasExistingBrand,
-                    brandInputType,
-                    answers,
-                  ).question}
+                : getQuestionContent(step, hasExistingBrand).question}
             </h4>
             {!mvpOnly &&
-              getQuestionContent(
-                step,
-                hasExistingBrand,
-                brandInputType,
-                answers,
-              ).helper && (
+              getQuestionContent(step, hasExistingBrand).helper && (
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  {
-                    getQuestionContent(
-                      step,
-                      hasExistingBrand,
-                      brandInputType,
-                      answers,
-                    ).helper
-                  }
+                  {getQuestionContent(step, hasExistingBrand).helper}
                 </p>
               )}
           </motion.div>
         </AnimatePresence>
       </div>
+      {(error || onboardingProgress) && (
+        <div className="px-4 pb-4 space-y-2">
+          {error && (
+            <div className="space-y-2 text-center">
+              <p className="text-sm text-red-400 bg-red-500/10 rounded-xl px-4 py-3 border border-red-500/20">
+                {error}
+              </p>
+              {retryFailedStep && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void retryFailedStep()}
+                  disabled={loading}
+                >
+                  Retry last step
+                </Button>
+              )}
+            </div>
+          )}
+          {onboardingProgress && (
+            <p className="text-sm text-foreground/90 bg-muted rounded-xl px-4 py-3 border border-border flex items-center justify-center gap-2">
+              <Spinner className="h-4 w-4" />
+              {onboardingProgress}
+            </p>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -996,6 +973,8 @@ export function OnboardingChat({
         setInput={state.setInput}
         onSubmit={state.handleSend}
         className={className}
+        onboardingProgress={state.onboardingProgress}
+        retryFailedStep={state.retryFailedStep}
       />
 
       <BrandPreviewModal

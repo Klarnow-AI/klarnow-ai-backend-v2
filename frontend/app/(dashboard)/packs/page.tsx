@@ -4,12 +4,29 @@ import { useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Plus } from "@/components/icons";
-import { Spinner } from "@/components/ui/page-loader";
 import { packs as packsApi } from "@/api_requests/packs";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useGet } from "@/hooks/use-get";
 
 import { PacksEmptyState, PackCard } from "./_components";
+
+function PackCardSkeleton() {
+  return (
+    <li className="rounded-xl border border-border bg-card p-5 space-y-4">
+      <Skeleton className="h-11 w-11 rounded-full" />
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-3.5 w-full" />
+        <Skeleton className="h-3.5 w-5/6" />
+      </div>
+      <div className="flex gap-2 pt-1">
+        <Skeleton className="h-6 w-20 rounded-full" />
+        <Skeleton className="h-6 w-16 rounded-full" />
+      </div>
+    </li>
+  );
+}
 
 export default function PacksPage() {
   const router = useRouter();
@@ -62,9 +79,11 @@ export default function PacksPage() {
       )}
 
       {loading ? (
-        <div className="flex items-center max-w-8xl mx-auto justify-center py-20">
-          <Spinner className="h-8 w-8" />
-        </div>
+        <ul className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <PackCardSkeleton key={i} />
+          ))}
+        </ul>
       ) : packs.length === 0 ? (
         <PacksEmptyState onCreate={() => router.push("/packs/new")} />
       ) : (

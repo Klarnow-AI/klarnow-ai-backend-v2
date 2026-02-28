@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Check, Eye, Target } from "@/components/icons";
+import { Eye, Target } from "@/components/icons";
 import { Chip } from "@/components/ui/chip";
 import { ComposeInput } from "@/components/ui/compose-input";
 import type { DayQuestionContext, NextActionChip } from "@/types/api-types";
@@ -98,17 +98,6 @@ export function ChatInputBlock({
         wrapperClassName="mb-4"
       />
       <div className="flex flex-wrap items-center justify-center gap-2">
-        {dayContext && dayContext.day >= 0 && dayContext.day <= 3 && onMarkDayComplete && (
-          <Chip
-            size="md"
-            icon={<Check className="h-4 w-4" />}
-            onClick={onMarkDayComplete}
-            disabled={loading}
-            className="cursor-pointer"
-          >
-            Mark day complete
-          </Chip>
-        )}
         <Chip
           size="md"
           icon={<Eye className="h-4 w-4" />}
@@ -117,31 +106,7 @@ export function ChatInputBlock({
         >
           Preview
         </Chip>
-        {questionContext && onQuestionChipClick ? (
-          <>
-            {questionContext.suggestion_chips.map((chip) => (
-              <Chip
-                key={chip.label}
-                size="md"
-                onClick={() => onQuestionChipClick(chip.value)}
-                disabled={loading}
-                className="cursor-pointer"
-              >
-                {chip.label}
-              </Chip>
-            ))}
-            {questionContext.show_resuggest && onResuggest && (
-              <Chip
-                size="md"
-                onClick={onResuggest}
-                disabled={loading}
-                className="cursor-pointer opacity-80"
-              >
-                Suggest more options
-              </Chip>
-            )}
-          </>
-        ) : (
+        {!questionContext &&
           suggestionChips?.map((chip) =>
             chip.href ? (
               <Link key={chip.label} href={chip.href}>
@@ -155,7 +120,7 @@ export function ChatInputBlock({
               </Chip>
             )
           )
-        )}
+        }
       </div>
     </div>
   );

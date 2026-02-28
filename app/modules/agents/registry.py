@@ -81,7 +81,14 @@ def execute(
     inputs: dict,
     db: Session,
 ) -> dict:
-    """Validate, run tool, log to decision_log, return result. No direct agent DB writes."""
+    """
+    Validate and run a tool with savepoint isolation.
+
+    Transaction policy:
+    - Each tool call runs inside a nested transaction (savepoint).
+    - Tool success/failure logs are flushed, not committed.
+    - The caller owns final commit/rollback for the request.
+    """
     if tool_name not in REGISTRY:
         raise ValueError(f"Unknown tool: {tool_name}")
     if not _can_run(agent, tool_name):
@@ -91,30 +98,32 @@ def execute(
     sanitised = _sanitise_inputs(copy.deepcopy(inputs))
 
     try:
-        result = tool.fn(db=db, **inputs)
-        summary = json.dumps(result)[:2000] if result else "ok"
-        db.add(
-            DecisionLog(
-                tool_name=tool_name,
-                agent=agent,
-                pack_id=pack_id,
-                inputs_sanitized=sanitised,
-                success=True,
-                result_summary=summary,
+        with db.begin_nested():
+            result = tool.fn(db=db, **inputs)
+            summary = json.dumps(result)[:2000] if result else "ok"
+            db.add(
+                DecisionLog(
+                    tool_name=tool_name,
+                    agent=agent,
+                    pack_id=pack_id,
+                    inputs_sanitized=sanitised,
+                    success=True,
+                    result_summary=summary,
+                )
             )
-        )
-        db.commit()
-        return result
+            db.flush()
+            return result
     except Exception as e:
-        db.add(
-            DecisionLog(
-                tool_name=tool_name,
-                agent=agent,
-                pack_id=pack_id,
-                inputs_sanitized=sanitised,
-                success=False,
-                error_message=str(e)[:2000],
+        with db.begin_nested():
+            db.add(
+                DecisionLog(
+                    tool_name=tool_name,
+                    agent=agent,
+                    pack_id=pack_id,
+                    inputs_sanitized=sanitised,
+                    success=False,
+                    error_message=str(e)[:2000],
+                )
             )
-        )
-        db.commit()
+            db.flush()
         raise

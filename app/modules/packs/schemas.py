@@ -71,6 +71,12 @@ class PackPatch(BaseModel):
     model_config = {"extra": "forbid"}
 
 
+class DayReadinessResponse(BaseModel):
+    """Day 0-3 readiness: whether all required questions have been answered."""
+
+    ready: bool
+
+
 class PackListItem(PackRead):
     """Pack with campaign status for list views."""
 
@@ -220,6 +226,20 @@ class OnboardingCompleteAccepted(BaseModel):
 
     status: str = "processing"
     pack_id: str
+    job_id: str | None = None
+
+
+class OnboardingJobStatusResponse(BaseModel):
+    """Current state of the durable onboarding background job."""
+
+    status: str
+    job_id: str | None = None
+    attempt: int = 0
+    max_attempts: int = 3
+    queued_at: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
+    last_error: str | None = None
 
 
 # --- Pack summary (overview from Brand OS → Proof Vault) ---
