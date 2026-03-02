@@ -34,6 +34,7 @@ function buildHref(item: NavItem, packId: string | null): string {
     return packId ? `/invoices?pack=${packId}` : "/invoices";
   }
   if (!packId) return "/packs";
+  if (item.key === "overview") return `/packs/${packId}`;
   return `/packs/${packId}${item.pathMatch}`;
 }
 
@@ -57,6 +58,7 @@ function isActive(
     return pathname === "/invoices" || pathname.startsWith("/invoices?");
   }
   if (!packId) return false;
+  if (item.key === "overview") return pathname === `/packs/${packId}`;
   return (
     pathname === `/packs/${packId}${item.pathMatch}` ||
     pathname.startsWith(`/packs/${packId}${item.pathMatch}/`)
@@ -131,8 +133,8 @@ export function MobileNavContent({ inline, className }: MobileNavContentProps) {
   }, [pathname]);
 
   const fixedItems: NavItem[] = [
-    buildItems[0], // Chat
-    buildItems[1], // Plan tracker
+    buildItems[0], // Overview
+    buildItems[1], // Chat
   ];
 
   const NavLink = ({ item }: { item: NavItem }) => {

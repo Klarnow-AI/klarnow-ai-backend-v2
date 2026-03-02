@@ -70,7 +70,7 @@ def get_next_action(
         }
 
     pack_path = f"/packs/{pack.id}"
-    chat_day = lambda n: f"/chat?pack={pack.id}&day={n}"
+    plan_tracker_day = lambda n: f"{pack_path}/plan-tracker?day={n}"
 
     # --- 0. Inactivity recovery (spec section 10) ---
     user = db.query(User).filter(User.id == user_id).first()
@@ -80,7 +80,7 @@ def get_next_action(
         if inactive_hours >= 72:
             return {
                 "action_text": "Simplify your offer",
-                "action_chips": [_chip("Day 1", chat_day(1)), _chip("Day 0", chat_day(0))],
+                "action_chips": [_chip("Day 1", plan_tracker_day(1)), _chip("Day 0", plan_tracker_day(0))],
                 "stage": "inactivity",
                 "can_proceed": True,
                 "blocker_message": None,
@@ -121,7 +121,7 @@ def get_next_action(
     if not can_pack:
         return {
             "action_text": "Complete pack basics",
-            "action_chips": [_chip("Day 0 / Offer", chat_day(0)), _chip("Set CTA", chat_day(0))],
+            "action_chips": [_chip("Day 0 / Offer", plan_tracker_day(0)), _chip("Set CTA", plan_tracker_day(0))],
             "stage": "blocked",
             "can_proceed": False,
             "blocker_message": pack_msg,
@@ -249,7 +249,7 @@ def get_next_action(
 
             # Day complete: optimisation actions (never replace revenue)
             if can_daily:
-                chips = [_chip("Mark day complete", day_path), _chip("Improve hook", chat_day(1)), _chip("Add proof", f"{pack_path}")]
+                chips = [_chip("Mark day complete", day_path), _chip("Improve hook", plan_tracker_day(1)), _chip("Add proof", f"{pack_path}")]
                 if credits == 0:
                     chips.append(_chip("Buy credits", "/settings"))
                 return {
@@ -276,8 +276,8 @@ def get_next_action(
                 "progress_counters": None,
             }
 
-        # Default: work on current day (Days 0-3 go to chat; 4+ to plan-tracker)
-        day_href = chat_day(day_num) if 0 <= day_num <= 3 else day_path
+        # Default: work on current day (all days open plan-tracker modal)
+        day_href = plan_tracker_day(day_num) if 0 <= day_num <= 3 else day_path
         chips = [_chip(f"Day {day_num}", day_href), _chip("Sprint", sprint_path)]
         if credits == 0 and day_num >= 4:
             chips.append(_chip("Buy credits", "/settings"))
@@ -342,7 +342,7 @@ def get_next_action(
     if not day_0_done or not has_basics:
         return {
             "action_text": "Complete Day 0 setup",
-            "action_chips": [_chip("Day 0", chat_day(0)), _chip("Set CTA & USP", chat_day(0))],
+            "action_chips": [_chip("Day 0", plan_tracker_day(0)), _chip("Set CTA & USP", plan_tracker_day(0))],
             "stage": "brand_os_done",
             "can_proceed": True,
             "blocker_message": None,

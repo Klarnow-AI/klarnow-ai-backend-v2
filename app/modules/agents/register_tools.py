@@ -2,7 +2,6 @@
 
 from app.modules.agents.registry import ToolDef, register
 from app.modules.brand_os.tools import generate_brand_os, GENERATE_BRAND_OS_SCHEMA
-from app.modules.chat.tools import ask_day_question, ASK_DAY_QUESTION_SCHEMA
 from app.modules.packs.tools import (
     update_pack,
     UPDATE_PACK_SCHEMA,
@@ -53,16 +52,6 @@ def register_all_tools() -> None:
             fn=complete_sprint_day,
             allowed_agents=["orchestrator"],
             side_effects="Marks DayCard complete, advances sprint.current_day",
-        )
-    )
-    register(
-        ToolDef(
-            name="ask_day_question",
-            description="When asking a Day 0-3 question, call this with field_key and day_context so the user gets input guidance and suggestion chips. Use re_suggest=true and previous_chips when user asks for different options.",
-            parameters_schema=ASK_DAY_QUESTION_SCHEMA,
-            fn=ask_day_question,
-            allowed_agents=["orchestrator"],
-            side_effects="None",
         )
     )
     register(

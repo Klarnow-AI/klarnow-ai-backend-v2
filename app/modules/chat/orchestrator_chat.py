@@ -71,36 +71,6 @@ def build_system_message(pack_context: dict | None) -> str:
             "When the user asks to generate or change something, use the appropriate tool (e.g. generate_brand_os). "
             "Tools create new versions (e.g. Version B); they never overwrite existing versions."
         )
-        if "day_context" in pack_context and pack_context.get("day_context") is not None:
-            day_n = pack_context["day_context"]
-            day_title = pack_context.get("day_title", "Day")
-            day_win = pack_context.get("day_win_condition", "")
-            base += (
-                f"\n\n--- Day {day_n} Conversational Flow ---\n"
-                f"You are guiding the user through Day {day_n}: {day_title}. "
-                f"Win condition: {day_win}.\n"
-                "Follow these steps in order. Ask ONE question at a time. "
-                "When asking ANY question (Day 0, 1, 2, or 3), ALWAYS call ask_day_question with field_key and day_context FIRST so suggestion chips are returned alongside your question. "
-                "Day 1 (offer_one_liner), Day 2 (primary_pain, primary_outcome), Day 3 (pitch_script, voice_notes_sent): you MUST call ask_day_question for each step so suggestion chips appear. "
-                "After the user answers, move to the next step. "
-                "When the user asks for different suggestions (e.g. 'suggest more', 'other options', 'different ideas'), call ask_day_question with re_suggest=true and previous_chips=[labels they already saw]. "
-                "When the user has provided the required information, call update_pack to save it. "
-                "When has_existing_brand is yes and the user provides a website URL, call extract_brand_from_url with that URL to extract brand data; then continue to the next step.\n"
-            )
-            steps = pack_context.get("day_conversation_steps", [])
-            if steps:
-                base += "Steps (ask one at a time):\n"
-                for s in steps:
-                    if s.get("if_has_brand"):
-                        base += f"  - {s['key']}: {s['label']} (only if has_existing_brand is Yes)\n"
-                    else:
-                        base += f"  - {s['key']}: {s['label']}\n"
-            base += (
-                "\nWhen the win condition is met and data is saved, call complete_sprint_day to mark the day complete. "
-                "After calling complete_sprint_day: PAUSE. Tell the user they've completed the day, congratulate them, "
-                "and ask if they want to proceed to the next day. Wait for their confirmation (e.g. 'Yes', 'Let's go') "
-                "before offering to start the next day."
-            )
     else:
         base += (
             "\nNo pack is selected. You can answer general marketing questions. "

@@ -67,7 +67,7 @@ export function PackCard({ pack, index = 0, onActionComplete }: PackCardProps) {
       transition={{ delay: 0.05 * index }}
       className="group relative"
     >
-      <Link href={`/chat?pack=${pack.id}`} className="block h-full">
+      <Link href={`/packs/${pack.id}`} className="block h-full">
         <Card className="h-full rounded-xl border border-border bg-card text-card-foreground shadow-sm hover:shadow-md hover:border-border/80 transition-all duration-200 cursor-pointer overflow-hidden">
           <CardHeader className="p-5 pb-2">
             <div className="flex flex-col gap-3">

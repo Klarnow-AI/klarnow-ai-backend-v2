@@ -8,17 +8,14 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import {
   buildChatUrl,
   buildNewChatUrl,
-  getQuestionContextFromMessage,
   isStreamingPlaceholder,
 } from "./helpers";
-import { dayGuides } from "@/app/(dashboard)/packs/[packId]/plan-tracker/day/[dayNumber]/_data/dayGuides";
 import {
   ChatMessageList,
   ChatInputBlock,
   ChatHistoryModal,
   NextActionBanner,
 } from "./_components";
-import { packs } from "@/api_requests/packs";
 import { me } from "@/api_requests/me";
 import type { NextAction } from "@/types/api-types";
 import { useChatStore } from "./_store/chat-store";
@@ -50,23 +47,8 @@ export default function ChatPage() {
   const searchParams = useSearchParams();
   const cFromUrl = searchParams.get("c");
   const packId = searchParams.get("pack") ?? undefined;
-  const dayParam = searchParams.get("day");
-  const dayContext: { day: number; title: string } | undefined =
-    dayParam !== null
-      ? (() => {
-          const d = parseInt(dayParam, 10);
-          if (Number.isInteger(d) && d >= 0 && d <= 3) {
-            const guide = dayGuides[d as 0 | 1 | 2 | 3];
-            return guide ? { day: d, title: guide.title } : undefined;
-          }
-          return undefined;
-        })()
-      : undefined;
   const [historyModalOpenState, setHistoryModalOpenState] = useState(false);
   const [nextAction, setNextAction] = useState<NextAction | null>(null);
-  const [dayReadyToComplete, setDayReadyToComplete] = useState<boolean | null>(
-    null,
-  );
 
   useEffect(() => {
     if (packId) {
@@ -145,27 +127,11 @@ export default function ChatPage() {
       .catch(() => setNextAction(null));
   }, [packId]);
 
-  useEffect(() => {
-    if (!packId || !dayContext || dayContext.day < 0 || dayContext.day > 3) {
-      setDayReadyToComplete(null);
-      return;
-    }
-    packs
-      .getDayReadiness(packId, dayContext.day)
-      .then((res) => setDayReadyToComplete(res.ready))
-      .catch(() => setDayReadyToComplete(false));
-  }, [packId, dayContext?.day, messages, loading]);
-
   async function ensureConversation() {
     if (conversationId) return conversationId;
-    const dayNum = dayParam !== null ? parseInt(dayParam, 10) : NaN;
-    const dayCtx =
-      Number.isInteger(dayNum) && dayNum >= 0 && dayNum <= 3
-        ? dayNum
-        : undefined;
-    const conv = await chatApi.createConversation(packId, dayCtx);
+    const conv = await chatApi.createConversation(packId);
     setConversationId(conv.id);
-    router.replace(buildChatUrl(conv.id, packId, dayCtx));
+    router.replace(buildChatUrl(conv.id, packId));
     return conv.id;
   }
 
@@ -217,16 +183,6 @@ export default function ChatPage() {
     }
   }
 
-  function handleDay0Choice(message: string) {
-    if (loading) return;
-    send("use", undefined, message);
-  }
-
-  function handleMarkDayComplete() {
-    if (loading) return;
-    send("use", undefined, "Mark this day as complete");
-  }
-
   function startNewChat() {
     router.replace(buildNewChatUrl(packId));
     resetForNewChat();
@@ -245,21 +201,6 @@ export default function ChatPage() {
   const hasCompletedAssistant = messages.some(
     (m) => m.role === "assistant" && !isStreamingPlaceholder(m.id),
   );
-
-  const hasAnsweredBrandChoice = messages.some(
-    (m) =>
-      m.role === "user" &&
-      (m.content === "Yes, I have a brand" || m.content === "No, new brand"),
-  );
-
-  const lastAssistantMessage = [...messages]
-    .reverse()
-    .find((m) => m.role === "assistant" && !isStreamingPlaceholder(m.id));
-  const lastAssistantMessageId = lastAssistantMessage?.id ?? null;
-  const questionContext =
-    dayContext && lastAssistantMessage
-      ? getQuestionContextFromMessage(lastAssistantMessage)
-      : null;
 
   if (!hasCompletedAssistant) {
     return (
@@ -285,22 +226,7 @@ export default function ChatPage() {
                     loading={loading}
                     stopTriggered={stopTriggered}
                     applyTargetId={applyTargetId}
-                    dayContext={dayContext}
-                    onDay0Choice={
-                      dayContext?.day === 0 ? handleDay0Choice : undefined
-                    }
-                    showDay0ChoiceChips={!hasAnsweredBrandChoice}
-                    questionContext={questionContext}
-                    onQuestionChipClick={(value) =>
-                      send("use", undefined, value)
-                    }
-                    onResuggest={() =>
-                      send("use", undefined, "Give me different suggestions")
-                    }
                     onOpenHistory={() => setHistoryModalOpenState(true)}
-                    onMarkDayComplete={
-                      dayReadyToComplete ? handleMarkDayComplete : undefined
-                    }
                   />
                 </div>
               </div>
@@ -312,18 +238,6 @@ export default function ChatPage() {
                     streamingContent={streamingContent}
                     loading={loading}
                     onApply={(id) => send("apply", id)}
-                    questionContext={questionContext}
-                    lastQuestionMessageId={lastAssistantMessageId}
-                    onQuestionChipClick={(value) =>
-                      send("use", undefined, value)
-                    }
-                    onResuggest={() =>
-                      send("use", undefined, "Give me different suggestions")
-                    }
-                    showMarkDayComplete={dayReadyToComplete ?? false}
-                    onMarkDayComplete={
-                      dayReadyToComplete ? handleMarkDayComplete : undefined
-                    }
                   />
                 </div>
                 <div className="shrink-0 mt-0 w-full">
@@ -335,22 +249,7 @@ export default function ChatPage() {
                     loading={loading}
                     stopTriggered={stopTriggered}
                     applyTargetId={applyTargetId}
-                    dayContext={dayContext}
-                    onDay0Choice={
-                      dayContext?.day === 0 ? handleDay0Choice : undefined
-                    }
-                    showDay0ChoiceChips={!hasAnsweredBrandChoice}
-                    questionContext={questionContext}
-                    onQuestionChipClick={(value) =>
-                      send("use", undefined, value)
-                    }
-                    onResuggest={() =>
-                      send("use", undefined, "Give me different suggestions")
-                    }
                     onOpenHistory={() => setHistoryModalOpenState(true)}
-                    onMarkDayComplete={
-                      dayReadyToComplete ? handleMarkDayComplete : undefined
-                    }
                   />
                 </div>
               </>
@@ -384,16 +283,6 @@ export default function ChatPage() {
             streamingContent={streamingContent}
             loading={loading}
             onApply={(id) => send("apply", id)}
-            questionContext={questionContext}
-            lastQuestionMessageId={lastAssistantMessageId}
-            onQuestionChipClick={(value) => send("use", undefined, value)}
-            onResuggest={() =>
-              send("use", undefined, "Give me different suggestions")
-            }
-            showMarkDayComplete={dayReadyToComplete ?? false}
-            onMarkDayComplete={
-              dayReadyToComplete ? handleMarkDayComplete : undefined
-            }
           />
         </div>
         <div className="shrink-0 mt-2 w-full">
@@ -407,20 +296,7 @@ export default function ChatPage() {
                 loading={loading}
                 stopTriggered={stopTriggered}
                 applyTargetId={applyTargetId}
-                dayContext={dayContext}
-                onDay0Choice={
-                  dayContext?.day === 0 ? handleDay0Choice : undefined
-                }
-                showDay0ChoiceChips={!hasAnsweredBrandChoice}
-                questionContext={questionContext}
-                onQuestionChipClick={(value) => send("use", undefined, value)}
-                onResuggest={() =>
-                  send("use", undefined, "Give me different suggestions")
-                }
                 onOpenHistory={() => setHistoryModalOpenState(true)}
-                onMarkDayComplete={
-                  dayReadyToComplete ? handleMarkDayComplete : undefined
-                }
               />
             </div>
           ) : (
@@ -432,20 +308,7 @@ export default function ChatPage() {
               loading={loading}
               stopTriggered={stopTriggered}
               applyTargetId={applyTargetId}
-              dayContext={dayContext}
-              onDay0Choice={
-                dayContext?.day === 0 ? handleDay0Choice : undefined
-              }
-              showDay0ChoiceChips={!hasAnsweredBrandChoice}
-              questionContext={questionContext}
-              onQuestionChipClick={(value) => send("use", undefined, value)}
-              onResuggest={() =>
-                send("use", undefined, "Give me different suggestions")
-              }
               onOpenHistory={() => setHistoryModalOpenState(true)}
-              onMarkDayComplete={
-                dayReadyToComplete ? handleMarkDayComplete : undefined
-              }
             />
           )}
           {messages.length === 0 && !loading && (

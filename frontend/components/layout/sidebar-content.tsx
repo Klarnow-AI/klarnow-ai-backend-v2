@@ -270,7 +270,7 @@ export function SidebarContent({
                         {packList.map((pack) => (
                           <Link
                             key={pack.id}
-                            href={`/chat?pack=${pack.id}`}
+                            href={`/packs/${pack.id}`}
                             onClick={() => {
                               setPackDropdownOpen(false);
                               handleLinkClick();
@@ -404,7 +404,7 @@ export function SidebarContent({
                         {packList.map((pack) => (
                           <Link
                             key={pack.id}
-                            href={`/chat?pack=${pack.id}`}
+                            href={`/packs/${pack.id}`}
                             onClick={() => {
                               setPackDropdownOpen(false);
                               try {
@@ -523,13 +523,18 @@ export function SidebarContent({
         <div className="space-y-0.5">
           {buildItems.map((item) => {
             const isChat = item.pathMatch === "/chat";
+            const isOverview = item.key === "overview";
             const href = isChat ? chatHref : buildHref(item.href);
             const isActive = isChat
               ? isChatActive
-              : effectivePackId
-                ? pathname === `/packs/${effectivePackId}${item.href}` ||
-                  pathname.startsWith(`/packs/${effectivePackId}${item.href}/`)
-                : false;
+              : isOverview
+                ? effectivePackId
+                  ? pathname === `/packs/${effectivePackId}`
+                  : false
+                : effectivePackId
+                  ? pathname === `/packs/${effectivePackId}${item.href}` ||
+                    pathname.startsWith(`/packs/${effectivePackId}${item.href}/`)
+                  : false;
             const sectionKey = navToSection[item.href];
             const section =
               sectionKey && effectivePackId

@@ -67,7 +67,7 @@ export default function LandingPage() {
       if (context.stage === "no_pack") {
         router.replace("/packs/new");
       } else if (context.pack) {
-        router.replace(`/chat?pack=${context.pack.id}`);
+        router.replace(`/packs/${context.pack.id}`);
       }
     }
   }, [isAuthenticated, isLoading, landingLoading, context, router]);
@@ -85,7 +85,7 @@ export default function LandingPage() {
   function handleDashboardClick(e: React.MouseEvent) {
     e.preventDefault();
     if (context?.pack) {
-      router.push(`/chat?pack=${context.pack.id}`);
+      router.push(`/packs/${context.pack.id}`);
     } else if (landingLoading) {
       return;
     } else {

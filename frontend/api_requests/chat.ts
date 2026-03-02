@@ -17,12 +17,12 @@ export const chat = {
         ? `${CHAT_PREFIX}/conversations?pack_id=${packId}`
         : `${CHAT_PREFIX}/conversations`
     ),
-  createConversation: (packId?: string, dayContext?: number) =>
+  createConversation: (packId?: string) =>
     api<Conversation>(`${CHAT_PREFIX}/conversations`, {
       method: "POST",
       body: JSON.stringify({
         pack_id: packId ?? null,
-        day_context: dayContext ?? null,
+        day_context: null,
       }),
     }),
   getConversation: (id: string) =>
