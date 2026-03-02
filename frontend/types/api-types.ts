@@ -693,7 +693,8 @@ export type BuilderProject = {
   user_id: string;
   name: string;
   files: Record<string, string>;
-  messages: Array<{ role: string; content: string }>;
+  messages: Array<{ role: string; content: string; files_snapshot?: Record<string, string> }>;
+  published_files?: Record<string, string> | null;
   live_url: string | null;
   published_at: string | null;
   created_at: string;

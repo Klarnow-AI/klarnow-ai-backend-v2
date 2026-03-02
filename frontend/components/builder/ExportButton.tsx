@@ -22,6 +22,7 @@ export function ExportButton() {
     try {
       const result = await builder.publish(projectId);
       useProjectStore.getState().setLiveUrl(result.live_url ?? null);
+      useProjectStore.getState().setPublishedFiles(result.published_files ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Publish failed");
     } finally {

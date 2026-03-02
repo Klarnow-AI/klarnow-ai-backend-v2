@@ -88,7 +88,7 @@ export default function DashboardLayout({
       return;
     }
     if (!packsLoading && !hasPacks && pathname !== "/packs/new") {
-      router.replace("/");
+      router.replace("/packs/new");
     }
   }, [isAuthenticated, isLoading, hasPacks, packsLoading, pathname, router]);
 

@@ -147,6 +147,8 @@ export const Mic = createIcon(Mic01Icon, "Mic");
 export const Stop = createIcon(StopIcon, "Stop");
 export const Trash2 = createIcon(Delete01Icon, "Trash2");
 export const ChevronDown = createIcon(ArrowDown01Icon, "ChevronDown");
+/** Sort indicator for sortable column headers */
+export const ArrowUpDown = createIcon(ArrowUp01Icon, "ArrowUpDown");
 export const Mail = createIcon(Mail01Icon, "Mail");
 export const Phone = createIcon(CallIcon, "Phone");
 export const MapPin = createIcon(Location01Icon, "MapPin");

@@ -187,6 +187,7 @@ def delete(db: Session, project: BuilderProject) -> None:
 def publish(db: Session, project: BuilderProject, live_url: str) -> BuilderProject:
     project.live_url = live_url
     project.published_at = datetime.now(timezone.utc)
+    project.published_files = dict(project.files) if project.files else {}
     db.commit()
     db.refresh(project)
     return project
@@ -194,9 +195,10 @@ def publish(db: Session, project: BuilderProject, live_url: str) -> BuilderProje
 
 @log_service_action()
 def unpublish(db: Session, project: BuilderProject) -> BuilderProject:
-    """Clear live_url, published_at, and subdomain_slug so the site is no longer served."""
+    """Clear live_url, published_at, subdomain_slug, and published_files."""
     project.live_url = None
     project.published_at = None
+    project.published_files = None
     project.subdomain_slug = None
     db.commit()
     db.refresh(project)

@@ -264,6 +264,7 @@ export default function WebsiteModule() {
             messages: project.messages ?? [],
             projectId: project.id,
             liveUrl: project.live_url ?? null,
+            publishedFiles: project.published_files ?? null,
           });
         }
       } catch (err) {

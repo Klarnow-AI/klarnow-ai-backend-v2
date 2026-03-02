@@ -1,15 +1,9 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import {
-  Plus,
-  Loader2,
-  LayoutDashboard,
-  GripVertical,
-} from "@/components/icons";
+import { Plus, Loader2, FileText } from "@/components/icons";
 import { Spinner } from "@/components/ui/page-loader";
 import {
   Card,
@@ -18,18 +12,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectItem } from "@/components/ui/select";
 import {
   Dialog,
@@ -48,53 +33,14 @@ import type {
   Proposal,
   ProposalCreateBody,
   ProposalUpdateBody,
-  ProposalStatus,
   Lead,
   ProposalGeneratedContent,
 } from "@/types/api-types";
-import { ProposalKanbanBoard } from "./_components/proposal-kanban-board";
-import { cn } from "@/lib/utils";
+import { createProposalColumns } from "./_components/proposal-columns";
+import { DataTable } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type ProposalWithPack = Proposal & { pack_name: string };
-type ViewMode = "table" | "kanban";
-
-function formatProposalId(id: string): string {
-  return id.replace(/-/g, "").slice(0, 9).toUpperCase();
-}
-
-function formatTableDate(dateStr: string | null): string {
-  if (!dateStr) return "—";
-  try {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString("en-GB", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return "—";
-  }
-}
-
-function ProposalClientCell({ proposal }: { proposal: ProposalWithPack }) {
-  const name = proposal.client_name ?? proposal.pack_name ?? "—";
-  const initial = (name === "—" ? "?" : name).charAt(0).toUpperCase();
-  const hue = name.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
-  return (
-    <div className="flex items-center gap-3">
-      <div
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium text-white"
-        style={{ backgroundColor: `hsl(${hue}, 60%, 45%)` }}
-      >
-        {initial}
-      </div>
-      <div className="min-w-0">
-        <p className="truncate font-medium text-foreground">{name}</p>
-      </div>
-    </div>
-  );
-}
 
 export default function ProposalsPage() {
   const searchParams = useSearchParams();
@@ -119,10 +65,7 @@ export default function ProposalsPage() {
   const [qualifiedLeads, setQualifiedLeads] = useState<Lead[]>([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [generatingDraft, setGeneratingDraft] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [editingProposal, setEditingProposal] = useState<Proposal | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const { gates: createPackGates } = usePackGates(createPackId || null);
   const sectionUnlock = createPackGates?.sections?.proposal;
@@ -285,61 +228,19 @@ export default function ProposalsPage() {
     }
   };
 
-  const handleMoveProposal = useCallback(
-    async (proposalId: string, status: ProposalStatus) => {
-      setEditingId(proposalId);
-      setError(null);
-      try {
-        await revenue.updateProposal(proposalId, { status });
-        setProposals((prev) =>
-          prev.map((p) => (p.id === proposalId ? { ...p, status } : p)),
-        );
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to update proposal");
-      } finally {
-        setEditingId(null);
-      }
-    },
-    [],
-  );
-
-  const filteredProposals = useMemo(() => {
-    if (!searchQuery.trim()) return proposals;
-    const q = searchQuery.trim().toLowerCase();
-    return proposals.filter(
-      (p) =>
-        formatProposalId(p.id).toLowerCase().includes(q) ||
-        p.amount.toLowerCase().includes(q) ||
-        p.pack_name?.toLowerCase().includes(q) ||
-        p.client_name?.toLowerCase().includes(q),
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] w-full max-w-[1400px] mx-auto items-center justify-center">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Spinner className="h-6 w-6" />
+          Loading proposals…
+        </div>
+      </div>
     );
-  }, [proposals, searchQuery]);
-
-  const allSelected =
-    filteredProposals.length > 0 &&
-    filteredProposals.every((p) => selectedIds.has(p.id));
-  const toggleSelectAll = () => {
-    if (allSelected) {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        filteredProposals.forEach((p) => next.delete(p.id));
-        return next;
-      });
-    } else {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        filteredProposals.forEach((p) => next.add(p.id));
-        return next;
-      });
-    }
-  };
+  }
 
   return (
-    <div
-      className={
-        viewMode === "kanban" ? "w-full" : "w-full max-w-[1400px] mx-auto"
-      }
-    >
+    <div className="w-full max-w-[1400px] mx-auto">
       {packFilter && packs.length > 0 && (
         <div className="mb-4 flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
@@ -372,42 +273,8 @@ export default function ProposalsPage() {
         </div>
       )}
 
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2 flex-1 min-w-0 max-w-sm">
-          <Input
-            type="text"
-            placeholder="Search proposal..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-10"
-          />
-          <Button variant="outline" size="sm" className="shrink-0 h-10">
-            Default Filter
-          </Button>
-        </div>
+      <div className="mb-6 flex flex-wrap items-center justify-end gap-4">
         <div className="flex items-center gap-2 shrink-0">
-          <div
-            className="inline-flex rounded-lg border-0 bg-border/40 p-0.5"
-            role="tablist"
-            aria-label="View mode"
-          >
-            <button
-              type="button"
-              onClick={() => setViewMode("table")}
-              className={`inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === "table" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-              aria-pressed={viewMode === "table"}
-            >
-              <GripVertical className="h-4 w-4" size={16} /> Table
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("kanban")}
-              className={`inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === "kanban" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-              aria-pressed={viewMode === "kanban"}
-            >
-              <LayoutDashboard className="h-4 w-4" size={16} /> Kanban
-            </button>
-          </div>
           <Button
             size="sm"
             className="gap-1.5"
@@ -672,152 +539,36 @@ export default function ProposalsPage() {
         )}
       </Dialog>
 
-      {loading ? (
-        <div className="flex items-center gap-2 py-12 justify-center text-muted-foreground">
-          <Spinner className="h-6 w-6" /> Loading proposals…
-        </div>
-      ) : viewMode === "kanban" ? (
-        proposals.length === 0 ? (
-          <Card>
-            <CardContent className="py-12">
-              <p className="text-center text-sm text-muted-foreground">
-                No proposals yet. Create one using a pack that has at least one
-                qualified lead.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <ProposalKanbanBoard
-            proposals={proposals}
-            onMoveProposal={handleMoveProposal}
-            onEditProposal={(p) => setEditingProposal(p)}
-            onDownloadPdf={(p) =>
-              revenue
-                .downloadProposalPdf(p.id)
-                .catch((e) =>
-                  setError(e instanceof Error ? e.message : "Download failed"),
-                )
-            }
-            onAddProposal={() => setCreateOpen(true)}
-          />
-        )
-      ) : (
-        <Card asMotion delay={0.1}>
-          <CardContent className="p-0">
-            {proposals.length === 0 ? (
-              <p className="py-12 px-6 text-center text-sm text-muted-foreground">
-                No proposals yet. Create one using a pack that has at least one
-                qualified lead.
-              </p>
+      <Card asMotion delay={0.1}>
+        <CardContent className="p-0">
+          {proposals.length === 0 ? (
+              <div className="p-6">
+                <EmptyState
+                  icon={
+                    <FileText className="h-12 w-12 text-muted-foreground" />
+                  }
+                  title="No proposals yet"
+                  description="Create proposals from packs that have at least one qualified lead. You can send, track, and manage client responses."
+                  actionLabel="New proposal"
+                  onAction={() => setCreateOpen(true)}
+                />
+              </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10">
-                        <Checkbox
-                          checked={allSelected}
-                          onCheckedChange={toggleSelectAll}
-                          aria-label="Select all"
-                        />
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap">
-                        Proposal ID
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap">
-                        Client
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap">
-                        Amount
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap">
-                        Product
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap">Date</TableHead>
-                      <TableHead className="whitespace-nowrap">
-                        Status
-                      </TableHead>
-                      <TableHead className="text-right w-24"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredProposals.map((proposal) => (
-                      <TableRow key={proposal.id}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedIds.has(proposal.id)}
-                            onCheckedChange={(checked) => {
-                              setSelectedIds((prev) => {
-                                const next = new Set(prev);
-                                if (checked) next.add(proposal.id);
-                                else next.delete(proposal.id);
-                                return next;
-                              });
-                            }}
-                            aria-label={`Select ${formatProposalId(proposal.id)}`}
-                          />
-                        </TableCell>
-                        <TableCell className="font-mono text-muted-foreground">
-                          {formatProposalId(proposal.id)}
-                        </TableCell>
-                        <TableCell>
-                          <ProposalClientCell proposal={proposal} />
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {proposal.currency === "USD" ? "$" : ""}
-                          {Number.isNaN(Number(proposal.amount))
-                            ? proposal.amount
-                            : Number(proposal.amount).toLocaleString()}
-                          {proposal.currency !== "USD"
-                            ? ` ${proposal.currency}`
-                            : ""}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {proposal.pack_name}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground whitespace-nowrap">
-                          {formatTableDate(
-                            proposal.due_date ?? proposal.created_at,
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className={cn(
-                              "inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium",
-                              proposal.status === "accepted" &&
-                                "bg-green-500/20 text-green-700 dark:text-green-400",
-                              proposal.status === "declined" &&
-                                "bg-destructive/20 text-destructive",
-                              proposal.status === "sent" &&
-                                "bg-amber-500/20 text-amber-700 dark:text-amber-400",
-                              proposal.status === "draft" &&
-                                "bg-muted text-muted-foreground",
-                            )}
-                          >
-                            {proposal.status === "sent"
-                              ? "Pending"
-                              : proposal.status}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-muted/50"
-                            onClick={() => setEditingProposal(proposal)}
-                          >
-                            Manage
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className="p-4">
+                <DataTable
+                  columns={createProposalColumns({
+                    onManage: (p) => setEditingProposal(p),
+                  })}
+                  data={proposals}
+                  filterColumn="search"
+                  filterPlaceholder="Filter proposals..."
+                  showColumnVisibility
+                  initialState={{ columnVisibility: { search: false } }}
+                />
               </div>
             )}
-          </CardContent>
-        </Card>
-      )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

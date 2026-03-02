@@ -263,80 +263,97 @@ export default function ChatPage() {
 
   if (!hasCompletedAssistant) {
     return (
-      <div ref={containerRef} className="w-full">
-        <div className="w-full max-w-[840px] mx-auto flex flex-col items-center">
-          <NextActionBanner nextAction={nextAction} />
-          <div className="w-full">
+      <div ref={containerRef} className="w-full flex flex-col min-h-full">
+        <div className="w-full max-w-[840px] mx-auto flex flex-col flex-1 min-h-0 items-center">
+          <div className="w-full flex-1 flex flex-col min-h-0">
             {messages.length === 0 && !loading ? (
-              <div className="flex flex-col items-center justify-center px-4 pt-20 lg:min-h-[320px] text-center">
-                <h3 className="text-2xl sm:text-5xl font-[600] text-foreground max-w-lg mx-auto mb-3">
-                  What are we shipping today?
+              <div className="flex-1 flex flex-col items-center justify-center px-4 py-10 text-center">
+                <NextActionBanner nextAction={nextAction} center />
+                <h3 className="text-2xl sm:text-5xl font-[600] text-foreground mx-auto mb-3">
+                  Build your campaign with Klaro
                 </h3>
-                <p className="text-sm text-muted-foreground max-w-md">
-                  Start with one of these prompts or type your own idea.
+                <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
+                  Start by asking Klaro anything about this pack, get
+                  suggestions, update your campaign, or plan your next steps.
                 </p>
+                <div className="w-full">
+                  <ChatInputBlock
+                    input={input}
+                    onChange={setInput}
+                    onSubmit={handleSubmit}
+                    onStop={handleStop}
+                    loading={loading}
+                    stopTriggered={stopTriggered}
+                    applyTargetId={applyTargetId}
+                    dayContext={dayContext}
+                    onDay0Choice={
+                      dayContext?.day === 0 ? handleDay0Choice : undefined
+                    }
+                    showDay0ChoiceChips={!hasAnsweredBrandChoice}
+                    questionContext={questionContext}
+                    onQuestionChipClick={(value) =>
+                      send("use", undefined, value)
+                    }
+                    onResuggest={() =>
+                      send("use", undefined, "Give me different suggestions")
+                    }
+                    onOpenHistory={() => setHistoryModalOpenState(true)}
+                    onMarkDayComplete={
+                      dayReadyToComplete ? handleMarkDayComplete : undefined
+                    }
+                  />
+                </div>
               </div>
             ) : (
-              <div className="w-full mx-auto flex flex-col items-start text-left py-4">
-                <ChatMessageList
-                  messages={messages}
-                  streamingContent={streamingContent}
-                  loading={loading}
-                  onApply={(id) => send("apply", id)}
-                  questionContext={questionContext}
-                  lastQuestionMessageId={lastAssistantMessageId}
-                  onQuestionChipClick={(value) => send("use", undefined, value)}
-                  onResuggest={() =>
-                    send("use", undefined, "Give me different suggestions")
-                  }
-                  showMarkDayComplete={dayReadyToComplete ?? false}
-                  onMarkDayComplete={
-                    dayReadyToComplete ? handleMarkDayComplete : undefined
-                  }
-                />
-              </div>
-            )}
-          </div>
-          <div className="mt-2 w-full">
-            <ChatInputBlock
-              input={input}
-              onChange={setInput}
-              onSubmit={handleSubmit}
-              onStop={handleStop}
-              loading={loading}
-              stopTriggered={stopTriggered}
-              applyTargetId={applyTargetId}
-              dayContext={dayContext}
-              onDay0Choice={
-                dayContext?.day === 0 ? handleDay0Choice : undefined
-              }
-              showDay0ChoiceChips={!hasAnsweredBrandChoice}
-              questionContext={questionContext}
-              onQuestionChipClick={(value) => send("use", undefined, value)}
-              onResuggest={() =>
-                send("use", undefined, "Give me different suggestions")
-              }
-              onOpenHistory={() => setHistoryModalOpenState(true)}
-              onMarkDayComplete={
-                dayReadyToComplete ? handleMarkDayComplete : undefined
-              }
-            />
-            {messages.length === 0 && !loading && (
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-2 max-w-xl mx-auto">
-                {STARTER_PROMPTS.map((prompt) => (
-                  <button
-                    key={prompt.text}
-                    type="button"
-                    onClick={() => send("use", undefined, prompt.text)}
-                    className={cn(
-                      "rounded-full border px-3 py-1.5 text-xs transition-colors",
-                      PROMPT_VARIANT_CLASSES[prompt.variant],
-                    )}
-                  >
-                    {prompt.text}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="w-full mx-auto flex flex-col items-start text-left py-4">
+                  <ChatMessageList
+                    messages={messages}
+                    streamingContent={streamingContent}
+                    loading={loading}
+                    onApply={(id) => send("apply", id)}
+                    questionContext={questionContext}
+                    lastQuestionMessageId={lastAssistantMessageId}
+                    onQuestionChipClick={(value) =>
+                      send("use", undefined, value)
+                    }
+                    onResuggest={() =>
+                      send("use", undefined, "Give me different suggestions")
+                    }
+                    showMarkDayComplete={dayReadyToComplete ?? false}
+                    onMarkDayComplete={
+                      dayReadyToComplete ? handleMarkDayComplete : undefined
+                    }
+                  />
+                </div>
+                <div className="mt-0 w-full">
+                  <ChatInputBlock
+                    input={input}
+                    onChange={setInput}
+                    onSubmit={handleSubmit}
+                    onStop={handleStop}
+                    loading={loading}
+                    stopTriggered={stopTriggered}
+                    applyTargetId={applyTargetId}
+                    dayContext={dayContext}
+                    onDay0Choice={
+                      dayContext?.day === 0 ? handleDay0Choice : undefined
+                    }
+                    showDay0ChoiceChips={!hasAnsweredBrandChoice}
+                    questionContext={questionContext}
+                    onQuestionChipClick={(value) =>
+                      send("use", undefined, value)
+                    }
+                    onResuggest={() =>
+                      send("use", undefined, "Give me different suggestions")
+                    }
+                    onOpenHistory={() => setHistoryModalOpenState(true)}
+                    onMarkDayComplete={
+                      dayReadyToComplete ? handleMarkDayComplete : undefined
+                    }
+                  />
+                </div>
+              </>
             )}
           </div>
         </div>

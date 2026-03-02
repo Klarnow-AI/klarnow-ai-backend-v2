@@ -1,16 +1,9 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import {
-  Receipt,
-  Plus,
-  Loader2,
-  Bell,
-  ChevronUp,
-  ChevronDown,
-} from "@/components/icons";
+import { Plus, Loader2, Bell, Receipt } from "@/components/icons";
 import { Spinner } from "@/components/ui/page-loader";
 import {
   Card,
@@ -19,18 +12,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectItem } from "@/components/ui/select";
 import {
   Dialog,
@@ -49,51 +33,14 @@ import type {
   InvoiceCreateBody,
   InvoiceUpdateBody,
 } from "@/types/api-types";
-import { cn } from "@/lib/utils";
+import {
+  createInvoiceColumns,
+  formatInvoiceId,
+} from "./_components/invoice-columns";
+import { DataTable } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type InvoiceWithPack = Invoice & { pack_name: string };
-
-function formatInvoiceId(id: string): string {
-  return id.replace(/-/g, "").slice(0, 9).toUpperCase();
-}
-
-function formatTableDate(dateStr: string | null): string {
-  if (!dateStr) return "—";
-  try {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString("en-GB", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return "—";
-  }
-}
-
-function ClientCell({ invoice }: { invoice: InvoiceWithPack }) {
-  const name = invoice.client_name ?? invoice.pack_name ?? "—";
-  const email = invoice.client_email ?? "";
-  const initial = (name === "—" ? "?" : name).charAt(0).toUpperCase();
-  const hue = name.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
-  return (
-    <div className="flex items-center gap-3">
-      <div
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium text-white"
-        style={{ backgroundColor: `hsl(${hue}, 60%, 45%)` }}
-      >
-        {initial}
-      </div>
-      <div className="min-w-0">
-        <p className="truncate font-medium text-foreground">{name}</p>
-        {email ? (
-          <p className="truncate text-xs text-muted-foreground">{email}</p>
-        ) : null}
-      </div>
-    </div>
-  );
-}
 
 export default function InvoicesPage() {
   const searchParams = useSearchParams();
@@ -111,8 +58,6 @@ export default function InvoicesPage() {
   const [formAmount, setFormAmount] = useState("");
   const [formCurrency, setFormCurrency] = useState("USD");
   const [formDueDate, setFormDueDate] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [manageInvoice, setManageInvoice] = useState<InvoiceWithPack | null>(
     null,
   );
@@ -256,37 +201,16 @@ export default function InvoicesPage() {
     (i) => i.status === "sent" || i.status === "overdue",
   ).length;
 
-  const filteredInvoices = useMemo(() => {
-    if (!searchQuery.trim()) return invoices;
-    const q = searchQuery.trim().toLowerCase();
-    return invoices.filter(
-      (inv) =>
-        formatInvoiceId(inv.id).toLowerCase().includes(q) ||
-        inv.amount.toLowerCase().includes(q) ||
-        inv.pack_name?.toLowerCase().includes(q) ||
-        inv.client_name?.toLowerCase().includes(q) ||
-        (inv.client_email && inv.client_email.toLowerCase().includes(q)),
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] w-full max-w-[1400px] mx-auto items-center justify-center">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Spinner className="h-6 w-6" />
+          Loading invoices…
+        </div>
+      </div>
     );
-  }, [invoices, searchQuery]);
-
-  const allSelected =
-    filteredInvoices.length > 0 &&
-    filteredInvoices.every((i) => selectedIds.has(i.id));
-  const toggleSelectAll = () => {
-    if (allSelected) {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        filteredInvoices.forEach((i) => next.delete(i.id));
-        return next;
-      });
-    } else {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        filteredInvoices.forEach((i) => next.add(i.id));
-        return next;
-      });
-    }
-  };
+  }
 
   return (
     <div className="w-full max-w-[1400px] mx-auto">
@@ -311,18 +235,6 @@ export default function InvoicesPage() {
       )}
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2 flex-1 min-w-0 max-w-sm">
-          <Input
-            type="text"
-            placeholder="Search invoice..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-10"
-          />
-          <Button variant="outline" size="sm" className="shrink-0 h-10">
-            Default Filter
-          </Button>
-        </div>
         <div className="flex items-center gap-2 shrink-0">
           {sentNotPaid > 0 && (
             <Button
@@ -452,114 +364,30 @@ export default function InvoicesPage() {
 
       <Card asMotion delay={0.1}>
         <CardContent className="p-0">
-          {loading ? (
-            <div className="flex items-center gap-2 py-6 text-muted-foreground">
-              <Spinner className="h-5 w-5" />
-              Loading invoices…
+          {invoices.length === 0 ? (
+            <div className="p-6">
+              <EmptyState
+                icon={
+                  <Receipt className="h-12 w-12 text-muted-foreground" />
+                }
+                title="No invoices yet"
+                description="Create invoices from packs with accepted proposals. Get paid faster with Stripe payment links."
+                actionLabel="New invoice"
+                onAction={() => setCreateOpen(true)}
+              />
             </div>
-          ) : invoices.length === 0 ? (
-            <p className="py-6 text-sm text-muted-foreground">
-              No invoices yet. Create one using a pack that has at least one
-              accepted proposal.
-            </p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox
-                        checked={allSelected}
-                        onCheckedChange={toggleSelectAll}
-                        aria-label="Select all"
-                      />
-                    </TableHead>
-                    <TableHead className="whitespace-nowrap">
-                      Invoice ID
-                    </TableHead>
-                    <TableHead className="whitespace-nowrap">Client</TableHead>
-                    <TableHead className="whitespace-nowrap">Amount</TableHead>
-                    <TableHead className="whitespace-nowrap">Product</TableHead>
-                    <TableHead className="whitespace-nowrap">Date</TableHead>
-                    <TableHead className="whitespace-nowrap">Status</TableHead>
-                    <TableHead className="text-right w-24"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredInvoices.map((invoice) => (
-                    <TableRow key={invoice.id}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedIds.has(invoice.id)}
-                          onCheckedChange={(checked) => {
-                            setSelectedIds((prev) => {
-                              const next = new Set(prev);
-                              if (checked) next.add(invoice.id);
-                              else next.delete(invoice.id);
-                              return next;
-                            });
-                          }}
-                          aria-label={`Select ${formatInvoiceId(invoice.id)}`}
-                        />
-                      </TableCell>
-                      <TableCell className="font-mono text-muted-foreground">
-                        {formatInvoiceId(invoice.id)}
-                      </TableCell>
-                      <TableCell>
-                        <ClientCell invoice={invoice} />
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {invoice.currency === "USD" && "$"}
-                        {Number.isNaN(Number(invoice.amount))
-                          ? invoice.amount
-                          : Number(invoice.amount).toLocaleString()}
-                        {invoice.currency !== "USD" && ` ${invoice.currency}`}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {invoice.pack_name}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground whitespace-nowrap">
-                        {formatTableDate(
-                          invoice.due_date ?? invoice.created_at,
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={cn(
-                            "inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium",
-                            invoice.status === "paid" &&
-                              "bg-green-500/20 text-green-700 dark:text-green-400",
-                            invoice.status === "overdue" &&
-                              "bg-destructive/20 text-destructive",
-                            invoice.status === "sent" &&
-                              "bg-amber-500/20 text-amber-700 dark:text-amber-400",
-                            invoice.status === "draft" &&
-                              "bg-muted text-muted-foreground",
-                          )}
-                        >
-                          {invoice.status === "sent"
-                            ? "Pending"
-                            : invoice.status === "paid"
-                              ? "Paid"
-                              : invoice.status === "overdue"
-                                ? "Overdue"
-                                : invoice.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="bg-muted/50"
-                          onClick={() => setManageInvoice(invoice)}
-                        >
-                          Manage
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="p-4">
+              <DataTable
+                columns={createInvoiceColumns({
+                  onManage: (inv) => setManageInvoice(inv),
+                })}
+                data={invoices}
+                filterColumn="search"
+                filterPlaceholder="Filter invoices..."
+                showColumnVisibility
+                initialState={{ columnVisibility: { search: false } }}
+              />
             </div>
           )}
         </CardContent>

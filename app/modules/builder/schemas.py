@@ -26,6 +26,7 @@ class BuilderProjectRead(BaseModel):
     name: str
     files: dict
     messages: list
+    published_files: dict | None = None
     live_url: str | None = None
     subdomain_slug: str | None = None
     published_at: datetime | None = None

@@ -35,6 +35,7 @@ import type { BrandContext } from "@/app/api/generate/route";
 type Message = {
   role: "user" | "assistant";
   content: string;
+  files_snapshot?: Record<string, string>;
 };
 
 type GenStage = "idle" | "thinking" | "planning" | "coding";
@@ -271,6 +272,7 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
   const canUndo = useProjectStore((s) => s.fileHistory.length > 0);
   const projectId = useProjectStore((s) => s.projectId);
   const liveUrl = useProjectStore((s) => s.liveUrl);
+  const publishedFiles = useProjectStore((s) => s.publishedFiles);
 
   const [messages, setMessagesLocal] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -345,6 +347,23 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
   useEffect(() => {
     adjustTextarea();
   }, [input, adjustTextarea]);
+
+  // ── Cmd/Ctrl+Z for undo ────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
+        const target = e.target as Node;
+        if (textareaRef.current?.contains(target)) return;
+        e.preventDefault();
+        if (canUndo && !isStreaming) {
+          useProjectStore.getState().undoLastChange();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [canUndo, isStreaming]);
 
   // ── Stop streaming ────────────────────────────────────────────────────────
 
@@ -438,10 +457,12 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
         } else {
           const displayMsg = summary || "Done! I\u2019ve updated your website.";
           setMessages((prev): Message[] => {
-            const updated: Message[] = [
-              ...prev,
-              { role: "assistant", content: displayMsg },
-            ];
+            const assistantMsg: Message = {
+              role: "assistant",
+              content: displayMsg,
+              ...(hasFiles ? { files_snapshot: extractedFiles } : {}),
+            };
+            const updated: Message[] = [...prev, assistantMsg];
             if (hasFiles) {
               versionCounter.current += 1;
               fileUpdateMap.current.set(
@@ -610,6 +631,7 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
     try {
       const result = await builder.publish(projectId);
       useProjectStore.getState().setLiveUrl(result.live_url ?? null);
+      useProjectStore.getState().setPublishedFiles(result.published_files ?? null);
     } catch (err) {
       setPublishError(err instanceof Error ? err.message : "Publish failed");
     } finally {
@@ -624,12 +646,23 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
     try {
       await builder.unpublish(projectId);
       useProjectStore.getState().setLiveUrl(null);
+      useProjectStore.getState().setPublishedFiles(null);
     } catch (err) {
       setPublishError(err instanceof Error ? err.message : "Unpublish failed");
     } finally {
       setIsUnpublishing(false);
     }
   }, [projectId]);
+
+  const handleRevertToPublished = useCallback(() => {
+    const files = useProjectStore.getState().publishedFiles;
+    if (!files || Object.keys(files).length === 0) return;
+    useProjectStore.getState().restoreFiles(files);
+  }, []);
+
+  const handleRevertToMessage = useCallback((snapshot: Record<string, string>) => {
+    useProjectStore.getState().restoreFiles(snapshot);
+  }, []);
 
   // ── Derived values ────────────────────────────────────────────────────────
 
@@ -741,6 +774,19 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
                   >
                     Retry
                   </button>
+                  {msg.files_snapshot && (
+                    <>
+                      <span className="text-border text-xs">·</span>
+                      <button
+                        className="text-[11px] text-muted-foreground hover:text-foreground px-2 py-1 rounded transition-colors hover:bg-accent whitespace-nowrap disabled:opacity-40"
+                        onClick={() => handleRevertToMessage(msg.files_snapshot)}
+                        disabled={isStreaming}
+                        title="Restore to this version"
+                      >
+                        Restore
+                      </button>
+                    </>
+                  )}
                 </div>
 
                 <div className="rounded-2xl rounded-tl-md px-4 py-3 text-sm text-foreground bg-accent/40">
@@ -829,81 +875,34 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
             </div>
           )}
 
-        {/* Publish section */}
+        {/* Version control strip */}
         {isPageReady && (
-          <div className="rounded-xl border border-border bg-background px-3 py-2.5 flex items-center justify-between gap-3">
-            {liveUrl ? (
+          <div className="rounded-xl border border-border bg-background px-3 py-2.5 flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleUndo}
+              disabled={!canUndo || isStreaming}
+              title="Undo last generation"
+              className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed px-2 py-1 rounded-lg hover:bg-accent transition-colors"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Undo
+            </button>
+            {publishedFiles && Object.keys(publishedFiles).length > 0 && (
               <>
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="flex-shrink-0 w-2 h-2 rounded-full bg-emerald-500" />
-                  <a
-                    href={liveUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-emerald-600 dark:text-emerald-400 font-medium hover:underline truncate"
-                    title={liveUrl}
-                  >
-                    Live
-                  </a>
-                  <a
-                    href={liveUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] text-muted-foreground hover:text-foreground truncate transition-colors"
-                    title={liveUrl}
-                  >
-                    {liveUrl.replace(/^https?:\/\//, "")}
-                  </a>
-                </div>
+                <span className="text-border text-xs">·</span>
                 <button
                   type="button"
-                  onClick={handlePublish}
-                  disabled={isPublishing || isStreaming}
-                  className="flex-shrink-0 flex items-center gap-1.5 text-xs font-medium text-foreground bg-accent hover:bg-accent/60 border border-border/50 rounded-lg px-2.5 py-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={handleRevertToPublished}
+                  disabled={isStreaming}
+                  title="Revert to last published version"
+                  className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed px-2 py-1 rounded-lg hover:bg-accent transition-colors"
                 >
-                  {isPublishing ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Globe className="w-3 h-3" />
-                  )}
-                  {isPublishing ? "Updating…" : "Republish"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleUnpublish}
-                  disabled={isUnpublishing || isStreaming}
-                  className="flex-shrink-0 flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-transparent hover:bg-accent/50 border border-border/50 rounded-lg px-2.5 py-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {isUnpublishing ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : null}
-                  {isUnpublishing ? "Unpublishing…" : "Unpublish"}
-                </button>
-              </>
-            ) : (
-              <>
-                <p className="text-xs text-muted-foreground leading-tight">
-                  Ready to go live?
-                </p>
-                <button
-                  type="button"
-                  onClick={handlePublish}
-                  disabled={isPublishing || isStreaming}
-                  className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg px-3 py-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {isPublishing ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Globe className="w-3 h-3" />
-                  )}
-                  {isPublishing ? "Publishing…" : "Publish"}
+                  Revert to published
                 </button>
               </>
             )}
           </div>
-        )}
-        {publishError && (
-          <p className="text-[11px] text-destructive px-1">{publishError}</p>
         )}
 
         {/* Compose box */}
@@ -931,17 +930,6 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
                 ⌘↵ to send
               </span>
               <div className="flex items-center gap-1">
-                {canUndo && !isStreaming && (
-                  <button
-                    type="button"
-                    onClick={handleUndo}
-                    title="Undo last generation"
-                    className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg hover:bg-accent transition-colors"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    Undo
-                  </button>
-                )}
                 {isStreaming ? (
                   <button
                     type="button"

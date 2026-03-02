@@ -3,22 +3,9 @@
 import { useParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
-import {
-  Plus,
-  Check,
-  Loader2,
-  LayoutDashboard,
-  GripVertical,
-  ChevronDown,
-} from "@/components/icons";
+import { Plus, Loader2, ChevronDown, Target } from "@/components/icons";
 import { Spinner } from "@/components/ui/page-loader";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,17 +19,23 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { clients } from "@/api_requests/clients";
-import type {
-  Lead,
-  LeadCreateBody,
-  LeadUpdateBody,
-  PipelineStage,
+import {
+  PIPELINE_STAGES,
+  type Lead,
+  type LeadCreateBody,
+  type LeadUpdateBody,
+  type PipelineStage,
 } from "@/types/api-types";
-import { KanbanBoard } from "./_components/kanban-board";
-
-const QUALIFIED = "qualified";
-
-type ViewMode = "board" | "list";
+import { createLeadColumns } from "./_components/lead-columns";
+import { DataTable } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function LeadsPage() {
   const params = useParams();
@@ -50,12 +43,10 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("board");
   const [showForm, setShowForm] = useState(false);
   const [defaultStage, setDefaultStage] = useState<PipelineStage | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [qualifyingId, setQualifyingId] = useState<string | null>(null);
-  const [movingId, setMovingId] = useState<string | null>(null);
   const [formName, setFormName] = useState("");
   const [formEmail, setFormEmail] = useState("");
   const [formPhone, setFormPhone] = useState("");
@@ -65,8 +56,20 @@ export default function LeadsPage() {
   const [editDueDate, setEditDueDate] = useState("");
   const [editDealValue, setEditDealValue] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [stageFilter, setStageFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const cancelRef = useRef<(() => void) | undefined>(undefined);
+
+  const filteredLeads = leads.filter((lead) => {
+    if (stageFilter !== "all" && lead.pipeline_stage !== stageFilter)
+      return false;
+    if (statusFilter === "qualified" && lead.status !== "qualified")
+      return false;
+    if (statusFilter === "not_qualified" && lead.status === "qualified")
+      return false;
+    return true;
+  });
 
   const fetchLeads = useCallback(async () => {
     if (!packId) return;
@@ -132,31 +135,6 @@ export default function LeadsPage() {
     }
   };
 
-  const handleMoveLead = useCallback(
-    async (leadId: string, pipelineStage: PipelineStage) => {
-      setMovingId(leadId);
-      setError(null);
-      try {
-        await clients.updateLead(leadId, { pipeline_stage: pipelineStage });
-        setLeads((prev) =>
-          prev.map((l) =>
-            l.id === leadId ? { ...l, pipeline_stage: pipelineStage } : l,
-          ),
-        );
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to move lead");
-      } finally {
-        setMovingId(null);
-      }
-    },
-    [],
-  );
-
-  const handleAddLead = useCallback((stage: PipelineStage) => {
-    setDefaultStage(stage);
-    setShowForm(true);
-  }, []);
-
   const openEdit = useCallback((lead: Lead) => {
     setEditingLead(lead);
     setEditName(lead.name);
@@ -219,7 +197,16 @@ export default function LeadsPage() {
     }
   };
 
-  const closedCount = leads.filter((l) => l.pipeline_stage === "closed").length;
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] w-full items-center justify-center">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Spinner className="h-6 w-6" />
+          Loading leads…
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
@@ -240,163 +227,117 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* Header: stats, view toggles, filters, Add lead */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          {loading ? (
-            <span className="flex items-center gap-2">
-              <Spinner className="h-4 w-4" />
-              Loading…
-            </span>
-          ) : (
-            <>
-              <span>
-                Total:{" "}
-                <strong className="text-foreground">{leads.length}</strong>{" "}
-                Leads
-              </span>
-              <span>
-                Closed:{" "}
-                <strong className="text-foreground">{closedCount}</strong> Deals
-              </span>
-            </>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <div
-            className="inline-flex rounded-lg border border-border bg-muted/30 p-0.5"
-            role="tablist"
-            aria-label="View mode"
-          >
-            <button
-              type="button"
-              onClick={() => setViewMode("board")}
-              className={`inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                viewMode === "board"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              aria-pressed={viewMode === "board"}
-            >
-              <LayoutDashboard className="h-4 w-4" size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("list")}
-              className={`inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                viewMode === "list"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              aria-pressed={viewMode === "list"}
-            >
-              <GripVertical className="h-4 w-4" size={16} />
-            </button>
-          </div>
-          <Button variant="outline" size="sm" className="gap-1.5" disabled>
-            <span>All leads</span>
-            <ChevronDown className="h-4 w-4" size={16} />
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5" disabled>
-            Filter
-          </Button>
-          <Button
-            size="sm"
-            className="gap-1.5"
-            onClick={() => {
-              setDefaultStage(null);
-              setShowForm(true);
-            }}
-          >
-            <Plus className="h-4 w-4" size={16} />
-            Add lead
-          </Button>
-        </div>
+      {/* Header: Add lead */}
+      <div className="mb-6 flex flex-wrap items-center justify-end gap-4">
+        <Button
+          size="sm"
+          className="gap-1.5"
+          onClick={() => {
+            setDefaultStage(null);
+            setShowForm(true);
+          }}
+        >
+          <Plus className="h-4 w-4" size={16} />
+          Add lead
+        </Button>
       </div>
 
-      {/* Board or List view */}
-      {loading ? (
-        <div className="flex items-center gap-2 py-12 text-muted-foreground justify-center">
-          <Spinner className="h-6 w-6" />
-          Loading leads…
-        </div>
-      ) : viewMode === "board" ? (
-        <KanbanBoard
-          leads={leads}
-          assigneeLabel="You"
-          onMoveLead={handleMoveLead}
-          onAddLead={handleAddLead}
-          onEditLead={openEdit}
-        />
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Leads</CardTitle>
-            <CardDescription>
-              {leads.length} lead{leads.length === 1 ? "" : "s"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {leads.length === 0 ? (
-              <p className="py-6 text-sm text-muted-foreground">
-                No leads yet. Add a lead to get started.
-              </p>
-            ) : (
-              <ul className="divide-y divide-border">
-                {leads.map((lead) => (
-                  <li
-                    key={lead.id}
-                    className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0"
-                  >
-                    <div>
-                      <span className="font-medium">{lead.name}</span>
-                      {lead.email && (
-                        <span className="ml-2 text-sm text-muted-foreground">
-                          {lead.email}
-                        </span>
-                      )}
-                      {lead.phone && (
-                        <span className="ml-2 text-sm text-muted-foreground">
-                          {lead.phone}
-                        </span>
-                      )}
-                      <span
-                        className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-medium"
-                        title="Status"
-                      >
-                        {lead.status}
+      {/* Table view */}
+      <Card>
+        <CardContent className="pt-10">
+          {leads.length === 0 ? (
+            <EmptyState
+              icon={<Target className="h-12 w-12 text-muted-foreground" />}
+              title="No leads yet"
+              description="Add contacts to track and qualify. Qualified leads unlock creating proposals."
+              actionLabel="Add lead"
+              onAction={() => {
+                setDefaultStage(null);
+                setShowForm(true);
+              }}
+            />
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      <span>
+                        {stageFilter === "all"
+                          ? "All leads"
+                          : stageFilter.charAt(0).toUpperCase() +
+                            stageFilter.slice(1)}
                       </span>
-                      <span
-                        className="ml-2 rounded-full bg-muted/80 px-2 py-0.5 text-xs font-medium"
-                        title="Stage"
-                      >
-                        {lead.pipeline_stage}
+                      <ChevronDown className="h-4 w-4" size={16} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuRadioGroup
+                      value={stageFilter}
+                      onValueChange={setStageFilter}
+                    >
+                      <DropdownMenuRadioItem value="all">
+                        All leads
+                      </DropdownMenuRadioItem>
+                      {PIPELINE_STAGES.map((stage) => (
+                        <DropdownMenuRadioItem
+                          key={stage}
+                          value={stage}
+                          className="capitalize"
+                        >
+                          {stage}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      <span>
+                        {statusFilter === "all"
+                          ? "Filter"
+                          : statusFilter === "qualified"
+                            ? "Qualified"
+                            : "Not qualified"}
                       </span>
-                    </div>
-                    {lead.status !== QUALIFIED && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleQualify(lead.id)}
-                        disabled={qualifyingId === lead.id}
-                      >
-                        {qualifyingId === lead.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            <Check className="h-4 w-4" />
-                            Qualify
-                          </>
-                        )}
-                      </Button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      )}
+                      <ChevronDown className="h-4 w-4" size={16} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuRadioGroup
+                      value={statusFilter}
+                      onValueChange={setStatusFilter}
+                    >
+                      <DropdownMenuRadioItem value="all">
+                        All statuses
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="qualified">
+                        Qualified
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="not_qualified">
+                        Not qualified
+                      </DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <DataTable
+                columns={createLeadColumns({
+                  onQualify: handleQualify,
+                  onEdit: openEdit,
+                  qualifyingId,
+                })}
+                data={filteredLeads}
+                filterColumn="name"
+                filterPlaceholder="Filter by name..."
+                showColumnVisibility
+                showSelectionCount={false}
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Add lead dialog */}
       <Dialog

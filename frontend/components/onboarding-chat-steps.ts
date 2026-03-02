@@ -12,31 +12,70 @@ export const STEP_BLOCKERS_START = 4;
 export const STEP_BLOCKERS_END = STEP_BLOCKERS_START + BLOCKER_COUNT - 1;
 export const STEP_PACK_TYPE = STEP_BLOCKERS_END + 1;
 
-/** MVP flow: 4 steps only (pack name + 3 questions). Keys match landing-complete API. */
+/** MVP flow: 4 steps only (3 questions + pack name). Keys match landing-complete API. */
 export const MVP_STEP_KEYS = [
-  "pack_name",
   "what_do_you_sell",
   "who_is_it_for",
   "where_are_you_based",
+  "pack_name",
 ] as const;
 
-export const MVP_QUESTIONS: { label: string; placeholder: string }[] = [
+export const MVP_QUESTIONS: {
+  label: string;
+  placeholder: string;
+  subLabel?: string;
+}[] = [
   {
-    label: "What would you like to name this campaign pack?",
-    placeholder: "e.g. My Campaign",
-  },
-  {
-    label: "What do you sell? Say it in one sentence.",
+    label: "What do you sell?",
     placeholder: "e.g. I help small shops get more foot traffic",
+    subLabel: "One sentence. This drives everything.",
   },
-  { label: "Who is it for?", placeholder: "e.g. Local retail owners" },
   {
-    label: "Where are you based? City + country.",
+    label: "Who is it for?",
+    placeholder: "e.g. Local retail owners",
+    subLabel: "Describe your ideal customer.",
+  },
+  {
+    label: "Where are you based?",
     placeholder: "e.g. Manchester, UK",
+    subLabel: "City + country.",
+  },
+  {
+    label: "What would you like to name this pack?",
+    placeholder: "e.g. My Campaign Pack",
+    subLabel: "This is your campaign pack name.",
   },
 ];
 
 export const MVP_STEP_COUNT = MVP_QUESTIONS.length;
+
+/** Generate pack name suggestion chips from the first 3 MVP answers. */
+export function getPackNameSuggestionChips(
+  answers: Record<string, string>,
+): { label: string; value: string }[] {
+  const offer = (answers.what_do_you_sell || "").trim();
+  const audience = (answers.who_is_it_for || "").trim();
+  const location = (answers.where_are_you_based || "").trim();
+  const chips: { label: string; value: string }[] = [];
+  if (audience)
+    chips.push({
+      label: `${audience} Campaign`,
+      value: `${audience} Campaign`,
+    });
+  if (offer && location)
+    chips.push({
+      label: `${offer} - ${location}`,
+      value: `${offer} - ${location}`,
+    });
+  if (offer)
+    chips.push({ label: `My ${offer} Pack`, value: `My ${offer} Pack` });
+  if (location)
+    chips.push({
+      label: `${location} Outreach`,
+      value: `${location} Outreach`,
+    });
+  return chips.slice(0, 4);
+}
 
 /** Extract question and helper text for form-focused UI */
 export function getQuestionContent(
@@ -93,4 +132,3 @@ export function getQuestionContent(
 
   return { question: "Loading..." };
 }
-

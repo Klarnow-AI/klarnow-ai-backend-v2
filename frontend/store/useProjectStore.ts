@@ -37,6 +37,7 @@ const initialProjectState = {
   projectId: null as string | null,
   files: { ...DEFAULT_FILES },
   messages: [] as Message[],
+  publishedFiles: null as Record<string, string> | null,
   isGenerating: false,
   selectedStyle: null as string | null,
   liveUrl: null as string | null,
@@ -53,6 +54,7 @@ type ProjectState = typeof initialProjectState & {
     messages: Message[];
     projectId: string;
     liveUrl?: string | null;
+    publishedFiles?: Record<string, string> | null;
   }) => void;
   updateFiles: (newFiles: Record<string, string>) => void;
   setMessages: (messages: Message[]) => void;
@@ -60,6 +62,8 @@ type ProjectState = typeof initialProjectState & {
   syncToBackend: () => void;
   pushToHistory: () => void;
   undoLastChange: () => void;
+  restoreFiles: (files: Record<string, string>) => void;
+  setPublishedFiles: (files: Record<string, string> | null) => void;
   reset: () => void;
 };
 
@@ -76,6 +80,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       isGenerating: false,
       selectedStyle: null,
       liveUrl: null,
+      publishedFiles: null,
       fileHistory: [],
     });
   },
@@ -86,13 +91,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   setLiveUrl: (url) => set({ liveUrl: url }),
 
-  hydrate: ({ files, messages, projectId, liveUrl }) => {
+  hydrate: ({ files, messages, projectId, liveUrl, publishedFiles }) => {
     const hasFiles = files && Object.keys(files).length > 0;
     set({
       projectId,
       files: hasFiles ? files : { ...DEFAULT_FILES },
       messages: messages ?? [],
       liveUrl: liveUrl ?? null,
+      publishedFiles: publishedFiles ?? null,
     });
   },
 
@@ -125,6 +131,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({ files: prev, fileHistory: rest });
     debouncedSync();
   },
+
+  restoreFiles: (files) => {
+    get().pushToHistory();
+    set({ files: { ...files } });
+    debouncedSync();
+  },
+
+  setPublishedFiles: (files) => set({ publishedFiles: files }),
 
   reset: () => {
     if (syncTimer) clearTimeout(syncTimer);

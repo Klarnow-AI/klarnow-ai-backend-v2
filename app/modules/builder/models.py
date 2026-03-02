@@ -30,6 +30,7 @@ class BuilderProject(Base):
     name: Mapped[str] = mapped_column(String(255), default="Untitled Project")
     files: Mapped[dict] = mapped_column(JSON, default=dict)
     messages: Mapped[list] = mapped_column(JSON, default=list)
+    published_files: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=None)
     live_url: Mapped[str | None] = mapped_column(String(2048), nullable=True, default=None)
     subdomain_slug: Mapped[str | None] = mapped_column(String(63), nullable=True, default=None, unique=True, index=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)

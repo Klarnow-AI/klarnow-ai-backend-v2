@@ -63,8 +63,12 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (isLoading || landingLoading) return;
-    if (isAuthenticated && context && context.stage === "no_pack") {
-      router.replace("/packs/new");
+    if (isAuthenticated && context) {
+      if (context.stage === "no_pack") {
+        router.replace("/packs/new");
+      } else if (context.pack) {
+        router.replace(`/chat?pack=${context.pack.id}`);
+      }
     }
   }, [isAuthenticated, isLoading, landingLoading, context, router]);
 
@@ -148,9 +152,14 @@ export default function LandingPage() {
           )}
 
           {/* Contextual headline - two lines */}
-          <h3 className="font-heading font-[500] text-foreground tracking-tight mb-2 line-clamp-2 text-3xl sm:text-4xl md:text-5xl">
+          <h3 className="font-heading font-[500] text-foreground tracking-tight mb-2 line-clamp-2 text-3xl sm:text-4xl md:text-5xl leading-tight">
             {headline}
           </h3>
+          <p className="text-muted-foreground text-md">
+            {headline === "Build a business people come back to."
+              ? "A 14-day sprint that helps you publish, capture leads, and get paid."
+              : ""}
+          </p>
 
           {/* Sprint dots: Day 0–14 when in sprint; otherwise none */}
           <div
@@ -233,7 +242,6 @@ export default function LandingPage() {
           </div>
         </motion.div>
       </main>
-
     </div>
   );
 }

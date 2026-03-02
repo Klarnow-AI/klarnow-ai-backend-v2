@@ -13,6 +13,8 @@ interface DialogProps {
 export function Dialog({ open, onOpenChange, children }: DialogProps) {
   const dialogRef = React.useRef<HTMLDivElement>(null);
   const previousFocusedElementRef = React.useRef<HTMLElement | null>(null);
+  const onOpenChangeRef = React.useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
 
   const getFocusableElements = React.useCallback(() => {
     if (!dialogRef.current) return [] as HTMLElement[];
@@ -31,7 +33,7 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && open) {
-        onOpenChange(false);
+        onOpenChangeRef.current(false);
       }
     };
     const handleTab = (e: KeyboardEvent) => {
@@ -69,7 +71,7 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
       document.removeEventListener("keydown", handleTab);
       document.body.style.overflow = "unset";
     };
-  }, [open, onOpenChange, getFocusableElements]);
+  }, [open, getFocusableElements]);
 
   React.useEffect(() => {
     if (!open) {

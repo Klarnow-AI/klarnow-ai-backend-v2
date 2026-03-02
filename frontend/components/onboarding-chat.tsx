@@ -41,6 +41,7 @@ import {
   MVP_QUESTIONS,
   MVP_STEP_COUNT,
   getQuestionContent,
+  getPackNameSuggestionChips,
 } from "@/components/onboarding-chat-steps";
 
 const DEFAULT_PACK_NAME = "My first pack";
@@ -86,7 +87,6 @@ export type OnboardingChatState = {
   onboardingProgress: string;
   retryFailedStep: (() => Promise<void>) | null;
 };
-
 
 export function useOnboardingChat(options: {
   onComplete?: (packId: string) => void;
@@ -189,10 +189,10 @@ export function useOnboardingChat(options: {
       setLoading(true);
       try {
         const payload = {
-          pack_name: answers.pack_name || "",
+          pack_name: trimmed,
           what_do_you_sell: answers.what_do_you_sell || "",
           who_is_it_for: answers.who_is_it_for || "",
-          where_are_you_based: trimmed,
+          where_are_you_based: answers.where_are_you_based || "",
         };
         const final = await meApi.landingComplete(payload);
         options.onComplete?.(final.pack_id);
@@ -492,7 +492,11 @@ export function OnboardingPathAInputType({
         size="sm"
         className="h-[50px] w-[50px] rounded-full p-0 shrink-0"
       >
-        {loading ? <Spinner className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+        {loading ? (
+          <Spinner className="h-5 w-5" />
+        ) : (
+          <ChevronRight className="h-5 w-5" />
+        )}
       </Button>
     </form>
   );
@@ -559,7 +563,7 @@ export function OnboardingStepIndicators({
           key={index}
           className={cn(
             "h-1.5 w-1.5 rounded-full transition-all",
-            index === activeIndex ? "bg-foreground/90" : "bg-foreground/25",
+            index === activeIndex ? "w-3 bg-foreground/90" : "bg-foreground/25",
           )}
         />
       ))}
@@ -719,6 +723,11 @@ export function OnboardingSlideView({
               ? MVP_QUESTIONS[step].label
               : getQuestionContent(step, hasExistingBrand).question}
           </h4>
+          {mvpOnly && step < MVP_STEP_COUNT && MVP_QUESTIONS[step].subLabel && (
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              {MVP_QUESTIONS[step].subLabel}
+            </p>
+          )}
           {!mvpOnly && getQuestionContent(step, hasExistingBrand).helper && (
             <p className="text-sm text-muted-foreground max-w-md mx-auto">
               {getQuestionContent(step, hasExistingBrand).helper}
@@ -741,25 +750,50 @@ export function OnboardingSlideView({
           transition={{ duration: 0.2 }}
         >
           {showMvpInput && (
-            <form onSubmit={onSubmit} className={ONBOARDING_INPUT_ROW_CLASS}>
-              <SearchInput
-                placeholder={MVP_QUESTIONS[step].placeholder}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                disabled={loading}
-                aria-label={MVP_QUESTIONS[step].label}
-                wrapperClassName={ONBOARDING_INPUT_WRAPPER_CLASS}
-                className={ONBOARDING_INPUT_CLASS}
-              />
-              <Button
-                type="submit"
-                disabled={loading || !input.trim()}
-                size="sm"
-                className="h-[50px] w-[50px] rounded-full p-0 shrink-0"
-              >
-                {loading ? <Spinner className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-              </Button>
-            </form>
+            <div className="flex flex-col gap-3 items-center w-full max-w-[460px] mx-auto">
+              {mvpOnly &&
+                step === 3 &&
+                (() => {
+                  const packNameChips = getPackNameSuggestionChips(answers);
+                  return packNameChips.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      {packNameChips.map((chip) => (
+                        <Chip
+                          key={chip.value}
+                          size="md"
+                          onClick={() => !loading && setInput(chip.value)}
+                          className="cursor-pointer"
+                        >
+                          {chip.label}
+                        </Chip>
+                      ))}
+                    </div>
+                  ) : null;
+                })()}
+              <form onSubmit={onSubmit} className={ONBOARDING_INPUT_ROW_CLASS}>
+                <SearchInput
+                  placeholder={MVP_QUESTIONS[step].placeholder}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  disabled={loading}
+                  aria-label={MVP_QUESTIONS[step].label}
+                  wrapperClassName={ONBOARDING_INPUT_WRAPPER_CLASS}
+                  className={ONBOARDING_INPUT_CLASS}
+                />
+                <Button
+                  type="submit"
+                  disabled={loading || !input.trim()}
+                  size="sm"
+                  className="h-[50px] w-[50px] rounded-full p-0 shrink-0"
+                >
+                  {loading ? (
+                    <Spinner className="h-5 w-5" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5" />
+                  )}
+                </Button>
+              </form>
+            </div>
           )}
           {showPackNameInput && (
             <form onSubmit={onSubmit} className={ONBOARDING_INPUT_ROW_CLASS}>
@@ -778,7 +812,11 @@ export function OnboardingSlideView({
                 size="sm"
                 className="h-[50px] w-[50px] rounded-full p-0 shrink-0"
               >
-                {loading ? <Spinner className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                {loading ? (
+                  <Spinner className="h-5 w-5" />
+                ) : (
+                  <ChevronRight className="h-5 w-5" />
+                )}
               </Button>
             </form>
           )}
@@ -814,7 +852,11 @@ export function OnboardingSlideView({
                 size="sm"
                 className="h-[50px] w-[50px] rounded-full p-0 shrink-0"
               >
-                {loading ? <Spinner className="h-5 w-5" /> : <Send className="h-5 w-5" />}
+                {loading ? (
+                  <Spinner className="h-5 w-5" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
               </Button>
             </form>
           )}
@@ -860,7 +902,11 @@ export function OnboardingSlideView({
                 size="sm"
                 className="h-[50px] w-[50px] rounded-full p-0 shrink-0"
               >
-                {loading ? <Spinner className="h-5 w-5" /> : <Send className="h-5 w-5" />}
+                {loading ? (
+                  <Spinner className="h-5 w-5" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
               </Button>
             </form>
           )}
@@ -962,12 +1008,18 @@ export function OnboardingSlideView({
                 ? MVP_QUESTIONS[step].label
                 : getQuestionContent(step, hasExistingBrand).question}
             </h4>
-            {!mvpOnly &&
-              getQuestionContent(step, hasExistingBrand).helper && (
+            {mvpOnly &&
+              step < MVP_STEP_COUNT &&
+              MVP_QUESTIONS[step].subLabel && (
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  {getQuestionContent(step, hasExistingBrand).helper}
+                  {MVP_QUESTIONS[step].subLabel}
                 </p>
               )}
+            {!mvpOnly && getQuestionContent(step, hasExistingBrand).helper && (
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                {getQuestionContent(step, hasExistingBrand).helper}
+              </p>
+            )}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -1101,8 +1153,13 @@ export function OnboardingSharedStepLayout({
   retryFailedStep?: (() => Promise<void>) | null;
 }) {
   return (
-    <div className={cn("w-full max-w-[600px] mx-auto", className)}>
-      <div className="min-h-[340px] flex flex-col justify-center">
+    <div
+      className={cn(
+        "w-full max-w-[600px] mx-auto flex flex-col flex-1",
+        className,
+      )}
+    >
+      <div className="min-h-[340px] flex flex-col justify-center flex-1">
         <div className="px-4 sm:px-6">
           <OnboardingSlideView
             step={step}
@@ -1148,7 +1205,11 @@ export function OnboardingSharedStepLayout({
         </div>
       </div>
 
-      <OnboardingStepIndicators step={step} mvpOnly={mvpOnly} className="mt-8" />
+      <OnboardingStepIndicators
+        step={step}
+        mvpOnly={mvpOnly}
+        className="mt-auto pt-8 pb-6"
+      />
     </div>
   );
 }

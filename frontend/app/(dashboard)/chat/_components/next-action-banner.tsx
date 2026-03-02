@@ -4,11 +4,14 @@ import Link from "next/link";
 import type { NextAction } from "@/types/api-types";
 import { Target } from "@/components/icons";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export function NextActionBanner({
   nextAction,
+  center = false,
 }: {
   nextAction: NextAction | null;
+  center?: boolean;
 }) {
   if (!nextAction) return null;
 
@@ -18,10 +21,15 @@ export function NextActionBanner({
 
   return (
     <div
-      className="shrink-0 w-full min-w-0 lg:py-10 py-6"
+      className={cn("shrink-0 min-w-0 py-6 mb-6", center && "flex justify-center w-full")}
       style={{ background: "unset", backgroundColor: "unset" }}
     >
-      <div className="w-full min-w-0 max-w-full rounded-2xl border-0 bg-border/40 px-3 py-3 flex items-center gap-2 sm:gap-4 sm:px-4 overflow-hidden">
+      <div
+        className={cn(
+          "w-full min-w-0 max-w-full rounded-2xl border-0 bg-border/40 px-3 py-3 flex items-center gap-2 sm:gap-4 sm:px-4 overflow-hidden",
+          center && "mx-auto max-w-xl",
+        )}
+      >
         <div className="rounded-full border-0 bg-border/50 p-2 shrink-0">
           <Target className="h-4 w-4 text-muted-foreground" size={16} />
         </div>
