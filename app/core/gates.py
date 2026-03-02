@@ -8,30 +8,30 @@ from app.core.errors import GateBlockedError
 from app.modules.packs.models import Pack
 
 
-def can_generate_conversion_page(db: Session, pack: Pack) -> None:
-    """Gate: Brand OS and Campaign (with CTA) must exist before generating conversion page."""
+def can_generate_website(db: Session, pack: Pack) -> None:
+    """Gate: Brand OS and Campaign (with CTA) must exist before building website."""
     if not pack.active_brand_os_id:
         raise GateBlockedError(
-            "You need a Brand OS before building your conversion page. Complete Core (generate Brand OS) first."
+            "You need a Brand OS before building your website. Complete Core (generate Brand OS) first."
         )
     if not pack.active_campaign_id:
         raise GateBlockedError(
-            "You need a Campaign with a primary CTA before building your conversion page. Set up your offer and CTA first."
+            "You need a Campaign with a primary CTA before building your website. Set up your offer and CTA first."
         )
     from app.modules.campaign.services import get_active_for_pack
     campaign = get_active_for_pack(db, pack.id)
     if not campaign or not campaign.primary_cta:
         raise GateBlockedError(
-            "Your campaign must have a primary CTA before generating the conversion page."
+            "Your campaign must have a primary CTA before building the website."
         )
 
 
 def can_generate_sprint(db: Session, pack: Pack) -> None:
-    """Gate: Conversion page must be published before starting the 7-day sprint."""
-    from app.modules.conversion_page.services import get_published
-    if get_published(db, pack.id) is None:
+    """Gate: Website must be published before starting the 7-day sprint."""
+    from app.modules.builder.services import get_published_for_pack
+    if get_published_for_pack(db, pack.id) is None:
         raise GateBlockedError(
-            "Publish your conversion page before starting the 7-Day Sprint. The page must be live and CTA working."
+            "Publish your website before starting the 7-Day Sprint. The site must be live and CTA working."
         )
 
 
@@ -87,18 +87,15 @@ def can_pass_pack_gate(pack: Pack) -> tuple[bool, str]:
 
 
 def can_pass_day7_gate(db: Session, pack: Pack) -> tuple[bool, str]:
-    """Day 7 gate: Require lead filter, proof, destination confirmed. Auto-generate proof if none."""
-    from app.modules.conversion_page.services import get_published
+    """Day 7 gate: Require published website and proof. Auto-generate proof if none."""
+    from app.modules.builder.services import get_published_for_pack
     from app.modules.proof_vault.models import Proof
     from app.modules.proof_vault.services import ensure_proof_exists
     
-    conversion_page = get_published(db, pack.id)
+    site = get_published_for_pack(db, pack.id)
     
-    if not conversion_page:
-        return False, "Publish your conversion destination first"
-    
-    if not conversion_page.lead_filter_type:
-        return False, "Add a lead filter to your conversion page"
+    if not site:
+        return False, "Publish your website first"
     
     proof_count = db.query(Proof).filter(Proof.pack_id == pack.id).count()
     if proof_count == 0:
@@ -154,4 +151,3 @@ def can_complete_day(db: Session, day_card, day_number: int, pack: Pack) -> tupl
         return False, "Log proof for today"
     
     return True, ""
-

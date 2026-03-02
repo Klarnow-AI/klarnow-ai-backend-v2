@@ -15,7 +15,7 @@ from app.core.gates import (
 )
 from app.modules.clients.models import LEAD_STATUS_NEW
 from app.modules.clients.services import list_leads_for_pack
-from app.modules.conversion_page.services import get_published
+from app.modules.builder.services import get_published_for_pack
 from app.modules.landing.schemas import NextActionChip
 from app.modules.packs.models import Pack
 from app.modules.packs.services import get_pack_for_user, list_packs_for_user
@@ -135,11 +135,11 @@ def get_next_action(
         if not can_d7:
             return {
                 "action_text": "Unlock Day 7",
-                "action_chips": [_chip("Conversion page", f"{pack_path}/conversion-page"), _chip("Add proof", f"{pack_path}")],
+                "action_chips": [_chip("Website", f"{pack_path}/website"), _chip("Add proof", f"{pack_path}")],
                 "stage": "blocked",
                 "can_proceed": False,
                 "blocker_message": d7_msg,
-                "why_it_matters": "You need a lead filter, at least one proof, and a published destination.",
+                "why_it_matters": "You need a published website and at least one proof.",
                 "time_estimate": None,
                 "progress_counters": None,
             }
@@ -335,7 +335,7 @@ def get_next_action(
         }
 
     # --- 5. No pack / no sprint: start ---
-    published_page = get_published(db, pack.id)
+    published_site = get_published_for_pack(db, pack.id)
     day_0_done = pack.day_0_completed_at is not None
     has_basics = bool(pack.brand_name and pack.primary_cta and pack.usp_statement)
 
@@ -350,14 +350,14 @@ def get_next_action(
             "time_estimate": "10 mins",
             "progress_counters": None,
         }
-    if not published_page:
+    if not published_site:
         return {
-            "action_text": "Publish conversion page",
-            "action_chips": [_chip("Conversion page", f"{pack_path}/conversion-page")],
+            "action_text": "Publish website",
+            "action_chips": [_chip("Website", f"{pack_path}/website")],
             "stage": "page_live",
             "can_proceed": True,
             "blocker_message": None,
-            "why_it_matters": "A live page is required before you can run the full sprint.",
+            "why_it_matters": "A live website is required before you can run the full sprint.",
             "time_estimate": "15 mins",
             "progress_counters": None,
         }

@@ -84,6 +84,7 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
       onMore,
       wrapperClassName,
       className,
+      onKeyDown: textareaOnKeyDown,
       ...textareaProps
     },
     ref,
@@ -91,8 +92,21 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
     const showStop = loading && onStop != null;
     const valueRef = useRef(value);
     valueRef.current = value;
+    const formRef = useRef<HTMLFormElement>(null);
     const [popoverOpen, setPopoverOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleKeyDown = useCallback(
+      (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          formRef.current?.requestSubmit();
+          return;
+        }
+        textareaOnKeyDown?.(e);
+      },
+      [textareaOnKeyDown],
+    );
 
     const { refs, floatingStyles, isPositioned } = useDynamicPopover({
       open: popoverOpen,
@@ -292,7 +306,11 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
     );
 
     return (
-      <form onSubmit={onSubmit} className={cn("w-full", wrapperClassName)}>
+      <form
+        ref={formRef}
+        onSubmit={onSubmit}
+        className={cn("w-full", wrapperClassName)}
+      >
         <div
           className={cn(
             "relative flex flex-col w-full rounded-3xl border-0 bg-border/40",
@@ -304,6 +322,7 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
             ref={ref}
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={disabled}
             rows={1}

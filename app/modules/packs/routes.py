@@ -25,7 +25,7 @@ from app.modules.packs.schemas import (
     SectionUnlock,
     BrandOSSummary,
     CampaignSummary,
-    ConversionPageSummary,
+    WebsiteSummary,
     PlanTrackerSummary,
     LeadsSummary,
     ProposalsSummary,
@@ -168,7 +168,7 @@ def get_pack_summary(
 
     from app.modules.brand_os.services import get_active_for_pack as get_brand_os, get_summary_fields
     from app.modules.campaign.services import get_active_for_pack as get_campaign
-    from app.modules.conversion_page.services import get_published as get_published_page
+    from app.modules.builder.services import get_published_for_pack as get_published_site
     from app.modules.sprint.services import get_active_sprint_for_pack
     from app.modules.clients.services import list_leads_for_pack, count_qualified_leads_for_pack
     from app.modules.revenue.services import list_proposals_for_pack, list_invoices_for_pack
@@ -181,7 +181,7 @@ def get_pack_summary(
         get_summary_fields(brand_os) if brand_os else (None, None, False)
     )
     campaign = get_campaign(db, pack_id)
-    published_page = get_published_page(db, pack_id)
+    published_site = get_published_site(db, pack_id)
     active_sprint = get_active_sprint_for_pack(db, pack_id)
     leads_list = list_leads_for_pack(db, pack_id)
     qualified_count = count_qualified_leads_for_pack(db, pack_id)
@@ -210,10 +210,10 @@ def get_pack_summary(
             primary_cta=campaign.primary_cta if campaign else None,
             goal_summary=goal_summary,
         ) if campaign else None,
-        conversion_page=ConversionPageSummary(
-            live_url=published_page.live_url if published_page else None,
-            published_at=published_page.published_at.isoformat() if published_page and published_page.published_at else None,
-        ) if published_page else None,
+        website=WebsiteSummary(
+            live_url=published_site.live_url if published_site else None,
+            published_at=published_site.published_at.isoformat() if published_site and published_site.published_at else None,
+        ) if published_site else None,
         plan_tracker=PlanTrackerSummary(
             horizon="14" if has_sprint else None,
             sprint_day=sprint_day,
@@ -250,7 +250,7 @@ def get_pack_gates(
 
     from app.core.errors import GateBlockedError
     from app.core.gates import (
-        can_generate_conversion_page,
+        can_generate_website,
         can_generate_assets,
         can_create_proposal,
         can_create_invoice,
@@ -278,7 +278,7 @@ def get_pack_gates(
 
     sections: dict[str, SectionUnlock] = {
         "brand_os": SectionUnlock(unlocked=True),
-        "website": _try_gate(can_generate_conversion_page, db, pack),
+        "website": _try_gate(can_generate_website, db, pack),
         "posters": _try_gate(can_generate_assets, db, pack),
         "ad_factory": _try_gate(can_generate_assets, db, pack),
         "leads": SectionUnlock(unlocked=True),
@@ -361,7 +361,7 @@ def patch_pack(
             setattr(pack, key, data[key])
 
     # Convenience: if Day 0 sets pack.primary_cta but no active Campaign exists yet,
-    # auto-create an active Campaign so downstream gates (conversion page) can proceed.
+    # auto-create an active Campaign so downstream gates (website) can proceed.
     if "primary_cta" in data:
         cta = (pack.primary_cta or "").strip()
         if cta:

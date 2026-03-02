@@ -15,7 +15,6 @@ from app.modules.agents.models import DecisionLog
 PERMISSION_MATRIX = {
     "orchestrator": None,  # None = all tools
     "strategy": ["generate_brand_os"],
-    "conversion": ["generate_conversion_page"],
     "creative": ["render_poster"],
     "video": ["render_video"],
     "revenue": ["create_proposal", "create_invoice"],

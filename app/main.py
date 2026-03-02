@@ -16,7 +16,6 @@ from app.core.auth.routes import router as auth_router
 from app.modules.packs.routes import router as packs_router
 from app.modules.brand_os.routes import router as brand_os_router
 from app.modules.campaign.routes import router as campaign_router
-from app.modules.conversion_page.routes import router as conversion_page_router
 from app.modules.sprint.routes import router as sprint_router
 from app.modules.clients.routes import router as clients_router
 from app.modules.revenue.routes import router as revenue_router
@@ -25,7 +24,6 @@ from app.modules.chat.routes import router as chat_router
 from app.modules.creative.routes import router as creative_router
 from app.modules.landing.routes import router as landing_router
 from app.modules.agents.routes import router as agents_router
-from app.modules.public_site.routes import router as public_site_router
 from app.modules.subscription.routes import router as subscription_router
 from app.modules.tasks.routes import router as tasks_router
 from app.modules.response_rules.routes import router as response_rules_router
@@ -128,7 +126,6 @@ app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(packs_router, prefix="/api/v1/packs", tags=["packs"])
 app.include_router(brand_os_router, prefix="/api/v1", tags=["brand-os"])
 app.include_router(campaign_router, prefix="/api/v1", tags=["campaign"])
-app.include_router(conversion_page_router, prefix="/api/v1", tags=["conversion-page"])
 app.include_router(sprint_router, prefix="/api/v1", tags=["sprint"])
 app.include_router(clients_router, prefix="/api/v1/clients", tags=["clients"])
 app.include_router(revenue_router, prefix="/api/v1/revenue", tags=["revenue"])
@@ -137,7 +134,6 @@ app.include_router(chat_router, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(creative_router, prefix="/api/v1/creative", tags=["creative"])
 app.include_router(landing_router, prefix="/api/v1/me", tags=["me"])
 app.include_router(agents_router, prefix="/api/v1/agents", tags=["agents"])
-app.include_router(public_site_router, prefix="/api/v1/public", tags=["public"])
 app.include_router(subscription_router, tags=["subscription"])
 app.include_router(tasks_router, tags=["tasks"])
 app.include_router(response_rules_router, tags=["response-rules"])

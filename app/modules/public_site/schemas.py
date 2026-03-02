@@ -1,4 +1,4 @@
-"""Public site schemas: lead capture and published conversion page."""
+"""Public site schemas: lead capture."""
 
 from pydantic import BaseModel
 
@@ -14,4 +14,3 @@ class PublicLeadCaptureBody(BaseModel):
 
 class PublicLeadCaptureResponse(BaseModel):
     lead_id: str
-

@@ -256,7 +256,7 @@ class CampaignSummary(BaseModel):
     goal_summary: str | None = None
 
 
-class ConversionPageSummary(BaseModel):
+class WebsiteSummary(BaseModel):
     live_url: str | None = None
     published_at: str | None = None  # ISO datetime or None if draft only
 
@@ -290,7 +290,7 @@ class PackSummaryResponse(BaseModel):
     pack: PackRead
     brand_os: BrandOSSummary | None = None
     campaign: CampaignSummary | None = None
-    conversion_page: ConversionPageSummary | None = None
+    website: WebsiteSummary | None = None
     plan_tracker: PlanTrackerSummary | None = None
     leads: LeadsSummary = Field(default_factory=LeadsSummary)
     proposals: ProposalsSummary = Field(default_factory=ProposalsSummary)

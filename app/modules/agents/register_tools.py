@@ -3,7 +3,6 @@
 from app.modules.agents.registry import ToolDef, register
 from app.modules.brand_os.tools import generate_brand_os, GENERATE_BRAND_OS_SCHEMA
 from app.modules.chat.tools import ask_day_question, ASK_DAY_QUESTION_SCHEMA
-from app.modules.conversion_page.tools import generate_conversion_page, GENERATE_CONVERSION_PAGE_SCHEMA
 from app.modules.packs.tools import (
     update_pack,
     UPDATE_PACK_SCHEMA,
@@ -74,16 +73,6 @@ def register_all_tools() -> None:
             fn=generate_brand_os,
             allowed_agents=["orchestrator", "strategy"],
             side_effects="Creates BrandOS row, sets pack.active_brand_os_id",
-        )
-    )
-    register(
-        ToolDef(
-            name="generate_conversion_page",
-            description="Generate a new conversion page version (React-driven structure). CTA must match campaign.primary_cta.",
-            parameters_schema=GENERATE_CONVERSION_PAGE_SCHEMA,
-            fn=generate_conversion_page,
-            allowed_agents=["orchestrator", "conversion"],
-            side_effects="Creates ConversionPage row",
         )
     )
     register(

@@ -27,7 +27,6 @@ from app.modules.builder import models as builder_models  # noqa: F401
 from app.modules.campaign import models as campaign_models  # noqa: F401
 from app.modules.chat import models as chat_models  # noqa: F401
 from app.modules.clients import models as clients_models  # noqa: F401
-from app.modules.conversion_page import models as conversion_page_models  # noqa: F401
 from app.modules.creative import models as creative_models  # noqa: F401
 from app.modules.packs import models as packs_models  # noqa: F401
 from app.modules.proof_vault import models as proof_vault_models  # noqa: F401

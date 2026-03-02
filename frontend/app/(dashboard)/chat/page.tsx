@@ -306,7 +306,7 @@ export default function ChatPage() {
               </div>
             ) : (
               <>
-                <div className="w-full mx-auto flex flex-col items-start text-left py-4">
+                <div className="w-full flex-1 min-h-0 overflow-y-auto mx-auto flex flex-col items-start text-left py-4">
                   <ChatMessageList
                     messages={messages}
                     streamingContent={streamingContent}
@@ -326,7 +326,7 @@ export default function ChatPage() {
                     }
                   />
                 </div>
-                <div className="mt-0 w-full">
+                <div className="shrink-0 mt-0 w-full">
                   <ChatInputBlock
                     input={input}
                     onChange={setInput}
@@ -372,10 +372,13 @@ export default function ChatPage() {
   }
 
   return (
-    <div ref={containerRef} className="w-full">
-      <div className="w-full max-w-[840px] mx-auto flex flex-col items-center">
+    <div
+      ref={containerRef}
+      className="w-full flex flex-col min-h-0 flex-1"
+    >
+      <div className="w-full max-w-[840px] mx-auto flex flex-col items-center flex-1 min-h-0">
         <NextActionBanner nextAction={nextAction} />
-        <div className="w-full flex flex-col items-start text-left">
+        <div className="w-full flex-1 min-h-0 overflow-y-auto flex flex-col items-start text-left">
           <ChatMessageList
             messages={messages}
             streamingContent={streamingContent}
@@ -393,7 +396,7 @@ export default function ChatPage() {
             }
           />
         </div>
-        <div className="mt-2 w-full">
+        <div className="shrink-0 mt-2 w-full">
           {isMobile ? (
             <div className="w-full">
               <ChatInputBlock

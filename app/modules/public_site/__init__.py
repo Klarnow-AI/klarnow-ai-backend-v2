@@ -1,2 +1,1 @@
-"""Public site endpoints (no auth): published pages + lead capture."""
-
+"""Public site schemas (no auth): lead capture."""

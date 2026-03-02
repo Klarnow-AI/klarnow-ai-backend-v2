@@ -21,7 +21,7 @@ from app.modules.ad_factory.models import AdFactoryRender, RENDER_STATUS_DRAFT, 
 from app.modules.ad_factory.schemas import BrandBrief, CTADestination, PackSnapshot, ProofAsset, Variant
 from app.modules.ad_factory.validation import validate_variants
 from app.modules.campaign.services import get_active_for_pack
-from app.modules.conversion_page.services import get_published
+from app.modules.builder.services import get_published_for_pack
 from app.modules.packs.models import Pack
 from app.modules.packs.services import get_pack_for_user
 from app.modules.sprint.services import get_active_sprint_for_pack
@@ -47,15 +47,15 @@ def _infer_cta_action(cta_text: str) -> str:
 
 def build_brand_brief_from_pack(db: Session, pack: Pack) -> BrandBrief:
     campaign = get_active_for_pack(db, pack.id)
-    conversion = get_published(db, pack.id)
+    site = get_published_for_pack(db, pack.id)
 
     cta_raw = (campaign.primary_cta or pack.primary_cta or "Visit the link").strip()
     cta_action = _infer_cta_action(cta_raw)
 
     destination_value = ""
     destination_type = "landing_page"
-    if conversion and conversion.live_url:
-        destination_value = conversion.live_url
+    if site and site.live_url:
+        destination_value = site.live_url
     else:
         destination_value = pack.website_url or "https://example.com"
 

@@ -60,7 +60,7 @@ def build_system_message(pack_context: dict | None) -> str:
         "- Never promise revenue outcomes ('you'll make $X', 'guaranteed results'). "
         "Reframe as 'conversion-optimized' or 'highest-performing setup'.\n"
         "- Keep all copy specific to the brand — no generic filler text.\n"
-        "- If asked to do something outside Brand OS / campaigns / conversion pages / creatives, "
+        "- If asked to do something outside Brand OS / campaigns / websites / creatives, "
         "redirect: 'I'm specialized in marketing execution — let me help you with [X] instead.'\n"
     )
     if pack_context:

@@ -126,6 +126,31 @@ def get_for_pack(db: Session, pack_id: UUID, user_id: UUID) -> BuilderProject | 
 
 
 @log_service_action()
+def get_for_pack_any(db: Session, pack_id: UUID) -> BuilderProject | None:
+    """Fetch the builder project for a pack without user scoping (internal use)."""
+    return (
+        db.query(BuilderProject)
+        .filter(BuilderProject.pack_id == pack_id)
+        .first()
+    )
+
+
+@log_service_action()
+def get_published_for_pack(db: Session, pack_id: UUID) -> BuilderProject | None:
+    """Fetch the published builder project for a pack (internal use)."""
+    return (
+        db.query(BuilderProject)
+        .filter(
+            BuilderProject.pack_id == pack_id,
+            BuilderProject.published_at.isnot(None),
+            BuilderProject.live_url.isnot(None),
+        )
+        .order_by(BuilderProject.published_at.desc())
+        .first()
+    )
+
+
+@log_service_action()
 def get_by_id(db: Session, project_id: UUID, user_id: UUID) -> BuilderProject | None:
     return (
         db.query(BuilderProject)

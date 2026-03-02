@@ -34,7 +34,7 @@ class BadRequestError(AppError):
 
 
 class GateBlockedError(AppError):
-    """Raised when a stage gate blocks progression (e.g. generate conversion page before Brand OS)."""
+    """Raised when a stage gate blocks progression (e.g. build website before Brand OS)."""
 
     def __init__(self, message: str):
         super().__init__(message, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)

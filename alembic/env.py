@@ -11,7 +11,6 @@ from app.modules.brand_os import models as brand_os_models  # noqa: F401
 from app.modules.campaign import models as campaign_models  # noqa: F401
 from app.modules.packs import models as packs_models  # noqa: F401
 from app.modules.agents import models as agents_models  # noqa: F401
-from app.modules.conversion_page import models as conversion_page_models  # noqa: F401
 from app.modules.creative import models as creative_models  # noqa: F401
 from app.modules.clients import models as clients_models  # noqa: F401
 from app.modules.revenue import models as revenue_models  # noqa: F401
@@ -90,5 +89,4 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-
 

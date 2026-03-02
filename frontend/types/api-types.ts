@@ -234,7 +234,7 @@ export type CampaignSummary = {
   goal_summary: string | null;
 };
 
-export type ConversionPageSummary = {
+export type WebsiteSummary = {
   live_url: string | null;
   published_at: string | null;
 };
@@ -388,7 +388,7 @@ export type PackSummaryResponse = {
   pack: Pack;
   brand_os: BrandOSSummary | null;
   campaign: CampaignSummary | null;
-  conversion_page: ConversionPageSummary | null;
+  website: WebsiteSummary | null;
   plan_tracker: PlanTrackerSummary | null;
   leads: LeadsSummary;
   proposals: ProposalsSummary;
@@ -627,53 +627,7 @@ export type LeadUpdateBody = {
   assigned_user_id?: string | null;
 };
 
-/** Website (pack-scoped). API: /api/v1/packs/:packId/conversion-page */
-export type ConversionPageRead = {
-  id: string;
-  pack_id: string;
-  version: string;
-  structure: Record<string, unknown> | null;
-  lead_filter_type: string | null;
-  lead_filter_value: string | null;
-  published_at: string | null;
-  live_url: string | null;
-  seo_metadata: Record<string, unknown> | null;
-  created_at: string;
-};
-
-export type ConversionPageListResponse = {
-  items: ConversionPageRead[];
-  total: number;
-};
-
-export type ConversionPagePreview = {
-  structure: Record<string, unknown> | null;
-  seo_metadata: Record<string, unknown> | null;
-  version: string;
-  primary_cta: string | null;
-};
-
-export const LEAD_FILTER_TYPES = [
-  "starting_price",
-  "who_its_for",
-  "minimum_order",
-  "area_served",
-  "exclusion_statement",
-] as const;
-
-export type ConversionPageUpdateBody = {
-  structure?: Record<string, unknown> | null;
-  lead_filter_type?: string | null;
-  lead_filter_value?: string | null;
-  seo_metadata?: Record<string, unknown> | null;
-};
-
-export type ConversionPagePublishBody = {
-  live_url?: string | null;
-  waiver_confirmed?: boolean;
-};
-
-/** Public site. API: /api/v1/public */
+/** Public lead capture payload (used by builder sites). */
 export type PublicLeadCaptureBody = {
   name: string;
   email?: string | null;

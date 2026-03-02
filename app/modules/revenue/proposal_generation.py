@@ -37,7 +37,7 @@ class ProposalGenerateResult(TypedDict):
 
 
 def _build_pack_context(pack: Pack, brand_os: Any) -> dict[str, Any]:
-    """Build pack context dict for proposal generation (mirrors conversion_page PackContext)."""
+    """Build pack context dict for proposal generation."""
     ctx: dict[str, Any] = {
         "pack_name": pack.name,
         "brand_name": pack.brand_name or "Our Brand",

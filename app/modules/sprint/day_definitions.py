@@ -193,21 +193,21 @@ DAY_DEFINITIONS: list[DayDefinition] = [
         "build_mode": {
             "tasks": [
                 "Create page draft",
-                "Add lead filter",
                 "Add proof",
-                "Review copy"
+                "Review copy",
+                "Confirm CTA"
             ],
-            "playbook": "Build the page where people will convert. This could be a landing page, booking page, or product page. Make sure it has a lead filter (price, location, who it's for) to qualify traffic. Add proof if you have it.",
+            "playbook": "Build the page where people will convert. This could be a landing page, booking page, or product page. Make sure the CTA and contact flow are clear. Add proof if you have it.",
             "scripts": []
         },
         "improve_mode": {
             "tasks": [
                 "Review existing destination",
-                "Add missing lead filter",
                 "Optimize copy",
-                "Add proof"
+                "Add proof",
+                "Reduce friction"
             ],
-            "playbook": "You already have a conversion destination—make it better. Add a lead filter if missing, update copy to match your refined USP, and add proof. Remove friction points.",
+            "playbook": "You already have a conversion destination—make it better. Update copy to match your refined USP, add proof, and remove friction points.",
             "scripts": []
         }
     },
@@ -222,7 +222,7 @@ DAY_DEFINITIONS: list[DayDefinition] = [
                 "Test conversion flow",
                 "Share link with 10 people"
             ],
-            "playbook": "Make it live. Publish your conversion page, test the full flow (from click to submission), then share the link with 10 real people. Get it in front of humans today.",
+            "playbook": "Make it live. Publish your website, test the full flow (from click to submission), then share the link with 10 real people. Get it in front of humans today.",
             "scripts": [
                 {
                     "title": "Share Script",

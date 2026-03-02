@@ -16,7 +16,7 @@ CHAT_CONTEXT_LAST_N_MESSAGES = 20
 def assemble_context(
     pack_id: UUID, db: Session, day_context: int | None = None
 ) -> dict:
-    """Load pack, onboarding, active Brand OS, Campaign, conversion page status, plan horizon.
+    """Load pack, onboarding, active Brand OS, Campaign, website status, plan horizon.
     When day_context is 0-3, include day playbook, tasks, win_condition for the Day 0-3 flow."""
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
@@ -24,16 +24,16 @@ def assemble_context(
     brand_os = get_active_for_pack(db, pack_id)
     campaign = get_campaign_for_pack(db, pack_id)
 
-    conversion_page_status = None
-    from app.modules.conversion_page.services import get_draft, get_published
-    draft = get_draft(db, pack_id)
-    published = get_published(db, pack_id)
-    if published:
-        conversion_page_status = "published"
-    elif draft:
-        conversion_page_status = "draft"
+    website_status = None
+    from app.modules.builder.services import get_for_pack_any, get_published_for_pack
+    draft_site = get_for_pack_any(db, pack_id)
+    published_site = get_published_for_pack(db, pack_id)
+    if published_site:
+        website_status = "published"
+    elif draft_site:
+        website_status = "draft"
     else:
-        conversion_page_status = "none"
+        website_status = "none"
 
     plan_horizon = None
     mode = "build"
@@ -54,7 +54,7 @@ def assemble_context(
         "campaign_goal": campaign.goal if campaign else None,
         "campaign_primary_cta": campaign.primary_cta if campaign else None,
         "campaign_angles": campaign.angles if campaign else None,
-        "conversion_page_status": conversion_page_status,
+        "website_status": website_status,
         "plan_horizon": plan_horizon,
     }
 

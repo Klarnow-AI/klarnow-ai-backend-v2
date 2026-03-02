@@ -273,7 +273,7 @@ def delete_account(
     """
     Permanently delete the authenticated user's account and all related data.
     This removes: login codes, packs (and their brand_os, campaigns,
-    proposals, invoices, proofs, conversion pages, plan trackers, etc.), clients,
+    proposals, invoices, proofs, websites, plan trackers, etc.), clients,
     chat conversations and messages. The operation cannot be undone.
     """
     # Remove any email login codes and password reset tokens for this user (tables are keyed by email)

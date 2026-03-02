@@ -1,7 +1,7 @@
 openai
 requests
 pydantic-settings
-fastapi
+fastapi[standard]
 uvicorn[standard]
 python-dotenv
 python-multipart
