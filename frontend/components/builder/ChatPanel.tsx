@@ -351,7 +351,7 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
   // ── Cmd/Ctrl+Z for undo ────────────────────────────────────────────────────
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: WindowEventMap["keydown"]) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
         const target = e.target as Node;
         if (textareaRef.current?.contains(target)) return;
@@ -779,7 +779,10 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
                       <span className="text-border text-xs">·</span>
                       <button
                         className="text-[11px] text-muted-foreground hover:text-foreground px-2 py-1 rounded transition-colors hover:bg-accent whitespace-nowrap disabled:opacity-40"
-                        onClick={() => handleRevertToMessage(msg.files_snapshot)}
+                        onClick={() => {
+                          if (msg.files_snapshot)
+                            handleRevertToMessage(msg.files_snapshot);
+                        }}
                         disabled={isStreaming}
                         title="Restore to this version"
                       >
