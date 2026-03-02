@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { buildChatUrlWithDay } from "@/app/(dashboard)/chat/helpers";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +18,10 @@ import type { SprintRead } from "@/types/api-types";
 import { SprintTimelineView } from "@/components/sprint-dashboard/sprint-timeline-view";
 import { SprintPhaseView } from "@/components/sprint-dashboard/sprint-phase-view";
 import { SprintAnalyticsView } from "@/components/sprint-dashboard/sprint-analytics-view";
+import { Day0Modal } from "@/components/day-0-modal";
+import { Day1Modal } from "@/components/day-1-modal";
+import { Day2Modal } from "@/components/day-2-modal";
+import { Day3Modal } from "@/components/day-3-modal";
 import { DayDetailModal } from "@/components/day-detail-modal";
 import { cn } from "@/lib/utils";
 
@@ -68,13 +71,13 @@ export default function PlanTrackerPage() {
     if (dayFromUrl === null) return;
     const n = parseInt(dayFromUrl, 10);
     if (Number.isInteger(n) && n >= 0 && n <= 3) {
-      router.replace(buildChatUrlWithDay(packId, n));
+      setDayModalOpen(n);
       return;
     }
     if (Number.isInteger(n) && n >= 4 && n <= 14) {
       setDayModalOpen(n);
     }
-  }, [dayFromUrl, packId, router]);
+  }, [dayFromUrl]);
 
   const handleStartSprint = async () => {
     setError("");
@@ -119,10 +122,6 @@ export default function PlanTrackerPage() {
   };
 
   const handleDayClick = (dayNumber: number) => {
-    if (dayNumber >= 0 && dayNumber <= 3) {
-      router.push(buildChatUrlWithDay(packId, dayNumber));
-      return;
-    }
     openDayModal(dayNumber);
   };
 
@@ -227,14 +226,50 @@ export default function PlanTrackerPage() {
         </motion.div>
       )}
 
-      {dayModalOpen !== null && dayModalOpen >= 4 && dayModalOpen <= 14 && (
-        <DayDetailModal
-          packId={packId}
-          dayNumber={dayModalOpen}
-          open={true}
-          onClose={closeDayModal}
-          onComplete={handleDayComplete}
-        />
+      {dayModalOpen !== null && (
+        <>
+          {dayModalOpen === 0 && (
+            <Day0Modal
+              open={true}
+              onClose={closeDayModal}
+              packId={packId}
+              onComplete={handleDayComplete}
+            />
+          )}
+          {dayModalOpen === 1 && (
+            <Day1Modal
+              open={true}
+              onClose={closeDayModal}
+              packId={packId}
+              onComplete={handleDayComplete}
+            />
+          )}
+          {dayModalOpen === 2 && (
+            <Day2Modal
+              open={true}
+              onClose={closeDayModal}
+              packId={packId}
+              onComplete={handleDayComplete}
+            />
+          )}
+          {dayModalOpen === 3 && (
+            <Day3Modal
+              open={true}
+              onClose={closeDayModal}
+              packId={packId}
+              onComplete={handleDayComplete}
+            />
+          )}
+          {dayModalOpen >= 4 && dayModalOpen <= 14 && (
+            <DayDetailModal
+              packId={packId}
+              dayNumber={dayModalOpen}
+              open={true}
+              onClose={closeDayModal}
+              onComplete={handleDayComplete}
+            />
+          )}
+        </>
       )}
     </div>
   );

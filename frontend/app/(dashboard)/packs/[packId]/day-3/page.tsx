@@ -2,7 +2,6 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { buildChatUrlWithDay } from "@/app/(dashboard)/chat/helpers";
 
 export default function Day3Redirect() {
   const params = useParams();
@@ -10,7 +9,7 @@ export default function Day3Redirect() {
   const packId = params.packId as string;
 
   useEffect(() => {
-    router.replace(buildChatUrlWithDay(packId, 3));
+    router.replace(`/packs/${packId}/plan-tracker?day=3`);
   }, [packId, router]);
 
   return (
