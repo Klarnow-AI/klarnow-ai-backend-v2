@@ -256,7 +256,7 @@ function SummarySection({
   return (
     <motion.section
       variants={item}
-      className={`rounded-2xl border border-border bg-card overflow-hidden min-h-0 flex flex-col ${className ?? ""}`}
+      className={`rounded-2xl border border-border bg-card overflow-hidden flex flex-col lg:min-h-0 ${className ?? ""}`}
     >
       <div className="flex shrink-0 items-center justify-between gap-2 px-5 py-3 border-b border-border bg-muted/30">
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -278,7 +278,7 @@ function SummarySection({
           </Link>
         </div>
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
+      <div className="overflow-visible px-5 py-4 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
         {isEmpty ? (
           <div className="flex flex-col items-center justify-center text-center py-6 px-2 min-h-[120px]">
             <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
@@ -366,10 +366,10 @@ export default function PackOverviewPage() {
   const hasNextStep = !!nextAction?.actionText || chips.length > 0;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden p-8">
-      <div className="flex flex-1 min-h-0 gap-6 overflow-hidden">
-        <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden max-w-6xl">
-          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col space-y-8">
+    <div className="flex flex-col p-8 lg:h-full lg:overflow-hidden">
+      <div className="flex flex-col gap-6 lg:flex-1 lg:min-h-0 lg:flex-row lg:overflow-hidden">
+        <div className="flex flex-col min-w-0 max-w-6xl lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+          <div className="flex flex-col space-y-8 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
             {pack.core_concept && (
               <motion.section
                 initial={{ opacity: 0, y: 8 }}
@@ -454,7 +454,7 @@ export default function PackOverviewPage() {
               variants={container}
               initial="hidden"
               animate="visible"
-              className="flex flex-1 min-h-0 flex flex-col space-y-3"
+              className="flex flex-col space-y-3 lg:flex-1 lg:min-h-0"
             >
               <div className="shrink-0 flex items-center justify-between gap-3">
                 <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -467,7 +467,7 @@ export default function PackOverviewPage() {
                   onDelete={handleDelete}
                 />
               </div>
-              <div className="grid flex-1 min-h-0 grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:flex-1 lg:min-h-0">
                 {PACK_SUMMARY_CARDS.map((moduleKey, index) => {
                   const mod = PACK_OVERVIEW_MODULES[moduleKey];
                   if (!mod) return null;
