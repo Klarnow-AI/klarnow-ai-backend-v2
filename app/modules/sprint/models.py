@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -70,11 +70,6 @@ class DayCard(Base):
     ai_output: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # structured output per day spec
     user_action: Mapped[str | None] = mapped_column(Text, nullable=True)
     definition_of_done: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Daily completion tracking (Days 4-13)
-    outreach_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    followup_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    proof_logged: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    output_shipped: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(

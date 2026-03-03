@@ -15,7 +15,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { sprintApi } from "@/api_requests/sprint";
 import type { SprintDayDetail } from "@/types/api-types";
-import { getDayGuide } from "@/app/(dashboard)/packs/[packId]/plan-tracker/day/[dayNumber]/_data/dayGuides";
+import {
+  getDayGuide,
+  type DayGuideTaskItem,
+} from "@/app/(dashboard)/packs/[packId]/plan-tracker/day/[dayNumber]/_data/dayGuides";
+import { resolveTaskAction } from "@/lib/plan-tracker-task-actions";
 import { ResponseRulesEditor } from "@/components/response-rules-editor";
 
 const DAY_LABELS: Record<number, string> = {
@@ -41,11 +45,11 @@ const DEFAULT_DEFINITION_OF_DONE: Record<number, string> = {
   1: "Offer updated or locked (build: create offer + price range; improve: audit + tighten).",
   2: "USP visible in messaging (build: create USP + audience; improve: extract from reviews/site).",
   3: "Pitch script created and objections handled.",
-  4: "Scripts and shot list generated; content shipped; outreach logged.",
+  4: "Scripts and shot list generated; first content shipped.",
   5: "Poster variants generated and posted; broadcast sent.",
   6: "Conversion destination ready (build: page draft; improve: optimised).",
   7: "Link shared with 10 people; destination confirmed and proof added.",
-  8: "Response rules locked and outreach habit started.",
+  8: "Response rules locked and ready to use.",
   9: "Follow-up queue cleared.",
   10: "One improvement applied live.",
   11: "Proposal (service/coach) or bundle offer (product) ready.",
@@ -76,7 +80,6 @@ export function DayDetailModal({
   const [completing, setCompleting] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
   const [error, setError] = useState("");
-  const [checkedTasks, setCheckedTasks] = useState<Set<number>>(new Set());
 
   const isValidDay =
     Number.isInteger(dayNumber) && dayNumber >= 4 && dayNumber <= 14;
@@ -99,20 +102,24 @@ export function DayDetailModal({
       .finally(() => setLoading(false));
   }, [isOpen, packId, dayNumber, isValidDay]);
 
-  useEffect(() => {
-    setCheckedTasks(new Set());
-  }, [dayNumber]);
-
   const guide = getDayGuide(dayNumber);
 
-  const toggleTask = (index: number) => {
-    setCheckedTasks((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
+  const handleInlineTaskAction = (targetId: string) => {
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    const focusable = target.querySelector<HTMLElement>(
+      "button, input, textarea, [tabindex]:not([tabindex='-1'])",
+    );
+    (focusable ?? target).focus({ preventScroll: true });
   };
+
+  const normalizeTask = (
+    task: string | DayGuideTaskItem,
+  ): { label: string; action: DayGuideTaskItem["action"] } =>
+    typeof task === "string"
+      ? { label: task, action: undefined }
+      : { label: task.label, action: task.action };
 
   const handleComplete = async () => {
     if (!sprint) return;
@@ -244,47 +251,49 @@ export function DayDetailModal({
                             <h3 className="font-semibold text-foreground">
                               Tasks
                             </h3>
-                            {checkedTasks.size === guide.tasks.length &&
-                              guide.tasks.length > 0 && (
-                                <span className="ml-auto text-xs text-green-600 dark:text-green-400 font-medium">
-                                  All complete!
-                                </span>
-                              )}
                           </div>
-                          <ul className="space-y-2">
+                          <ul className="space-y-3">
                             {guide.tasks.map((task, index) => {
-                              const isChecked = checkedTasks.has(index);
+                              const normalized = normalizeTask(task);
+                              const resolvedAction = normalized.action
+                                ? resolveTaskAction(packId, normalized.action)
+                                : null;
+
                               return (
                                 <li
                                   key={index}
-                                  className="flex items-start gap-3 group"
+                                  className="flex items-start justify-between gap-3 rounded-lg border border-border/60 p-3"
                                 >
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleTask(index)}
-                                    className="mt-0.5 flex-shrink-0"
-                                  >
-                                    <div
-                                      className={`h-5 w-5 rounded border-2 flex items-center justify-center transition-all ${
-                                        isChecked
-                                          ? "bg-primary border-primary"
-                                          : "border-muted-foreground/30 group-hover:border-primary/50"
-                                      }`}
-                                    >
-                                      {isChecked && (
-                                        <Check className="h-3 w-3 text-primary-foreground" />
-                                      )}
-                                    </div>
-                                  </button>
-                                  <span
-                                    className={`text-sm leading-relaxed ${
-                                      isChecked
-                                        ? "text-muted-foreground line-through"
-                                        : "text-foreground"
-                                    }`}
-                                  >
-                                    {task}
+                                  <span className="text-sm leading-relaxed text-foreground">
+                                    {normalized.label}
                                   </span>
+                                  {resolvedAction?.type === "route" &&
+                                    normalized.action && (
+                                      <Link
+                                        href={resolvedAction.href}
+                                        className="shrink-0"
+                                      >
+                                        <Button variant="outline" size="sm">
+                                          {normalized.action.ctaLabel}
+                                        </Button>
+                                      </Link>
+                                    )}
+                                  {resolvedAction?.type === "inline" &&
+                                    normalized.action && (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="shrink-0"
+                                        onClick={() =>
+                                          handleInlineTaskAction(
+                                            resolvedAction.targetId,
+                                          )
+                                        }
+                                      >
+                                        {normalized.action.ctaLabel}
+                                      </Button>
+                                    )}
                                 </li>
                               );
                             })}
@@ -326,44 +335,8 @@ export function DayDetailModal({
                     )}
                   </div>
                 )}
-                {dayNumber === 4 && (
-                  <div className="mb-4">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Generate scripts and shot list:
-                    </p>
-                    <Link href={`/packs/${packId}/ad-factory`}>
-                      <Button variant="outline" size="sm">
-                        Open Ad Factory
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-                {dayNumber === 5 && (
-                  <div className="mb-4">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Generate poster variants:
-                    </p>
-                    <Link href={`/packs/${packId}/posters`}>
-                      <Button variant="outline" size="sm">
-                        Open Posters
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-                {dayNumber === 6 && (
-                  <div className="mb-4">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Create or optimise your website:
-                    </p>
-                    <Link href={`/packs/${packId}/website`}>
-                      <Button variant="outline" size="sm">
-                        Open Website
-                      </Button>
-                    </Link>
-                  </div>
-                )}
                 {dayNumber === 8 && (
-                  <div className="mb-4">
+                  <div id="response-rules-editor" tabIndex={-1} className="mb-4">
                     <ResponseRulesEditor packId={packId} onLock={refetchDay} />
                   </div>
                 )}

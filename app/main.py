@@ -37,10 +37,16 @@ from app.modules.ad_factory.routes import router as ad_factory_router
 async def lifespan(app: FastAPI):
     from app.modules.agents.register_tools import register_all_tools
     from app.modules.packs.onboarding_jobs import recover_pending_onboarding_jobs
+    from app.shared.services.reference_kb import get_reference_kb
     log = logging.getLogger("uvicorn.error")
     log.info("CORS allowed origins: %s", settings.cors_allow_origins)
     register_all_tools()
     recover_pending_onboarding_jobs()
+    try:
+        get_reference_kb().warmup()
+    except Exception as e:
+        # Non-fatal: app should start even if reference KB indexing fails.
+        log.warning("Reference KB warmup failed: %s", e)
     yield
 
 

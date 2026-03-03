@@ -17,7 +17,6 @@ import { sprintApi } from "@/api_requests/sprint";
 import type { SprintRead } from "@/types/api-types";
 import { SprintTimelineView } from "@/components/sprint-dashboard/sprint-timeline-view";
 import { SprintPhaseView } from "@/components/sprint-dashboard/sprint-phase-view";
-import { SprintAnalyticsView } from "@/components/sprint-dashboard/sprint-analytics-view";
 import { Day0Modal } from "@/components/day-0-modal";
 import { Day1Modal } from "@/components/day-1-modal";
 import { Day2Modal } from "@/components/day-2-modal";
@@ -34,7 +33,7 @@ export default function PlanTrackerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dayModalOpen, setDayModalOpen] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<"timeline" | "phase" | "analytics">("timeline");
+  const [activeTab, setActiveTab] = useState<"timeline" | "phase">("timeline");
   const cancelRef = useRef<(() => void) | undefined>(undefined);
 
   const loadSprint = useCallback(() => {
@@ -197,7 +196,7 @@ export default function PlanTrackerPage() {
           </div>
 
           <div className="flex gap-2 border-b border-border pb-2">
-            {(["timeline", "phase", "analytics"] as const).map((tab) => (
+            {(["timeline", "phase"] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -211,7 +210,6 @@ export default function PlanTrackerPage() {
               >
                 {tab === "timeline" && "Timeline"}
                 {tab === "phase" && "By Phase"}
-                {tab === "analytics" && "Analytics"}
               </button>
             ))}
           </div>
@@ -222,7 +220,6 @@ export default function PlanTrackerPage() {
           {activeTab === "phase" && (
             <SprintPhaseView sprint={sprint} onDayClick={handleDayClick} />
           )}
-          {activeTab === "analytics" && <SprintAnalyticsView sprint={sprint} />}
         </motion.div>
       )}
 

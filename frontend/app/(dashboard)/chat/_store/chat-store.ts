@@ -2,11 +2,13 @@
 
 import { create } from "zustand";
 import type { Conversation, Message } from "@/types/api-types";
+import type { StreamStatus } from "@/hooks/use-chat-stream";
 
 export type ChatState = {
   conversationId: string | null;
   messages: Message[];
   streamingContent: string;
+  streamStatus: StreamStatus;
   previewMessageId: string | null;
   applyTargetId: string | null;
   historyList: Conversation[];
@@ -20,6 +22,7 @@ export type ChatActions = {
   setConversationId: (id: string | null) => void;
   setMessages: (messages: Message[] | ((prev: Message[]) => Message[])) => void;
   setStreamingContent: (s: string) => void;
+  setStreamStatus: (s: StreamStatus) => void;
   setPreviewMessageId: (id: string | null) => void;
   setApplyTargetId: (id: string | null) => void;
   setHistoryList: (list: Conversation[] | ((prev: Conversation[]) => Conversation[])) => void;
@@ -35,6 +38,7 @@ const initialState: ChatState = {
   conversationId: null,
   messages: [],
   streamingContent: "",
+  streamStatus: "idle",
   previewMessageId: null,
   applyTargetId: null,
   historyList: [],
@@ -52,6 +56,7 @@ export const useChatStore = create<ChatState & ChatActions>((set) => ({
       messages: typeof arg === "function" ? arg(s.messages) : arg,
     })),
   setStreamingContent: (s) => set({ streamingContent: s }),
+  setStreamStatus: (s) => set({ streamStatus: s }),
   setPreviewMessageId: (id) => set({ previewMessageId: id }),
   setApplyTargetId: (id) => set({ applyTargetId: id }),
   setHistoryList: (arg) =>
@@ -67,6 +72,7 @@ export const useChatStore = create<ChatState & ChatActions>((set) => ({
       conversationId: null,
       messages: [],
       streamingContent: "",
+      streamStatus: "idle",
       previewMessageId: null,
       applyTargetId: null,
       loading: false,

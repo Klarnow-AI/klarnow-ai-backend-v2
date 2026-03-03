@@ -142,6 +142,7 @@ def generate_proposal_route(
         content=result["content"],
         suggested_amount=result.get("suggested_amount"),
         suggested_due_date=result.get("suggested_due_date"),
+        references=result.get("references"),
     )
 
 

@@ -1,6 +1,6 @@
 """Next Action engine: one next action. Priority: blockers, revenue leaks, sprint day, optimisation, check-in."""
 
-from datetime import timedelta, timezone
+from datetime import timezone
 from datetime import datetime as dt
 from uuid import UUID
 
@@ -11,21 +11,17 @@ from app.core.gates import (
     can_pass_day8_gate,
     can_pass_pack_gate,
     can_pass_paywall_gate,
-    can_complete_day,
 )
 from app.modules.clients.models import LEAD_STATUS_NEW
 from app.modules.clients.services import list_leads_for_pack
 from app.modules.builder.services import get_published_for_pack
 from app.modules.landing.schemas import NextActionChip
-from app.modules.packs.models import Pack
 from app.modules.packs.services import get_pack_for_user, list_packs_for_user
 from app.modules.revenue.services import list_proposals_for_pack, list_invoices_for_pack
 from app.modules.sprint.services import (
     get_active_sprint_for_pack,
     get_day_card,
-    get_sprint_day_detail,
 )
-from app.modules.sprint.outreach_targets import get_daily_outreach_target, get_daily_followup_target
 from app.modules.tasks.services import get_overdue_tasks
 from app.modules.subscription.services import check_credits
 from app.modules.packs.models import User
@@ -180,88 +176,6 @@ def get_next_action(
         card = get_day_card(db, sprint.id, day_num)
         sprint_path = f"{pack_path}/plan-tracker"
         day_path = f"{sprint_path}/day/{day_num}"
-
-        if card and day_num >= 4 and day_num <= 13:
-            can_daily, daily_msg = can_complete_day(db, card, day_num, pack)
-            outreach_target = get_daily_outreach_target(pack.business_type or "product")
-            followup_target = get_daily_followup_target(pack.business_type or "product")
-            progress_counters = {
-                "outreach": f"{card.outreach_count}/{outreach_target}",
-                "followups": f"{card.followup_count}/{followup_target}",
-                "output": "done" if card.output_shipped else "pending",
-                "proof": "done" if card.proof_logged else "pending",
-            }
-            if not card.output_shipped:
-                return {
-                    "action_text": "Ship today's output",
-                    "action_chips": [_chip(f"Day {day_num}", day_path), _chip("Sprint", sprint_path)],
-                    "stage": "sprint_day",
-                    "can_proceed": True,
-                    "blocker_message": None,
-                    "why_it_matters": "Completing the day's deliverable is the first step to finishing the day.",
-                    "time_estimate": "20 mins",
-                    "progress_counters": progress_counters,
-                }
-            if card.outreach_count < outreach_target:
-                return {
-                    "action_text": f"Complete outreach ({card.outreach_count}/{outreach_target})",
-                    "action_chips": [_chip("Log outreach", day_path), _chip("Sprint", sprint_path)],
-                    "stage": "sprint_day",
-                    "can_proceed": True,
-                    "blocker_message": None,
-                    "why_it_matters": "Daily outreach keeps your pipeline full and enables day completion.",
-                    "time_estimate": "20 mins",
-                    "progress_counters": progress_counters,
-                }
-            if card.followup_count < followup_target:
-                return {
-                    "action_text": f"Complete follow-ups ({card.followup_count}/{followup_target})",
-                    "action_chips": [_chip("Follow-up queue", f"{pack_path}/plan-tracker/day/9"), _chip("Day", day_path)],
-                    "stage": "sprint_day",
-                    "can_proceed": True,
-                    "blocker_message": None,
-                    "why_it_matters": "Follow-ups move leads forward and are required to complete the day.",
-                    "time_estimate": "15 mins",
-                    "progress_counters": progress_counters,
-                }
-            if not card.proof_logged:
-                return {
-                    "action_text": "Log proof for today",
-                    "action_chips": [_chip("Log proof", day_path), _chip("Sprint", sprint_path)],
-                    "stage": "sprint_day",
-                    "can_proceed": True,
-                    "blocker_message": None,
-                    "why_it_matters": "Logging proof completes the daily gate so you can finish the day.",
-                    "time_estimate": "2 mins",
-                    "progress_counters": progress_counters,
-                }
-            if not can_daily and daily_msg:
-                return {
-                    "action_text": "Complete Day " + str(day_num),
-                    "action_chips": [_chip("Day " + str(day_num), day_path)],
-                    "stage": "sprint_day",
-                    "can_proceed": False,
-                    "blocker_message": daily_msg,
-                    "why_it_matters": None,
-                    "time_estimate": None,
-                    "progress_counters": progress_counters,
-                }
-
-            # Day complete: optimisation actions (never replace revenue)
-            if can_daily:
-                chips = [_chip("Mark day complete", day_path), _chip("Improve hook", plan_tracker_day(1)), _chip("Add proof", f"{pack_path}")]
-                if credits == 0:
-                    chips.append(_chip("Buy credits", "/settings"))
-                return {
-                    "action_text": "Day complete — improve your offer",
-                    "action_chips": chips,
-                    "stage": "sprint_day",
-                    "can_proceed": True,
-                    "blocker_message": None,
-                    "why_it_matters": "Polish your hook or add proof before the next day.",
-                    "time_estimate": "5 mins",
-                    "progress_counters": progress_counters,
-                }
 
         # Day 14: check-in state
         if day_num == 14 and card and not card.completed_at:

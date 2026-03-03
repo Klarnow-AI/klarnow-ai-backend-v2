@@ -9,7 +9,9 @@ from sqlalchemy.orm import Session
 
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
+from app.core.errors import NotFoundError
 from app.modules.packs.models import User
+from app.modules.packs.services import get_pack_for_user
 from app.modules.tasks import services
 from app.modules.tasks.models import FollowUpTask
 
@@ -54,6 +56,19 @@ def _task_to_read(task: FollowUpTask, lead_name: str | None = None, last_interac
     )
 
 
+def _ensure_pack_access(db: Session, pack_id: UUID, user_id: UUID) -> None:
+    if not get_pack_for_user(db, pack_id, user_id):
+        raise NotFoundError("Pack not found")
+
+
+def _get_task_for_user_or_404(db: Session, task_id: UUID, user_id: UUID) -> FollowUpTask:
+    task = db.query(FollowUpTask).filter(FollowUpTask.id == task_id).first()
+    if not task:
+        raise NotFoundError("Task not found")
+    _ensure_pack_access(db, task.pack_id, user_id)
+    return task
+
+
 @router.get("", response_model=list[FollowUpTaskRead])
 def get_tasks(
     pack_id: UUID = Query(...),
@@ -63,6 +78,8 @@ def get_tasks(
 ):
     """Get follow-up tasks for a pack. Sorted: overdue, due today, upcoming."""
     from app.modules.clients.models import Lead
+
+    _ensure_pack_access(db, pack_id, current_user.id)
 
     if status == "overdue":
         tasks = services.get_overdue_tasks(db, pack_id)
@@ -92,6 +109,7 @@ def complete_task(
     db: Session = Depends(get_db),
 ):
     """Mark task as completed."""
+    _get_task_for_user_or_404(db, task_id, current_user.id)
     task = services.complete_task(db, task_id)
     lead_name = None
     last_interaction_summary = None
@@ -111,6 +129,7 @@ def skip_task(
     db: Session = Depends(get_db),
 ):
     """Mark task as skipped."""
+    _get_task_for_user_or_404(db, task_id, current_user.id)
     task = services.skip_task(db, task_id)
     lead_name = None
     last_interaction_summary = None

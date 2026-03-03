@@ -12,7 +12,6 @@ from app.modules.packs.services import get_pack_for_user
 from app.modules.sprint.schemas import (
     SprintRead,
     SprintCreate,
-    SprintUpdate,
     DayCardRead,
     DayCardUpdate,
     SprintDayDetail,
@@ -22,7 +21,6 @@ from app.modules.sprint.schemas import (
     SuggestFieldResponse,
 )
 from app.modules.sprint.services import (
-    get_active_sprint_for_pack,
     get_sprint_for_pack,
     get_sprint_by_id,
     create_sprint_for_pack,
@@ -200,57 +198,3 @@ def day_14_checkin(
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail=str(e))
     return SprintRead.model_validate(new_sprint)
-
-
-@router.post("/sprint/{sprint_id}/day/{day_number}/log-outreach", response_model=DayCardRead)
-def log_outreach_endpoint(
-    sprint_id: UUID,
-    day_number: int,
-    count: int = 1,
-    db=Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Log outreach activities for a sprint day."""
-    from app.modules.sprint.services import log_outreach
-    card = log_outreach(db, sprint_id, day_number, count)
-    return DayCardRead.model_validate(card)
-
-
-@router.post("/sprint/{sprint_id}/day/{day_number}/log-followup", response_model=DayCardRead)
-def log_followup_endpoint(
-    sprint_id: UUID,
-    day_number: int,
-    count: int = 1,
-    db=Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Log follow-up activities for a sprint day."""
-    from app.modules.sprint.services import log_followup
-    card = log_followup(db, sprint_id, day_number, count)
-    return DayCardRead.model_validate(card)
-
-
-@router.post("/sprint/{sprint_id}/day/{day_number}/log-proof", response_model=DayCardRead)
-def log_proof_endpoint(
-    sprint_id: UUID,
-    day_number: int,
-    db=Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Mark proof as logged for a sprint day."""
-    from app.modules.sprint.services import mark_proof_logged
-    card = mark_proof_logged(db, sprint_id, day_number)
-    return DayCardRead.model_validate(card)
-
-
-@router.post("/sprint/{sprint_id}/day/{day_number}/mark-output-shipped", response_model=DayCardRead)
-def mark_output_shipped_endpoint(
-    sprint_id: UUID,
-    day_number: int,
-    db=Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Mark output as shipped for a sprint day."""
-    from app.modules.sprint.services import mark_output_shipped
-    card = mark_output_shipped(db, sprint_id, day_number)
-    return DayCardRead.model_validate(card)

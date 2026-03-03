@@ -103,6 +103,10 @@ def run_tool_chain(
                 break
             except Exception as e:
                 retries += 1
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
                 if retries > retry_cap:
                     results.append({"tool": tool_name, "success": False, "error": str(e)})
                     raise

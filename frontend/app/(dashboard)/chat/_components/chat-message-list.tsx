@@ -3,11 +3,13 @@
 import { useRef, useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import type { Message } from "@/types/api-types";
+import type { StreamStatus } from "@/hooks/use-chat-stream";
 import { ChatMessageItem } from "./chat-message-item";
 
 export type ChatMessageListProps = {
   messages: Message[];
   streamingContent: string;
+  streamStatus: StreamStatus;
   loading: boolean;
   onApply: (messageId: string) => void;
 };
@@ -15,6 +17,7 @@ export type ChatMessageListProps = {
 export function ChatMessageList({
   messages,
   streamingContent,
+  streamStatus,
   loading,
   onApply,
 }: ChatMessageListProps) {
@@ -27,13 +30,14 @@ export function ChatMessageList({
   }, [messages, streamingContent, loading]);
 
   return (
-    <div className="w-full space-y-6 pb-4">
+    <div className="w-full space-y-4 pb-2">
       <AnimatePresence>
         {messages.map((m) => (
           <ChatMessageItem
             key={m.id}
             message={m}
             streamingContent={streamingContent}
+            streamStatus={streamStatus}
             loading={loading}
             onApply={onApply}
           />

@@ -57,10 +57,6 @@ export type DayCardRead = {
   ai_output: Record<string, unknown> | null;
   user_action: string | null;
   definition_of_done: string | null;
-  outreach_count: number;
-  followup_count: number;
-  proof_logged: boolean;
-  output_shipped: boolean;
   completed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -88,12 +84,6 @@ export type SprintDayDetail = {
   completed_at: string | null;
   unlocked: boolean;
   blocker_message?: string | null;
-  outreach_count?: number;
-  followup_count?: number;
-  proof_logged?: boolean;
-  output_shipped?: boolean;
-  outreach_target?: number;
-  followup_target?: number;
 };
 
 export type Pack = {
@@ -325,10 +315,17 @@ export type ProposalGeneratedContent = {
   notes?: string;
 };
 
+export type ReferenceSnippet = {
+  chunk_id: string;
+  score: number;
+  excerpt: string;
+};
+
 export type ProposalGenerateResponse = {
   content: ProposalGeneratedContent;
   suggested_amount: string | null;
   suggested_due_date: string | null;
+  references?: ReferenceSnippet[] | null;
 };
 
 /** Invoice (revenue). API: /api/v1/revenue */
@@ -416,6 +413,19 @@ export type DayQuestionContext = {
   show_resuggest: boolean;
 };
 
+export type MessageAttachment = {
+  id: string;
+  file_name: string;
+  content_type: string | null;
+  size_bytes: number;
+  has_text_content: boolean;
+};
+
+export type ChatAttachment = MessageAttachment & {
+  conversation_id: string;
+  created_at: string;
+};
+
 export type Message = {
   id: string;
   conversation_id: string;
@@ -423,6 +433,7 @@ export type Message = {
   content: string | null;
   tool_calls: unknown;
   tool_results: unknown;
+  attachments?: MessageAttachment[] | null;
   is_preview: boolean;
   created_at: string;
 };
@@ -435,6 +446,10 @@ export type ConversationListResponse = {
 export type MessageListResponse = {
   items: Message[];
   total: number;
+};
+
+export type SuggestedPromptsResponse = {
+  prompts: string[];
 };
 
 /** Creative assets (poster, flyer, video). */

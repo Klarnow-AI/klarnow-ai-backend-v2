@@ -8,6 +8,7 @@ from typing import Any, Callable
 from uuid import UUID
 
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import PendingRollbackError
 
 from app.modules.agents.models import DecisionLog
 
@@ -73,6 +74,37 @@ def _can_run(agent: str, tool_name: str) -> bool:
     return tool_name in allowed
 
 
+def _rollback_quietly(db: Session) -> None:
+    try:
+        db.rollback()
+    except Exception:
+        pass
+
+
+def _flush_decision_log(
+    db: Session,
+    tool_name: str,
+    agent: str,
+    pack_id: UUID | None,
+    inputs_sanitized: dict,
+    success: bool,
+    result_summary: str | None = None,
+    error_message: str | None = None,
+) -> None:
+    db.add(
+        DecisionLog(
+            tool_name=tool_name,
+            agent=agent,
+            pack_id=pack_id,
+            inputs_sanitized=inputs_sanitized,
+            success=success,
+            result_summary=result_summary,
+            error_message=error_message,
+        )
+    )
+    db.flush()
+
+
 def execute(
     tool_name: str,
     agent: str,
@@ -100,22 +132,23 @@ def execute(
         with db.begin_nested():
             result = tool.fn(db=db, **inputs)
             summary = json.dumps(result)[:2000] if result else "ok"
-            db.add(
-                DecisionLog(
-                    tool_name=tool_name,
-                    agent=agent,
-                    pack_id=pack_id,
-                    inputs_sanitized=sanitised,
-                    success=True,
-                    result_summary=summary,
-                )
+            _flush_decision_log(
+                db=db,
+                tool_name=tool_name,
+                agent=agent,
+                pack_id=pack_id,
+                inputs_sanitized=sanitised,
+                success=True,
+                result_summary=summary,
             )
-            db.flush()
             return result
     except Exception as e:
-        with db.begin_nested():
-            db.add(
-                DecisionLog(
+        if isinstance(e, PendingRollbackError):
+            _rollback_quietly(db)
+        try:
+            with db.begin_nested():
+                _flush_decision_log(
+                    db=db,
                     tool_name=tool_name,
                     agent=agent,
                     pack_id=pack_id,
@@ -123,6 +156,20 @@ def execute(
                     success=False,
                     error_message=str(e)[:2000],
                 )
-            )
-            db.flush()
+        except Exception:
+            # Keep original tool exception as the source of truth.
+            _rollback_quietly(db)
+            try:
+                with db.begin_nested():
+                    _flush_decision_log(
+                        db=db,
+                        tool_name=tool_name,
+                        agent=agent,
+                        pack_id=pack_id,
+                        inputs_sanitized=sanitised,
+                        success=False,
+                        error_message=str(e)[:2000],
+                    )
+            except Exception:
+                _rollback_quietly(db)
         raise

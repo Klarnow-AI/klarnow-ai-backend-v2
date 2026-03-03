@@ -13,6 +13,7 @@ from app.modules.brand_os.services import get_active_for_pack, get_context_strin
 from app.modules.clients.models import Client, Lead
 from app.modules.clients.services import get_lead_by_pack_and_client
 from app.modules.packs.models import Pack
+from app.shared.services.reference_kb import get_reference_kb
 
 logger = get_logger("klarnow.revenue.proposal_generation")
 
@@ -34,6 +35,7 @@ class ProposalGenerateResult(TypedDict):
     content: ProposalGeneratedContent
     suggested_amount: str | None
     suggested_due_date: str | None
+    references: list[dict[str, Any]]
 
 
 def _build_pack_context(pack: Pack, brand_os: Any) -> dict[str, Any]:
@@ -95,7 +97,51 @@ def _build_lead_context(lead: Lead | None, client: Client | None) -> dict[str, A
     return ctx
 
 
-def _build_prompt(pack_ctx: dict[str, Any], lead_ctx: dict[str, Any]) -> str:
+def _build_reference_query(pack_ctx: dict[str, Any], lead_ctx: dict[str, Any]) -> str:
+    """Compose retrieval query for global reference KB."""
+    parts: list[str] = [
+        str(pack_ctx.get("brand_name") or ""),
+        str(pack_ctx.get("offer_one_liner") or ""),
+        str(pack_ctx.get("target_audience") or ""),
+        str(pack_ctx.get("primary_cta") or ""),
+        str(pack_ctx.get("usp_statement") or ""),
+        str(pack_ctx.get("primary_pain") or ""),
+        str(pack_ctx.get("primary_outcome") or ""),
+        str(lead_ctx.get("lead_summary") or ""),
+        str(lead_ctx.get("budget_range") or ""),
+        str(lead_ctx.get("urgency") or ""),
+    ]
+    return "\n".join([p for p in parts if p.strip()])
+
+
+def _get_reference_context(
+    pack_ctx: dict[str, Any],
+    lead_ctx: dict[str, Any],
+) -> tuple[str | None, list[dict[str, Any]]]:
+    """Retrieve optional markdown KB snippets for proposal grounding."""
+    query = _build_reference_query(pack_ctx, lead_ctx)
+    if not query.strip():
+        return None, []
+    try:
+        payload = get_reference_kb().retrieve(query)
+    except Exception as e:
+        logger.warning("proposal_reference_retrieval_failed: %s", e)
+        return None, []
+    context_text = payload.get("context_text") if isinstance(payload, dict) else None
+    references = payload.get("references") if isinstance(payload, dict) else None
+    if not isinstance(context_text, str):
+        context_text = None
+    if not isinstance(references, list):
+        references = []
+    return context_text, references
+
+
+def _build_prompt(
+    pack_ctx: dict[str, Any],
+    lead_ctx: dict[str, Any],
+    *,
+    reference_context: str | None = None,
+) -> str:
     """Build user prompt for proposal content generation."""
     lines = [
         "Generate a short, professional proposal draft for the following context.",
@@ -128,6 +174,16 @@ def _build_prompt(pack_ctx: dict[str, Any], lead_ctx: dict[str, Any]) -> str:
         if lead_ctx.get("urgency"):
             lines.append(f"- Urgency: {lead_ctx['urgency']}")
 
+    if reference_context:
+        lines.extend([
+            "",
+            "GLOBAL REFERENCE DOCUMENT EXCERPTS:",
+            reference_context,
+            "",
+            "Use the reference excerpts when relevant for factual grounding.",
+            "If excerpts are not relevant to this proposal, continue with best professional judgment.",
+        ])
+
     lines.extend([
         "",
         "Return ONLY a JSON object with this exact structure (no markdown, no explanation):",
@@ -148,7 +204,9 @@ def _build_prompt(pack_ctx: dict[str, Any], lead_ctx: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _stub_result() -> ProposalGenerateResult:
+def _stub_result(
+    references: list[dict[str, Any]] | None = None,
+) -> ProposalGenerateResult:
     """Return a stub when API key is missing or generation fails."""
     return ProposalGenerateResult(
         content=ProposalGeneratedContent(
@@ -159,6 +217,7 @@ def _stub_result() -> ProposalGenerateResult:
         ),
         suggested_amount=None,
         suggested_due_date=None,
+        references=references or [],
     )
 
 
@@ -198,6 +257,7 @@ def generate_proposal_draft(
         if not client and lead and lead.client_id:
             client = db.query(Client).filter(Client.id == lead.client_id).first()
     lead_ctx = _build_lead_context(lead, client)
+    reference_context, references = _get_reference_context(pack_ctx, lead_ctx)
 
     # Default suggested_due_date: +14 days if we have nothing from lead
     default_due = (date.today() + timedelta(days=14)).isoformat()
@@ -206,7 +266,11 @@ def generate_proposal_draft(
 
     try:
         client_openai = OpenAI(api_key=settings.openai_api_key)
-        prompt = _build_prompt(pack_ctx, lead_ctx)
+        prompt = _build_prompt(
+            pack_ctx,
+            lead_ctx,
+            reference_context=reference_context,
+        )
         response = client_openai.chat.completions.create(
             model="gpt-4o",
             messages=[
@@ -227,7 +291,7 @@ def generate_proposal_draft(
         )
         raw = response.choices[0].message.content
         if not raw:
-            return _stub_result()
+            return _stub_result(references=references)
         raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[-1] if "\n" in raw else raw[3:]
@@ -248,13 +312,14 @@ def generate_proposal_draft(
             ),
             suggested_amount=data.get("suggested_amount") if isinstance(data.get("suggested_amount"), str) else None,
             suggested_due_date=data.get("suggested_due_date") if isinstance(data.get("suggested_due_date"), str) else None,
+            references=references,
         )
         if not result["suggested_due_date"] and (lead_ctx or True):
             result["suggested_due_date"] = default_due
         return result
     except json.JSONDecodeError as e:
         logger.warning("Proposal generation JSON parse error: %s", e)
-        return _stub_result()
+        return _stub_result(references=references)
     except Exception as e:
         logger.exception("Proposal generation failed: %s", e)
-        return _stub_result()
+        return _stub_result(references=references)

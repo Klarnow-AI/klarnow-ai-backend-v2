@@ -8,6 +8,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import {
   buildChatUrl,
   buildNewChatUrl,
+  dedupeMessagesById,
   isStreamingPlaceholder,
 } from "./helpers";
 import {
@@ -17,7 +18,7 @@ import {
   NextActionBanner,
 } from "./_components";
 import { me } from "@/api_requests/me";
-import type { NextAction } from "@/types/api-types";
+import type { ChatAttachment, NextAction } from "@/types/api-types";
 import { useChatStore } from "./_store/chat-store";
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
@@ -41,6 +42,26 @@ const PROMPT_VARIANT_CLASSES = {
   violet:
     "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300 hover:bg-violet-500/20 hover:border-violet-500/40",
 } as const;
+const UPLOADING_ATTACHMENT_PREFIX = "uploading-";
+
+function createUploadingAttachment(
+  conversationId: string,
+  file: File,
+): ChatAttachment {
+  const suffix =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    id: `${UPLOADING_ATTACHMENT_PREFIX}${suffix}`,
+    conversation_id: conversationId,
+    file_name: file.name || "attachment",
+    content_type: file.type || null,
+    size_bytes: file.size ?? 0,
+    has_text_content: false,
+    created_at: new Date().toISOString(),
+  };
+}
 
 export default function ChatPage() {
   const router = useRouter();
@@ -49,6 +70,8 @@ export default function ChatPage() {
   const packId = searchParams.get("pack") ?? undefined;
   const [historyModalOpenState, setHistoryModalOpenState] = useState(false);
   const [nextAction, setNextAction] = useState<NextAction | null>(null);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const skipAttachmentClearOnUrlSyncRef = useRef(false);
 
   useEffect(() => {
     if (packId) {
@@ -63,6 +86,7 @@ export default function ChatPage() {
     input,
     loading,
     streamingContent,
+    streamStatus,
     previewMessageId,
     applyTargetId,
     historyList,
@@ -71,6 +95,7 @@ export default function ChatPage() {
     setConversationId,
     setMessages,
     setStreamingContent,
+    setStreamStatus,
     setPreviewMessageId,
     setApplyTargetId,
     setHistoryList,
@@ -86,6 +111,7 @@ export default function ChatPage() {
       s.input,
       s.loading,
       s.streamingContent,
+      s.streamStatus,
       s.previewMessageId,
       s.applyTargetId,
       s.historyList,
@@ -94,6 +120,7 @@ export default function ChatPage() {
       s.setConversationId,
       s.setMessages,
       s.setStreamingContent,
+      s.setStreamStatus,
       s.setPreviewMessageId,
       s.setApplyTargetId,
       s.setHistoryList,
@@ -119,7 +146,12 @@ export default function ChatPage() {
   useEffect(() => {
     if (cFromUrl) setConversationId(cFromUrl);
     else setConversationId(null);
-  }, [cFromUrl, setConversationId]);
+    if (skipAttachmentClearOnUrlSyncRef.current) {
+      skipAttachmentClearOnUrlSyncRef.current = false;
+      return;
+    }
+    setAttachments([]);
+  }, [cFromUrl, setConversationId, setAttachments]);
 
   useEffect(() => {
     me.getNextAction(packId ?? null)
@@ -137,17 +169,18 @@ export default function ChatPage() {
 
   async function loadMessages(cid: string) {
     const res = await chatApi.getMessages(cid);
+    const nextMessages = dedupeMessagesById(res.items);
     setMessages((prev) => {
       if (
-        res.items.length === 0 &&
+        nextMessages.length === 0 &&
         prev.some(
           (m) => isStreamingPlaceholder(m.id) || m.id.startsWith("user-"),
         )
       )
-        return prev;
-      return res.items;
+        return dedupeMessagesById(prev);
+      return nextMessages;
     });
-    const lastPreview = res.items.filter((m) => m.is_preview).pop();
+    const lastPreview = nextMessages.filter((m) => m.is_preview).pop();
     if (lastPreview) setPreviewMessageId(lastPreview.id);
   }
 
@@ -162,6 +195,7 @@ export default function ChatPage() {
     setMessages,
     setLoading,
     setStreamingContent,
+    setStreamStatus,
     stopTriggered,
     setStopTriggered,
     setPreviewMessageId,
@@ -178,14 +212,92 @@ export default function ChatPage() {
       send("apply", applyTargetId);
       setApplyTargetId(null);
     } else {
-      if (!input.trim()) return;
-      send("use");
+      const hasUploadingAttachments = attachments.some((attachment) =>
+        attachment.id.startsWith(UPLOADING_ATTACHMENT_PREFIX),
+      );
+      if (hasUploadingAttachments) {
+        toast.error("Please wait for attachments to finish uploading.");
+        return;
+      }
+      const queuedAttachments = attachments.filter(
+        (attachment) =>
+          !attachment.id.startsWith(UPLOADING_ATTACHMENT_PREFIX),
+      );
+      if (!input.trim() && queuedAttachments.length === 0) return;
+      setAttachments([]);
+      send("use", undefined, undefined, queuedAttachments);
     }
   }
 
   function startNewChat() {
     router.replace(buildNewChatUrl(packId));
+    setAttachments([]);
     resetForNewChat();
+  }
+
+  async function handleAttachFiles(files: File[]) {
+    if (loading) return;
+    const selectedFiles = files.slice(0, 5);
+    if (selectedFiles.length === 0) return;
+
+    const pendingConversationId = conversationId ?? "pending";
+    const pendingAttachments = selectedFiles.map((file) =>
+      createUploadingAttachment(pendingConversationId, file),
+    );
+    setAttachments((prev) => [...prev, ...pendingAttachments]);
+
+    if (!conversationId) {
+      skipAttachmentClearOnUrlSyncRef.current = true;
+    }
+    const cid = await ensureConversation();
+    if (!cid) {
+      skipAttachmentClearOnUrlSyncRef.current = false;
+      const pendingIds = new Set(pendingAttachments.map((item) => item.id));
+      setAttachments((prev) =>
+        prev.filter((attachment) => !pendingIds.has(attachment.id)),
+      );
+      toast.error("Could not attach file. Please try again.");
+      return;
+    }
+
+    const pendingByIndex = pendingAttachments.map((attachment) => ({
+      ...attachment,
+      conversation_id: cid,
+    }));
+    const pendingIdSet = new Set(pendingByIndex.map((item) => item.id));
+    setAttachments((prev) =>
+      prev.map((attachment) =>
+        pendingIdSet.has(attachment.id)
+          ? { ...attachment, conversation_id: cid }
+          : attachment,
+      ),
+    );
+
+    for (let index = 0; index < selectedFiles.length; index += 1) {
+      const file = selectedFiles[index];
+      const pendingAttachment = pendingByIndex[index];
+      try {
+        const uploaded = await chatApi.uploadAttachment(cid, file);
+        setAttachments((prev) =>
+          prev.map((attachment) =>
+            attachment.id === pendingAttachment.id ? uploaded : attachment,
+          ),
+        );
+      } catch {
+        setAttachments((prev) =>
+          prev.filter(
+            (attachment) => attachment.id !== pendingAttachment.id,
+          ),
+        );
+        toast.error(`Could not attach ${file.name}`);
+      }
+    }
+  }
+
+  function handleRemoveAttachment(attachmentId: string) {
+    setAttachments((prev) =>
+      prev.filter((attachment) => attachment.id !== attachmentId),
+    );
   }
 
   async function handleDeleteConversation(convId: string) {
@@ -226,16 +338,20 @@ export default function ChatPage() {
                     loading={loading}
                     stopTriggered={stopTriggered}
                     applyTargetId={applyTargetId}
+                    attachments={attachments}
+                    onAttachFiles={handleAttachFiles}
+                    onRemoveAttachment={handleRemoveAttachment}
                     onOpenHistory={() => setHistoryModalOpenState(true)}
                   />
                 </div>
               </div>
             ) : (
               <>
-                <div className="w-full flex-1 min-h-0 overflow-y-auto mx-auto flex flex-col items-start text-left py-4">
+                <div className="w-full flex-1 min-h-0 overflow-y-auto mx-auto flex flex-col items-start text-left py-2">
                   <ChatMessageList
                     messages={messages}
                     streamingContent={streamingContent}
+                    streamStatus={streamStatus}
                     loading={loading}
                     onApply={(id) => send("apply", id)}
                   />
@@ -249,6 +365,9 @@ export default function ChatPage() {
                     loading={loading}
                     stopTriggered={stopTriggered}
                     applyTargetId={applyTargetId}
+                    attachments={attachments}
+                    onAttachFiles={handleAttachFiles}
+                    onRemoveAttachment={handleRemoveAttachment}
                     onOpenHistory={() => setHistoryModalOpenState(true)}
                   />
                 </div>
@@ -281,6 +400,7 @@ export default function ChatPage() {
           <ChatMessageList
             messages={messages}
             streamingContent={streamingContent}
+            streamStatus={streamStatus}
             loading={loading}
             onApply={(id) => send("apply", id)}
           />
@@ -296,6 +416,9 @@ export default function ChatPage() {
                 loading={loading}
                 stopTriggered={stopTriggered}
                 applyTargetId={applyTargetId}
+                attachments={attachments}
+                onAttachFiles={handleAttachFiles}
+                onRemoveAttachment={handleRemoveAttachment}
                 onOpenHistory={() => setHistoryModalOpenState(true)}
               />
             </div>
@@ -308,6 +431,9 @@ export default function ChatPage() {
               loading={loading}
               stopTriggered={stopTriggered}
               applyTargetId={applyTargetId}
+              attachments={attachments}
+              onAttachFiles={handleAttachFiles}
+              onRemoveAttachment={handleRemoveAttachment}
               onOpenHistory={() => setHistoryModalOpenState(true)}
             />
           )}
@@ -317,7 +443,24 @@ export default function ChatPage() {
                 <button
                   key={prompt.text}
                   type="button"
-                  onClick={() => send("use", undefined, prompt.text)}
+                  onClick={() => {
+                    const hasUploadingAttachments = attachments.some(
+                      (attachment) =>
+                        attachment.id.startsWith(UPLOADING_ATTACHMENT_PREFIX),
+                    );
+                    if (hasUploadingAttachments) {
+                      toast.error(
+                        "Please wait for attachments to finish uploading.",
+                      );
+                      return;
+                    }
+                    const queuedAttachments = attachments.filter(
+                      (attachment) =>
+                        !attachment.id.startsWith(UPLOADING_ATTACHMENT_PREFIX),
+                    );
+                    setAttachments([]);
+                    send("use", undefined, prompt.text, queuedAttachments);
+                  }}
                   className={cn(
                     "rounded-full border px-3 py-1.5 text-xs transition-colors",
                     PROMPT_VARIANT_CLASSES[prompt.variant],

@@ -1,15 +1,21 @@
 """Chat API: conversations, messages, Use / Preview / Apply."""
 
+import uuid as uuid_lib
+from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 
+from app.core.config import get_settings
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
-from app.core.errors import NotFoundError
+from app.core.errors import BadRequestError, NotFoundError
+from app.core.storage import upload_file as storage_upload_file
 from app.modules.packs.models import User
+from app.modules.chat.models import ChatAttachment
 from app.modules.chat.schemas import (
+    ChatAttachmentRead,
     ConversationCreate,
     ConversationListItem,
     ConversationList,
@@ -18,6 +24,7 @@ from app.modules.chat.schemas import (
     MessageRead,
     SendMessageBody,
     SendMessageResponse,
+    SuggestedPromptsResponse,
 )
 from app.modules.chat.services import (
     create_conversation,
@@ -28,8 +35,132 @@ from app.modules.chat.services import (
     list_conversations,
 )
 from app.modules.chat.orchestrator_chat import run_chat_turn, run_chat_turn_stream
+from app.modules.chat.prompt_suggestions import suggest_pack_chat_prompts
 
 router = APIRouter()
+
+TEXT_ATTACHMENT_EXTENSIONS = {
+    "txt",
+    "md",
+    "markdown",
+    "csv",
+    "json",
+    "xml",
+    "yaml",
+    "yml",
+    "html",
+    "htm",
+    "py",
+    "js",
+    "ts",
+    "tsx",
+    "jsx",
+    "css",
+    "sql",
+    "log",
+}
+
+
+def _safe_filename(name: str | None) -> str:
+    raw = (name or "attachment").strip()
+    safe = "".join(ch if ch.isalnum() or ch in {"-", "_", "."} else "_" for ch in raw)
+    safe = safe.strip("._")
+    return (safe or "attachment")[:200]
+
+
+def _is_text_attachment(file_name: str, content_type: str | None) -> bool:
+    if content_type and content_type.lower().startswith("text/"):
+        return True
+    ext = Path(file_name).suffix.lower().lstrip(".")
+    return ext in TEXT_ATTACHMENT_EXTENSIONS
+
+
+def _extract_text_content(
+    payload: bytes,
+    file_name: str,
+    content_type: str | None,
+    max_chars: int,
+) -> str | None:
+    if not payload or not _is_text_attachment(file_name, content_type):
+        return None
+    decoded = payload.decode("utf-8", errors="replace").replace("\x00", " ").strip()
+    if not decoded:
+        return None
+    return decoded[: max(500, max_chars)]
+
+
+@router.post(
+    "/conversations/{conversation_id}/attachments",
+    response_model=ChatAttachmentRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_attachment(
+    conversation_id: UUID,
+    file: UploadFile = File(...),
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload one file for chat context and return attachment metadata."""
+    conv = get_conversation_for_user(db, conversation_id, current_user.id)
+    if not conv:
+        raise NotFoundError("Conversation not found")
+
+    content = await file.read()
+    if not content:
+        raise BadRequestError("File is empty")
+
+    settings = get_settings()
+    max_bytes = max(1, settings.chat_attachment_max_size_mb) * 1024 * 1024
+    if len(content) > max_bytes:
+        raise BadRequestError(
+            f"File too large. Max size is {settings.chat_attachment_max_size_mb}MB."
+        )
+
+    safe_name = _safe_filename(file.filename)
+    key = f"chat/attachments/{conversation_id}/{uuid_lib.uuid4().hex}_{safe_name}"
+    uploaded_key = storage_upload_file(key, content, content_type=file.content_type)
+    text_content = _extract_text_content(
+        payload=content,
+        file_name=safe_name,
+        content_type=file.content_type,
+        max_chars=settings.chat_attachment_max_text_chars,
+    )
+
+    attachment = ChatAttachment(
+        conversation_id=conversation_id,
+        user_id=current_user.id,
+        file_name=safe_name,
+        content_type=file.content_type,
+        size_bytes=len(content),
+        storage_key=uploaded_key,
+        text_content=text_content,
+    )
+    db.add(attachment)
+    db.commit()
+    db.refresh(attachment)
+    return ChatAttachmentRead(
+        id=attachment.id,
+        conversation_id=attachment.conversation_id,
+        file_name=attachment.file_name,
+        content_type=attachment.content_type,
+        size_bytes=attachment.size_bytes,
+        has_text_content=bool(attachment.text_content),
+        created_at=attachment.created_at,
+    )
+
+
+@router.get("/packs/{pack_id}/suggested-prompts", response_model=SuggestedPromptsResponse)
+def get_suggested_prompts(
+    pack_id: UUID,
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return up to 3 contextual chat starter prompts for a pack."""
+    try:
+        prompts = suggest_pack_chat_prompts(db, current_user.id, pack_id)
+    except ValueError as e:
+        raise NotFoundError(str(e))
+    return SuggestedPromptsResponse(prompts=prompts)
 
 
 @router.get("/conversations", response_model=ConversationList)
@@ -120,7 +251,10 @@ def list_messages(
 def send_message(
     conversation_id: UUID,
     body: SendMessageBody,
-    stream: bool = Query(False, description="If true, return SSE stream (one event with full response)"),
+    stream: bool = Query(
+        False,
+        description="If true, return SSE stream (events: status, chunk, done, error).",
+    ),
     db=Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -129,7 +263,7 @@ def send_message(
     - mode=use: run tools and return outcome (new version created).
     - mode=preview: return proposed tool_calls without executing.
     - mode=apply: execute tool_calls from the message given in apply_to_message_id.
-    - stream=true: response is SSE (event: message, data: JSON).
+    - stream=true: response is SSE with status/chunk/done/error events.
     """
     conv = get_conversation_for_user(db, conversation_id, current_user.id)
     if not conv:
@@ -144,6 +278,7 @@ def send_message(
                 user_content=body.content,
                 mode=body.mode,
                 apply_to_message_id=body.apply_to_message_id,
+                attachment_ids=body.attachment_ids,
             ):
                 yield chunk
         return StreamingResponse(
@@ -160,6 +295,7 @@ def send_message(
             user_content=body.content,
             mode=body.mode,
             apply_to_message_id=body.apply_to_message_id,
+            attachment_ids=body.attachment_ids,
         )
     except ValueError as e:
         raise NotFoundError(str(e))
@@ -168,5 +304,7 @@ def send_message(
         message_id=result.get("message_id"),
         tool_calls=result.get("tool_calls"),
         tool_results=result.get("tool_results"),
+        action_chips=result.get("action_chips"),
+        references=result.get("references"),
         preview=result.get("preview", False),
     )

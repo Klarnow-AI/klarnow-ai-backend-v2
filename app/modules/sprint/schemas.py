@@ -13,10 +13,6 @@ class DayCardRead(BaseModel):
     ai_output: dict | None
     user_action: str | None
     definition_of_done: str | None
-    outreach_count: int
-    followup_count: int
-    proof_logged: bool
-    output_shipped: bool
     completed_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -71,15 +67,9 @@ class SprintDayDetail(BaseModel):
     ai_output: dict | None
     user_action: str | None
     definition_of_done: str | None
-    outreach_count: int
-    followup_count: int
-    proof_logged: bool
-    output_shipped: bool
     completed_at: datetime | None
     unlocked: bool
     blocker_message: str | None = None
-    outreach_target: int = 10
-    followup_target: int = 5
 
 
 class DayCompleteRequest(BaseModel):

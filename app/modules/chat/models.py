@@ -55,7 +55,32 @@ class Message(Base):
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
     tool_calls: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # list of {id, name, arguments}
     tool_results: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # id -> result for apply
+    attachments: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
     is_preview: Mapped[bool] = mapped_column(default=False, nullable=False)  # True = proposed, not executed
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     conversation: Mapped["Conversation"] = relationship("Conversation", back_populates="messages")
+
+
+class ChatAttachment(Base):
+    __tablename__ = "chat_attachment"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("conversation.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    storage_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    text_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

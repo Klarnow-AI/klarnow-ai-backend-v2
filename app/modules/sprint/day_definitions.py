@@ -142,17 +142,16 @@ DAY_DEFINITIONS: list[DayDefinition] = [
     {
         "day_number": 4,
         "title": "Ad Factory",
-        "win_condition": "Assets generated + post shipped + outreach logged",
+        "win_condition": "Assets generated and first ad shipped",
         "requires_mode_variation": False,
         "build_mode": {
             "tasks": [
                 "Generate video scripts",
                 "Create shot list",
                 "Export first ad",
-                "Ship content",
-                "Log outreach"
+                "Ship content"
             ],
-            "playbook": "Today you create your first marketing assets. Use AI to generate video scripts, define your shots, and export your first ad. Post it. Then log your outreach activity to unlock the next day.",
+            "playbook": "Today you create your first marketing assets. Use AI to generate video scripts, define your shots, and export your first ad. Post it so your sprint keeps moving.",
             "scripts": [
                 {
                     "title": "Hook Formula",
@@ -172,10 +171,9 @@ DAY_DEFINITIONS: list[DayDefinition] = [
                 "Generate poster variants",
                 "Export best option",
                 "Post on social media",
-                "Send broadcast message",
-                "Log outreach"
+                "Send broadcast message"
             ],
-            "playbook": "Create visual assets that communicate your offer at a glance. Generate poster variants, pick the best one, export it, and post it. Then send a broadcast to your audience. Log your outreach to complete the day.",
+            "playbook": "Create visual assets that communicate your offer at a glance. Generate poster variants, pick the best one, export it, and post it. Then send a broadcast to your audience.",
             "scripts": [
                 {
                     "title": "Broadcast Template",

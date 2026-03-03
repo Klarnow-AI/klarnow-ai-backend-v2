@@ -233,11 +233,7 @@ def get_sprint_day_detail(db: Session, pack_id: UUID, day_number: int) -> dict |
     if not card:
         return None
 
-    from app.modules.sprint.outreach_targets import get_daily_outreach_target, get_daily_followup_target
     pack = db.query(Pack).filter(Pack.id == sprint.pack_id).first()
-    business_type = (pack.business_type if pack else None) or "product"
-    outreach_target = get_daily_outreach_target(business_type)
-    followup_target = get_daily_followup_target(business_type)
 
     unlocked = day_number <= sprint.current_day
     blocker_message: str | None = None
@@ -267,63 +263,4 @@ def get_sprint_day_detail(db: Session, pack_id: UUID, day_number: int) -> dict |
         "completed_at": card.completed_at,
         "unlocked": unlocked,
         "blocker_message": blocker_message if not unlocked else None,
-        "outreach_count": card.outreach_count,
-        "followup_count": card.followup_count,
-        "proof_logged": card.proof_logged,
-        "output_shipped": card.output_shipped,
-        "outreach_target": outreach_target,
-        "followup_target": followup_target,
     }
-
-
-@log_service_action()
-def log_outreach(db: Session, sprint_id: UUID, day_number: int, count: int = 1) -> DayCard:
-    """Log outreach activities for a sprint day."""
-    card = get_day_card(db, sprint_id, day_number)
-    if not card:
-        raise ValueError(f"No day card for day {day_number}")
-    
-    card.outreach_count += count
-    db.commit()
-    db.refresh(card)
-    return card
-
-
-@log_service_action()
-def log_followup(db: Session, sprint_id: UUID, day_number: int, count: int = 1) -> DayCard:
-    """Log follow-up activities for a sprint day."""
-    card = get_day_card(db, sprint_id, day_number)
-    if not card:
-        raise ValueError(f"No day card for day {day_number}")
-    
-    card.followup_count += count
-    db.commit()
-    db.refresh(card)
-    return card
-
-
-@log_service_action()
-def mark_proof_logged(db: Session, sprint_id: UUID, day_number: int) -> DayCard:
-    """Mark proof as logged for a sprint day."""
-    card = get_day_card(db, sprint_id, day_number)
-    if not card:
-        raise ValueError(f"No day card for day {day_number}")
-    
-    card.proof_logged = True
-    db.commit()
-    db.refresh(card)
-    return card
-
-
-@log_service_action()
-def mark_output_shipped(db: Session, sprint_id: UUID, day_number: int) -> DayCard:
-    """Mark output as shipped for a sprint day."""
-    card = get_day_card(db, sprint_id, day_number)
-    if not card:
-        raise ValueError(f"No day card for day {day_number}")
-    
-    card.output_shipped = True
-    db.commit()
-    db.refresh(card)
-    return card
-

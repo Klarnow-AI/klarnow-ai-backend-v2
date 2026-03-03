@@ -47,6 +47,23 @@ class Settings(BaseSettings):
     # Optional: OpenAI
     openai_api_key: str = ""
 
+    # Optional: Chat attachments
+    chat_attachment_max_size_mb: int = 20
+    chat_attachment_max_text_chars: int = 20000
+    chat_attachment_prompt_max_chars: int = 12000
+    chat_attachment_max_per_message: int = 8
+
+    # Optional: Global reference markdown KB (RAG-lite for chat/proposals)
+    reference_doc_enabled: bool = False
+    reference_doc_path: str = "app/core/reference/100M-Leads.md"
+    reference_doc_embedding_model: str = "text-embedding-3-small"
+    reference_doc_chunk_chars: int = 1200
+    reference_doc_chunk_overlap_chars: int = 200
+    reference_doc_top_k: int = 5
+    reference_doc_min_score: float = 0.2
+    reference_doc_max_chars: int = 250000
+    reference_doc_cache_ttl_seconds: int = 300
+
     # Optional: Kling API (official - api-singapore.klingai.com, JWT auth)
     kling_access_key: str = ""
     kling_secret_key: str = ""

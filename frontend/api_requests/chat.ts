@@ -2,10 +2,12 @@ import { API_BASE } from "@/lib/utils";
 import { getHeaders, getToken, handleUnauthorized } from "@/lib/http";
 import { api } from "@/lib/http";
 import type {
+  ChatAttachment,
   Conversation,
   ConversationListResponse,
   Message,
   MessageListResponse,
+  SuggestedPromptsResponse,
 } from "@/types/api-types";
 
 const CHAT_PREFIX = "/api/v1/chat";
@@ -33,12 +35,25 @@ export const chat = {
     api<MessageListResponse>(
       `${CHAT_PREFIX}/conversations/${conversationId}/messages`
     ),
+  getSuggestedPrompts: (packId: string) =>
+    api<SuggestedPromptsResponse>(
+      `${CHAT_PREFIX}/packs/${encodeURIComponent(packId)}/suggested-prompts`
+    ),
+  uploadAttachment: (conversationId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api<ChatAttachment>(
+      `${CHAT_PREFIX}/conversations/${conversationId}/attachments`,
+      { method: "POST", body: form }
+    );
+  },
   sendMessage: (
     conversationId: string,
     body: {
       content: string;
       mode?: "use" | "preview" | "apply";
       apply_to_message_id?: string | null;
+      attachment_ids?: string[];
     },
     stream = false,
     signal?: AbortSignal

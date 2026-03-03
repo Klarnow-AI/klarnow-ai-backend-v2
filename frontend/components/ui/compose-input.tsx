@@ -10,12 +10,6 @@ import {
   Mic,
   Send,
   Stop,
-  Image,
-  Lightbulb,
-  Search,
-  ShoppingBag,
-  MoreVertical,
-  ChevronRight,
   Clock,
 } from "@/components/icons";
 import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
@@ -41,19 +35,13 @@ export interface ComposeInputProps extends Omit<
   /** Optional override for left toolbar (default: Plus opens popover) */
   leftButtons?: React.ReactNode;
   /** Called when user attaches files via the popover */
-  onAttachFiles?: (files: FileList) => void;
-  /** Called when user selects "Create image" */
-  onCreateImage?: () => void;
-  /** Called when user selects "Thinking" */
-  onThinking?: () => void;
-  /** Called when user selects "Deep Research" */
-  onDeepResearch?: () => void;
-  /** Called when user selects "Shopping research" */
-  onShoppingResearch?: () => void;
-  /** Called when user selects "More" */
-  onMore?: () => void;
+  onAttachFiles?: (files: File[]) => void;
   /** Optional override for right icons before submit (default: Mic) */
   rightIconsBeforeSubmit?: React.ReactNode;
+  /** When true, submit button can be enabled without text input. */
+  allowEmptySubmit?: boolean;
+  /** Optional override for history trigger (default: Clock button) */
+  historyTrigger?: React.ReactNode;
   /** When provided, renders a History button (Clock icon) before the mic */
   onOpenHistory?: () => void;
   /** When false, Mic is non-interactive (default: true) */
@@ -74,14 +62,11 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
       stopTriggered = false,
       leftButtons,
       rightIconsBeforeSubmit,
+      allowEmptySubmit = false,
+      historyTrigger,
       onOpenHistory,
       voiceRecordingEnabled = true,
       onAttachFiles,
-      onCreateImage,
-      onThinking,
-      onDeepResearch,
-      onShoppingResearch,
-      onMore,
       wrapperClassName,
       className,
       onKeyDown: textareaOnKeyDown,
@@ -138,10 +123,12 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
 
     const handleFileChange = useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (files && files.length > 0 && onAttachFiles) {
-          onAttachFiles(files);
+        const selectedFiles = Array.from(e.target.files ?? []);
+        if (selectedFiles.length === 0 || !onAttachFiles) {
+          e.target.value = "";
+          return;
         }
+        onAttachFiles(selectedFiles);
         e.target.value = "";
       },
       [onAttachFiles],
@@ -162,15 +149,6 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
 
     const micDisabled =
       disabled || loading || !supported || !voiceRecordingEnabled;
-
-    const handleMenuAction = useCallback((callback?: () => void) => {
-      setPopoverOpen(false);
-      if (callback) {
-        callback();
-      } else {
-        toast.info("Coming soon");
-      }
-    }, []);
 
     const defaultLeft = (
       <div ref={refs.setReference} className="relative shrink-0">
@@ -220,50 +198,6 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
                       <span className="min-w-0 truncate">
                         Attach photo, video, docx
                       </span>
-                    </button>
-                    <div className="my-2 h-px bg-border/60" />
-                    <button
-                      type="button"
-                      onClick={() => handleMenuAction(onCreateImage)}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
-                    >
-                      <Image className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span>Create image</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleMenuAction(onThinking)}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
-                    >
-                      <Lightbulb className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span>Thinking</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleMenuAction(onDeepResearch)}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
-                    >
-                      <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span>Deep Research</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleMenuAction(onShoppingResearch)}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
-                    >
-                      <ShoppingBag className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span>Shopping research</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleMenuAction(onMore)}
-                      className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-foreground transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <MoreVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <span>More</span>
-                      </div>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                     </button>
                   </motion.div>
                 </div>
@@ -337,19 +271,20 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
               {leftButtons ?? defaultLeft}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {onOpenHistory && (
-                <IconButton
-                  type="button"
-                  variant="ghost"
-                  size="md"
-                  aria-label="History"
-                  onClick={onOpenHistory}
-                  disabled={disabled || loading}
-                  className="text-muted-foreground"
-                >
-                  <Clock className="h-5 w-5" />
-                </IconButton>
-              )}
+              {historyTrigger ??
+                (onOpenHistory && (
+                  <IconButton
+                    type="button"
+                    variant="ghost"
+                    size="md"
+                    aria-label="History"
+                    onClick={onOpenHistory}
+                    disabled={disabled || loading}
+                    className="text-muted-foreground"
+                  >
+                    <Clock className="h-5 w-5" />
+                  </IconButton>
+                ))}
               {rightIconsBeforeSubmit ?? defaultRightIcons}
               {showStop ? (
                 <IconButton
@@ -369,7 +304,7 @@ const ComposeInput = forwardRef<HTMLTextAreaElement, ComposeInputProps>(
                   variant="solid"
                   size="md"
                   aria-label="Send"
-                  disabled={disabled || !value.trim()}
+                  disabled={disabled || (!value.trim() && !allowEmptySubmit)}
                   className="disabled:opacity-50"
                 >
                   <Send className="h-4 w-4" />

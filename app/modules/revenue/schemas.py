@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.shared.schemas import ReferenceSnippet
+
 
 class ProposalBase(BaseModel):
     amount: str
@@ -101,6 +103,7 @@ class ProposalGenerateResponse(BaseModel):
     content: dict  # description, line_items, terms, notes
     suggested_amount: str | None = None
     suggested_due_date: str | None = None
+    references: list[ReferenceSnippet] | None = None
 
 
 class InvoiceList(BaseModel):

@@ -1,8 +1,15 @@
+import type { DayGuideTaskAction } from "@/lib/plan-tracker-task-actions";
+
+export interface DayGuideTaskItem {
+  label: string;
+  action?: DayGuideTaskAction;
+}
+
 export interface DayGuide {
   dayNumber: number;
   title: string;
   overview: string;
-  tasks: string[];
+  tasks: Array<string | DayGuideTaskItem>;
   tips: string[];
   expectedOutcome: string;
 }
@@ -79,45 +86,80 @@ export const dayGuides: Record<number, DayGuide> = {
   4: {
     dayNumber: 4,
     title: "Ad Factory",
-    overview: "Generate video scripts and shot list. Ship content and log outreach.",
+    overview: "Generate video scripts and shot list. Ship your first content asset.",
     tasks: [
-      "Generate video scripts",
-      "Create shot list",
-      "Export first ad",
-      "Ship content and log outreach"
+      {
+        label: "Generate video scripts",
+        action: { type: "route", key: "open_ad_factory", ctaLabel: "Open Ad Factory" },
+      },
+      {
+        label: "Create shot list",
+        action: { type: "route", key: "open_ad_factory", ctaLabel: "Open Ad Factory" },
+      },
+      {
+        label: "Export first ad",
+        action: { type: "route", key: "open_ad_factory", ctaLabel: "Open Ad Factory" },
+      },
+      {
+        label: "Ship content",
+        action: { type: "route", key: "open_ad_factory", ctaLabel: "Open Ad Factory" },
+      },
     ],
     tips: [
       "Hook formula: start with the outcome - 'How to [result] without [pain]'",
       "Keep messaging consistent with Day 2 pain/outcome"
     ],
-    expectedOutcome: "Scripts and shot list generated. First ad shipped and outreach logged."
+    expectedOutcome: "Scripts and shot list generated. First ad shipped."
   },
   5: {
     dayNumber: 5,
     title: "Posters",
     overview: "Generate poster variants. Post and send a broadcast.",
     tasks: [
-      "Generate poster variants",
-      "Export best option",
-      "Post on social media",
-      "Send broadcast message",
-      "Log outreach"
+      {
+        label: "Generate poster variants",
+        action: { type: "route", key: "open_posters", ctaLabel: "Open Posters" },
+      },
+      {
+        label: "Export best option",
+        action: { type: "route", key: "open_posters", ctaLabel: "Open Posters" },
+      },
+      {
+        label: "Post on social media",
+        action: { type: "route", key: "open_posters", ctaLabel: "Open Posters" },
+      },
+      {
+        label: "Send broadcast message",
+        action: { type: "route", key: "open_leads", ctaLabel: "Open Leads" },
+      },
     ],
     tips: [
       "Posters should communicate your offer at a glance",
       "One clear CTA per poster"
     ],
-    expectedOutcome: "Poster posted and broadcast sent. Outreach logged."
+    expectedOutcome: "Poster posted and broadcast sent."
   },
   6: {
     dayNumber: 6,
     title: "Conversion destination",
     overview: "Build: create page draft. Improve: optimise existing destination.",
     tasks: [
-      "Create page draft (or optimise existing)",
-      "Add lead filter",
-      "Add proof",
-      "Review copy"
+      {
+        label: "Create page draft (or optimise existing)",
+        action: { type: "route", key: "open_website", ctaLabel: "Open Website" },
+      },
+      {
+        label: "Add lead filter",
+        action: { type: "route", key: "open_website", ctaLabel: "Open Website" },
+      },
+      {
+        label: "Add proof",
+        action: { type: "route", key: "open_website", ctaLabel: "Open Website" },
+      },
+      {
+        label: "Review copy",
+        action: { type: "route", key: "open_website", ctaLabel: "Open Website" },
+      },
     ],
     tips: [
       "Lead filter qualifies traffic (price, location, who it's for)",
@@ -131,10 +173,22 @@ export const dayGuides: Record<number, DayGuide> = {
     title: "Publish / Confirm",
     overview: "Build: publish page and share link with 10 people. Improve: confirm destination and add proof.",
     tasks: [
-      "Publish page (or confirm destination URL)",
-      "Test conversion flow",
-      "Add proof if missing",
-      "Share link with 10 people"
+      {
+        label: "Publish page (or confirm destination URL)",
+        action: { type: "route", key: "open_website", ctaLabel: "Open Website" },
+      },
+      {
+        label: "Test conversion flow",
+        action: { type: "route", key: "open_website", ctaLabel: "Open Website" },
+      },
+      {
+        label: "Add proof if missing",
+        action: { type: "route", key: "open_website", ctaLabel: "Open Website" },
+      },
+      {
+        label: "Share link with 10 people",
+        action: { type: "route", key: "open_leads", ctaLabel: "Open Leads" },
+      },
     ],
     tips: [
       "Test the full flow from click to submission",
@@ -145,27 +199,48 @@ export const dayGuides: Record<number, DayGuide> = {
   8: {
     dayNumber: 8,
     title: "Response rules",
-    overview: "Lock response rules and start your outreach habit. Generate templates, customise, then lock.",
+    overview: "Lock response rules. Generate templates, customise, then lock.",
     tasks: [
-      "Generate response templates",
-      "Customise to your voice",
-      "Lock response rules",
-      "Test with a mock enquiry"
+      {
+        label: "Generate response templates",
+        action: { type: "inline", key: "scroll_response_rules_editor", ctaLabel: "Open Rules Editor" },
+      },
+      {
+        label: "Customise to your voice",
+        action: { type: "inline", key: "scroll_response_rules_editor", ctaLabel: "Open Rules Editor" },
+      },
+      {
+        label: "Lock response rules",
+        action: { type: "inline", key: "scroll_response_rules_editor", ctaLabel: "Open Rules Editor" },
+      },
+      {
+        label: "Test with a mock enquiry",
+        action: { type: "inline", key: "scroll_response_rules_editor", ctaLabel: "Open Rules Editor" },
+      },
     ],
     tips: [
       "Templates for: enquiries, objections, booking requests",
       "From today you have copy-paste responses ready"
     ],
-    expectedOutcome: "Response rules locked. Outreach habit started."
+    expectedOutcome: "Response rules locked and ready to use."
   },
   9: {
     dayNumber: 9,
     title: "Follow-up",
     overview: "Clear your follow-up queue. Every lead gets a response.",
     tasks: [
-      "Review follow-up queue",
-      "Contact all pending leads",
-      "Mark tasks complete"
+      {
+        label: "Review follow-up queue",
+        action: { type: "route", key: "open_leads", ctaLabel: "Open Leads" },
+      },
+      {
+        label: "Contact all pending leads",
+        action: { type: "route", key: "open_leads", ctaLabel: "Open Leads" },
+      },
+      {
+        label: "Mark tasks complete",
+        action: { type: "route", key: "open_leads", ctaLabel: "Open Leads" },
+      },
     ],
     tips: [
       "No lead sits in 'New' for more than 24 hours",
@@ -178,9 +253,18 @@ export const dayGuides: Record<number, DayGuide> = {
     title: "Fix the leak",
     overview: "Apply one improvement live. Find one thing losing you customers and fix it today.",
     tasks: [
-      "Identify one leak (unclear CTA, slow response, confusing offer)",
-      "Fix it live",
-      "Document the change"
+      {
+        label: "Identify one leak (unclear CTA, slow response, confusing offer)",
+        action: { type: "route", key: "open_plan_tracker", ctaLabel: "Open Plan Tracker" },
+      },
+      {
+        label: "Fix it live",
+        action: { type: "route", key: "open_website", ctaLabel: "Open Website" },
+      },
+      {
+        label: "Document the change",
+        action: { type: "route", key: "open_chat", ctaLabel: "Open Chat" },
+      },
     ],
     tips: [
       "Pick one thing only",
@@ -193,9 +277,18 @@ export const dayGuides: Record<number, DayGuide> = {
     title: "Close path",
     overview: "Service/coach: create proposal. Product: create bundle offer.",
     tasks: [
-      "Create proposal template (service/coach) OR bundle offer (product)",
-      "Set pricing",
-      "Test send to one lead"
+      {
+        label: "Create proposal template (service/coach) OR bundle offer (product)",
+        action: { type: "route", key: "open_proposals", ctaLabel: "Open Proposals" },
+      },
+      {
+        label: "Set pricing",
+        action: { type: "route", key: "open_proposals", ctaLabel: "Open Proposals" },
+      },
+      {
+        label: "Test send to one lead",
+        action: { type: "route", key: "open_proposals", ctaLabel: "Open Proposals" },
+      },
     ],
     tips: [
       "Make it ready to send today",
@@ -208,9 +301,18 @@ export const dayGuides: Record<number, DayGuide> = {
     title: "Close conversations",
     overview: "Ask for the sale. Send proposal/offer to qualified leads and request next step.",
     tasks: [
-      "Identify 3 qualified leads",
-      "Send proposal or offer",
-      "Request next step (call, payment, agreement)"
+      {
+        label: "Identify 3 qualified leads",
+        action: { type: "route", key: "open_leads", ctaLabel: "Open Leads" },
+      },
+      {
+        label: "Send proposal or offer",
+        action: { type: "route", key: "open_proposals", ctaLabel: "Open Proposals" },
+      },
+      {
+        label: "Request next step (call, payment, agreement)",
+        action: { type: "route", key: "open_leads", ctaLabel: "Open Leads" },
+      },
     ],
     tips: [
       "Don't be passive - close the loop",
@@ -223,9 +325,18 @@ export const dayGuides: Record<number, DayGuide> = {
     title: "Invoice / Payment",
     overview: "Send invoice or payment request. Get paid.",
     tasks: [
-      "Create invoice or payment link",
-      "Send to accepted proposals",
-      "Set payment follow-up reminder"
+      {
+        label: "Create invoice or payment link",
+        action: { type: "route", key: "open_invoices", ctaLabel: "Open Invoices" },
+      },
+      {
+        label: "Send to accepted proposals",
+        action: { type: "route", key: "open_invoices", ctaLabel: "Open Invoices" },
+      },
+      {
+        label: "Set payment follow-up reminder",
+        action: { type: "route", key: "open_invoices", ctaLabel: "Open Invoices" },
+      },
     ],
     tips: [
       "Send the invoice immediately when they say yes",
@@ -238,8 +349,14 @@ export const dayGuides: Record<number, DayGuide> = {
     title: "Check-in",
     overview: "Review sprint metrics, document wins and lessons, start Sprint 2.",
     tasks: [
-      "Review sprint metrics",
-      "Document wins and lessons",
+      {
+        label: "Review sprint metrics",
+        action: { type: "route", key: "open_plan_tracker", ctaLabel: "Open Plan Tracker" },
+      },
+      {
+        label: "Document wins and lessons",
+        action: { type: "route", key: "open_chat", ctaLabel: "Open Chat" },
+      },
       "Complete check-in to start Sprint 2"
     ],
     tips: [

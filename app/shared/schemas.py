@@ -11,3 +11,11 @@ class GoalSchema(BaseModel):
     time_horizon_days: int = Field(..., ge=1)
     primary_channel: str = Field(..., description="e.g. Meta Ads")
     conversion_action: str = Field(..., description="e.g. Book Call")
+
+
+class ReferenceSnippet(BaseModel):
+    """Reference excerpt returned by global markdown knowledge retrieval."""
+
+    chunk_id: str
+    score: float
+    excerpt: str

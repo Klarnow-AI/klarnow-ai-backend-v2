@@ -71,24 +71,4 @@ export const sprintApi = {
         body: JSON.stringify(body),
       }
     ),
-
-  logOutreach: (sprintId: string, dayNumber: number, count = 1) =>
-    api(`/api/v1/sprint/${sprintId}/day/${dayNumber}/log-outreach?count=${count}`, {
-      method: "POST",
-    }),
-
-  logFollowup: (sprintId: string, dayNumber: number, count = 1) =>
-    api(`/api/v1/sprint/${sprintId}/day/${dayNumber}/log-followup?count=${count}`, {
-      method: "POST",
-    }),
-
-  logProof: (sprintId: string, dayNumber: number) =>
-    api(`/api/v1/sprint/${sprintId}/day/${dayNumber}/log-proof`, {
-      method: "POST",
-    }),
-
-  markOutputShipped: (sprintId: string, dayNumber: number) =>
-    api(`/api/v1/sprint/${sprintId}/day/${dayNumber}/mark-output-shipped`, {
-      method: "POST",
-    }),
 };

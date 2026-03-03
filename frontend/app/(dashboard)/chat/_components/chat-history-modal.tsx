@@ -16,6 +16,7 @@ export type ChatHistoryModalProps = {
   loading: boolean;
   packId: string | undefined;
   onDelete: (convId: string) => void;
+  onSelectConversation?: (convId: string) => void;
 };
 
 export function ChatHistoryModal({
@@ -25,6 +26,7 @@ export function ChatHistoryModal({
   loading,
   packId,
   onDelete,
+  onSelectConversation,
 }: ChatHistoryModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -128,13 +130,26 @@ export function ChatHistoryModal({
                     key={conv.id}
                     className="group flex items-center gap-1 rounded-xl hover:bg-muted"
                   >
-                    <Link
-                      href={buildChatUrl(conv.id, packId)}
-                      onClick={onClose}
-                      className="min-w-0 flex-1 truncate px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {conv.title || "Conversation"}
-                    </Link>
+                    {onSelectConversation ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelectConversation(conv.id);
+                          onClose();
+                        }}
+                        className="min-w-0 flex-1 truncate px-3 py-2.5 text-left text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {conv.title || "Conversation"}
+                      </button>
+                    ) : (
+                      <Link
+                        href={buildChatUrl(conv.id, packId)}
+                        onClick={onClose}
+                        className="min-w-0 flex-1 truncate px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {conv.title || "Conversation"}
+                      </Link>
+                    )}
                     <IconButton
                       type="button"
                       variant="ghost"

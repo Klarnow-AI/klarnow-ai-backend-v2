@@ -218,6 +218,13 @@ def _run_worker(pack_id: UUID) -> None:
                 try:
                     _run_onboarding_pipeline(db, pack_id)
                 except Exception as exc:
+                    try:
+                        db.rollback()
+                    except Exception:
+                        pass
+                    pack = db.get(Pack, pack_id)
+                    if not pack:
+                        return
                     job = _get_job_data(pack) or job
                     job["last_error"] = str(exc)[:2000]
                     retry_attempt = attempt
@@ -272,4 +279,3 @@ def recover_pending_onboarding_jobs() -> int:
         return started
     finally:
         db.close()
-

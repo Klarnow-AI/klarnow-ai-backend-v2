@@ -119,35 +119,7 @@ def can_pass_day8_gate(db: Session, pack: Pack) -> tuple[bool, str]:
 
 def can_complete_day(db: Session, day_card, day_number: int, pack: Pack) -> tuple[bool, str]:
     """
-    Daily completion gate (requires all):
-    - Output shipped
-    - Outreach target met
-    - Follow-up target met
-    - Proof logged
-    
-    (Only applies to Days 4-13)
-    
-    IMPORTANT: These are requirements PER SPRINT DAY, not per calendar day.
-    Each DayCard tracks its own completion requirements. Users can complete
-    multiple sprint days in one calendar sitting if they meet each day's requirements.
+    Daily completion gate (Days 4-13) currently has no extra requirements.
+    Day unlock logic and Day 7/8 specific gates remain enforced elsewhere.
     """
-    from app.modules.sprint.outreach_targets import get_daily_outreach_target, get_daily_followup_target
-    
-    if day_number < 4 or day_number > 13:
-        return True, ""  # No daily gate for Days 0-3, 14
-    
-    if not day_card.output_shipped:
-        return False, "Ship today's output first"
-    
-    outreach_target = get_daily_outreach_target(pack.business_type or "product")
-    if day_card.outreach_count < outreach_target:
-        return False, f"Complete {outreach_target} outreach activities ({day_card.outreach_count}/{outreach_target})"
-    
-    followup_target = get_daily_followup_target(pack.business_type or "product")
-    if day_card.followup_count < followup_target:
-        return False, f"Complete {followup_target} follow-ups ({day_card.followup_count}/{followup_target})"
-    
-    if not day_card.proof_logged:
-        return False, "Log proof for today"
-    
     return True, ""

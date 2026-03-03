@@ -368,7 +368,7 @@ export default function PackOverviewPage() {
   return (
     <div className="flex flex-col p-8 lg:h-full lg:overflow-hidden">
       <div className="flex flex-col gap-6 lg:flex-1 lg:min-h-0 lg:flex-row lg:overflow-hidden">
-        <div className="flex flex-col min-w-0 max-w-6xl lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+        <div className="flex flex-col min-w-0 w-full lg:flex-1 lg:min-h-0 lg:overflow-hidden">
           <div className="flex flex-col space-y-8 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
             {pack.core_concept && (
               <motion.section

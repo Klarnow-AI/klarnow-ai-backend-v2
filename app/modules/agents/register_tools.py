@@ -21,6 +21,14 @@ from app.modules.revenue.tools import (
     CREATE_PROPOSAL_SCHEMA,
     CREATE_INVOICE_SCHEMA,
 )
+from app.modules.packs.read_tools import (
+    get_pack_snapshot,
+    get_pack_followup_queue,
+    get_account_snapshot,
+    GET_PACK_SNAPSHOT_SCHEMA,
+    GET_PACK_FOLLOWUP_QUEUE_SCHEMA,
+    GET_ACCOUNT_SNAPSHOT_SCHEMA,
+)
 
 
 def register_all_tools() -> None:
@@ -102,5 +110,35 @@ def register_all_tools() -> None:
             fn=create_invoice,
             allowed_agents=["orchestrator", "revenue"],
             side_effects="Creates Invoice row (draft)",
+        )
+    )
+    register(
+        ToolDef(
+            name="get_pack_snapshot",
+            description="Read-only snapshot of pack execution state: campaign, website, Brand OS, leads, follow-up queue, proposals, invoices.",
+            parameters_schema=GET_PACK_SNAPSHOT_SCHEMA,
+            fn=get_pack_snapshot,
+            allowed_agents=["orchestrator"],
+            side_effects="read-only",
+        )
+    )
+    register(
+        ToolDef(
+            name="get_pack_followup_queue",
+            description="Read-only follow-up queue for a pack (pending or overdue).",
+            parameters_schema=GET_PACK_FOLLOWUP_QUEUE_SCHEMA,
+            fn=get_pack_followup_queue,
+            allowed_agents=["orchestrator"],
+            side_effects="read-only",
+        )
+    )
+    register(
+        ToolDef(
+            name="get_account_snapshot",
+            description="Read-only account-wide summary across the user's packs.",
+            parameters_schema=GET_ACCOUNT_SNAPSHOT_SCHEMA,
+            fn=get_account_snapshot,
+            allowed_agents=["orchestrator"],
+            side_effects="read-only",
         )
     )

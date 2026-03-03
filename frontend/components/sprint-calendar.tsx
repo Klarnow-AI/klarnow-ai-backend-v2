@@ -5,7 +5,6 @@ import { Check, AlertCircle, Lock } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import type { SprintRead, DayCardRead } from "@/types/api-types";
 
 interface SprintCalendarProps {
@@ -124,18 +123,6 @@ export function SprintCalendar({ sprint, onDayClick }: SprintCalendarProps) {
     return null;
   };
 
-  const getProgressPercentage = (card: DayCardRead): number => {
-    if (card.completed_at) return 100;
-    if (card.day_number < 4 || card.day_number > 13) return 0;
-    let completed = 0;
-    const total = 4;
-    if (card.output_shipped) completed++;
-    if (card.proof_logged) completed++;
-    if (card.outreach_count >= 10) completed++;
-    if (card.followup_count >= 5) completed++;
-    return (completed / total) * 100;
-  };
-
   return (
     <div className="w-full flex flex-col">
       {/* Fixed header: no month nav, just sprint info */}
@@ -189,7 +176,6 @@ export function SprintCalendar({ sprint, onDayClick }: SprintCalendarProps) {
                     dayCard.day_number > sprint.current_day &&
                     !dayCard.completed_at;
                   const isClickable = isSprintDay && !isLocked && !isCompleted;
-                  const progress = dayCard ? getProgressPercentage(dayCard) : 0;
 
                   return (
                     <Card
@@ -255,15 +241,6 @@ export function SprintCalendar({ sprint, onDayClick }: SprintCalendarProps) {
                                 {DAY_TITLES[dayCard.day_number]}
                               </div>
                             </div>
-                            {!isCompleted &&
-                              !isLocked &&
-                              dayCard.day_number >= 4 &&
-                              dayCard.day_number <= 13 && (
-                                <Progress
-                                  value={progress}
-                                  className="h-1 mt-1.5"
-                                />
-                              )}
                           </div>
                         )}
                       </div>
