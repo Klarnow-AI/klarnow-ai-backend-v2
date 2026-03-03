@@ -8,10 +8,6 @@ import { toast } from "sonner";
 import { Spinner } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { MobileNavContent } from "@/components/layout/mobile-nav-content";
-import { LayoutDashboard, X } from "@/components/icons";
-import { IconButton } from "@/components/ui/icon-button";
-import { useMobileInputNav } from "@/contexts/mobile-input-nav-context";
 
 type Screen = "generate" | "overview" | "script-detail" | "render" | "launch";
 
@@ -25,7 +21,6 @@ export default function AdFactoryPage() {
   const [selectedVariant, setSelectedVariant] = useState<"A" | "B" | "C" | null>(null);
 
   const isMobile = !useMediaQuery("(min-width: 1024px)");
-  const { showNavInsteadOfInput, setShowNavInsteadOfInput } = useMobileInputNav();
 
   const handleGenerate = useCallback(async () => {
     if (!packId) return;
@@ -102,30 +97,6 @@ export default function AdFactoryPage() {
         )}
       </div>
 
-      {isMobile && (
-        <div className="shrink-0 flex items-center gap-2 px-4 py-4 border-t border-border">
-          {showNavInsteadOfInput ? (
-            <div className="flex-1 min-h-[4.5rem] flex items-center">
-              <MobileNavContent inline className="h-[4.5rem]" />
-            </div>
-          ) : (
-            <div className="flex-1" />
-          )}
-          <IconButton
-            type="button"
-            variant="ghost"
-            size="md"
-            aria-label={showNavInsteadOfInput ? "Back to content" : "Show navigation"}
-            onClick={() => setShowNavInsteadOfInput(!showNavInsteadOfInput)}
-          >
-            {showNavInsteadOfInput ? (
-              <X className="h-5 w-5" />
-            ) : (
-              <LayoutDashboard className="h-5 w-5" />
-            )}
-          </IconButton>
-        </div>
-      )}
     </div>
   );
 }

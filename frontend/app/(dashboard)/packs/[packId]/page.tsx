@@ -17,27 +17,13 @@ import {
 } from "@/components/icons";
 import { Spinner } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { packs as packsApi } from "@/api_requests/packs";
 import { me } from "@/api_requests/me";
 import type { PackSummaryResponse } from "@/types/api-types";
 import { PackActionsMenu } from "@/components/pack-actions-menu";
 import { PackChatPanel } from "./_components/pack-chat-panel";
 import { useGet } from "@/hooks/use-get";
-
-const PACK_TYPE_LABELS: Record<string, string> = {
-  enquiries: "Enquiries",
-  quotes: "Quotes",
-  sales: "Sales",
-};
-
-function getStageLabel(stage: string | undefined): string {
-  if (!stage || stage === "no_pack") return "Setup";
-  if (stage === "brand_os_done") return "Foundation";
-  if (stage === "page_live") return "Page live";
-  if (stage === "sprint") return "Sprint";
-  if (stage === "leads") return "Leads";
-  return "In progress";
-}
 
 /** Fixed pack summary cards — no add/remove. */
 const PACK_SUMMARY_CARDS: string[] = ["brand_os", "plan_tracker"];
@@ -148,14 +134,27 @@ const PACK_OVERVIEW_MODULES: Record<
       "Start your 14-day sprint to publish, launch, capture leads, and get paid.",
     getContent: (s) =>
       s.plan_tracker?.has_sprint ? (
-        <p>
-          <span className="font-medium text-muted-foreground">
-            14-day sprint
-          </span>
-          {s.plan_tracker.sprint_day != null && (
-            <> — Day {s.plan_tracker.sprint_day} of 14</>
-          )}
-        </p>
+        <div className="space-y-3">
+          <p>
+            <span className="font-medium text-muted-foreground">
+              14-day sprint
+            </span>
+            {s.plan_tracker.sprint_day != null && (
+              <> — Day {s.plan_tracker.sprint_day} of 14</>
+            )}
+          </p>
+          <Progress
+            value={
+              (Math.min(
+                Math.max(s.plan_tracker.sprint_day ?? 0, 0),
+                14,
+              ) /
+                14) *
+              100
+            }
+            className="h-2"
+          />
+        </div>
       ) : null,
   },
   leads: {
@@ -363,50 +362,11 @@ export default function PackOverviewPage() {
   }
 
   const { pack } = summary;
-  const stageLabel = nextAction ? getStageLabel(nextAction.stage) : null;
   const chips = nextAction?.actionChips ?? [];
   const hasNextStep = !!nextAction?.actionText || chips.length > 0;
 
   return (
     <div className="flex flex-col h-full overflow-hidden p-8">
-      <motion.header
-        initial={{ opacity: 0, y: -4 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="sticky top-0 z-10 border-b border-border/60 bg-background/80 backdrop-blur-md -mx-8 px-8 py-4 mb-6"
-      >
-        <div className="max-w-8xl mx-auto flex flex-wrap items-center justify-between gap-8">
-          <div className="flex items-center gap-2 flex-wrap min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight truncate">
-              {pack.name}
-            </h1>
-            {pack.pack_type && (
-              <span
-                className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground shrink-0"
-                aria-label={`Pack type: ${PACK_TYPE_LABELS[pack.pack_type] ?? pack.pack_type}`}
-              >
-                {PACK_TYPE_LABELS[pack.pack_type] ?? pack.pack_type}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {stageLabel && (
-              <span
-                className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
-                aria-label={`Stage: ${stageLabel}`}
-              >
-                {stageLabel}
-              </span>
-            )}
-            <PackActionsMenu
-              pack={pack}
-              onArchive={handleArchive}
-              onRestore={handleRestore}
-              onDelete={handleDelete}
-            />
-          </div>
-        </div>
-      </motion.header>
-
       <div className="flex flex-1 min-h-0 gap-6 overflow-hidden">
         <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden max-w-6xl">
           <div className="flex-1 min-h-0 overflow-y-auto flex flex-col space-y-8">
@@ -496,10 +456,18 @@ export default function PackOverviewPage() {
               animate="visible"
               className="flex flex-1 min-h-0 flex flex-col space-y-3"
             >
-              <h2 className="shrink-0 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Pack summary
-              </h2>
-              <div className="grid flex-1 min-h-0 grid-cols-2 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
+              <div className="shrink-0 flex items-center justify-between gap-3">
+                <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Pack summary
+                </h2>
+                <PackActionsMenu
+                  pack={pack}
+                  onArchive={handleArchive}
+                  onRestore={handleRestore}
+                  onDelete={handleDelete}
+                />
+              </div>
+              <div className="grid flex-1 min-h-0 grid-cols-1 sm:grid-cols-2 gap-4">
                 {PACK_SUMMARY_CARDS.map((moduleKey, index) => {
                   const mod = PACK_OVERVIEW_MODULES[moduleKey];
                   if (!mod) return null;

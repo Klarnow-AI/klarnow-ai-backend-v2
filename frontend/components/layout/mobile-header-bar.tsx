@@ -6,13 +6,15 @@ import { createPortal } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, FolderKanban, Plus } from "@/components/icons";
+import { ChevronDown, FolderKanban, Menu, Plus, X } from "@/components/icons";
 import { useTheme } from "@/contexts/theme-context";
 import { useDynamicPopover } from "@/hooks/use-dynamic-popover";
 import { packs as packsApi, type Pack } from "@/lib/api";
 import { PACKS_UPDATED_EVENT_NAME } from "@/contexts/new-pack-modal-context";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/page-loader";
+import { IconButton } from "@/components/ui/icon-button";
+import { useMobileSidebar } from "@/contexts/mobile-sidebar-context";
 
 const STORAGE_KEY_LAST_PACK = "sidebar-last-pack-id";
 
@@ -25,6 +27,7 @@ export function MobileHeaderBar() {
   const [packDropdownOpen, setPackDropdownOpen] = useState(false);
   const [packsLoading, setPacksLoading] = useState(true);
   const [packsError, setPacksError] = useState("");
+  const { isOpen, toggle } = useMobileSidebar();
 
   const {
     refs: packDropdownRefs,
@@ -97,6 +100,14 @@ export function MobileHeaderBar() {
 
   return (
     <header className="shrink-0 flex items-center gap-3 px-4 py-3 bg-transparent">
+      <IconButton
+        aria-label={isOpen ? "Close navigation" : "Open navigation"}
+        variant="outline"
+        size="md"
+        onClick={toggle}
+      >
+        {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+      </IconButton>
       <Link
         href="/chat"
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl overflow-hidden"
@@ -117,11 +128,11 @@ export function MobileHeaderBar() {
         <button
           type="button"
           onClick={() => setPackDropdownOpen((o) => !o)}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-xl px-2 py-1.5 text-left transition-all focus-visible:outline-none focus-visible:ring-0"
+          className="flex min-w-0 flex-1 items-center gap-1 rounded-xl px-2 py-1.5 text-left transition-all focus-visible:outline-none focus-visible:ring-0"
           style={{ width: "250px" }}
           title={currentPack?.name ?? "Select a pack"}
         >
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
+          <span className="min-w-0 flex-1 truncate text-right text-sm font-semibold text-foreground">
             {currentPack?.name ?? "Select a pack"}
           </span>
           {packsLoading && <Spinner className="h-4 w-4 shrink-0" />}

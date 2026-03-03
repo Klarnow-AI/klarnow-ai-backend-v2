@@ -24,7 +24,8 @@ export default function PackLayout({
   const isTabletOrLarger = useIsTabletOrLarger();
 
   const isPackOverview = !!packId && pathname === `/packs/${packId}`;
-  const showFab = !!packId && !isPackOverview;
+  const showDesktopFab = !!packId && !isPackOverview;
+  const showMobileOverviewFab = !!packId && isPackOverview && !isTabletOrLarger;
 
   const layoutContextValue = useMemo(
     () => ({ openChatPopover: () => setChatOpen(true) }),
@@ -60,7 +61,7 @@ export default function PackLayout({
       <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
         {children}
       </div>
-      {showFab && packId && (
+      {showDesktopFab && packId && (
         <>
           <button
             ref={fabRef}
@@ -100,6 +101,23 @@ export default function PackLayout({
               </SheetContent>
             </Sheet>
           )}
+        </>
+      )}
+      {showMobileOverviewFab && packId && (
+        <>
+          <button
+            type="button"
+            onClick={() => setChatOpen((open) => !open)}
+            aria-label="Chat with Klaro"
+            className="md:hidden flex fixed bottom-6 right-6 pb-safe pr-safe z-40 h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-black/10 transition-all hover:shadow-xl hover:shadow-black/15 hover:scale-105 focus:outline-none focus:scale-105"
+          >
+            <MessageSquare className="h-6 w-6" />
+          </button>
+          <Sheet open={chatOpen} onOpenChange={setChatOpen} side="right">
+            <SheetContent className="p-0">
+              <PackChatPanel packId={packId} />
+            </SheetContent>
+          </Sheet>
         </>
       )}
     </PackLayoutProvider>

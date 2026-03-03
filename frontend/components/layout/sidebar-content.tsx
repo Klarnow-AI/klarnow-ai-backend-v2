@@ -39,11 +39,11 @@ const STORAGE_KEY_SIDEBAR = "sidebar-collapsed";
 
 const navLinkClass = (isActive: boolean, collapsed?: boolean) =>
   cn(
-    "flex items-center rounded-xl text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-0 hover:scale-[1.02]",
+    "flex items-center rounded-xl text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-0",
     collapsed ? "justify-center gap-0 px-2 py-2.5" : "gap-3 px-3 py-2.5",
     isActive
-      ? " font-[600] text-primary scale-[1.02]"
-      : "text-muted-foreground hover:text-foreground hover: font-[600]",
+      ? "bg-muted/60 text-foreground"
+      : "text-muted-foreground hover:text-foreground hover:bg-muted/40",
   );
 
 export type SidebarContentProps = {
@@ -205,7 +205,7 @@ export function SidebarContent({
   const header = (
     <div
       className={cn(
-        "flex items-center min-w-0 relative bg-border/30",
+        "flex items-center min-w-0 relative border-b border-border/40",
         variant === "sheet"
           ? "gap-2 p-4"
           : collapsed
@@ -236,10 +236,10 @@ export function SidebarContent({
             <button
               type="button"
               onClick={() => setPackDropdownOpen((o) => !o)}
-              className="flex min-w-0 flex-1 items-center gap-2 rounded-xl px-2 py-1.5 text-left transition-all focus-visible:outline-none focus-visible:ring-0"
+              className="flex min-w-0 flex-1 items-center gap-1 rounded-xl px-2 py-1.5 text-left transition-all focus-visible:outline-none focus-visible:ring-0"
               title={currentPack?.name ?? "Select a pack"}
             >
-              <span className="min-w-0 flex-1 truncate font-semibold text-lg text-foreground">
+              <span className="min-w-0 flex-1 truncate text-right font-semibold text-lg text-foreground">
                 {currentPack?.name ?? "Select a pack"}
               </span>
               <ChevronDown
@@ -370,10 +370,10 @@ export function SidebarContent({
             <button
               type="button"
               onClick={() => setPackDropdownOpen((o) => !o)}
-              className="flex min-w-0 flex-1 items-center gap-2 rounded-xl px-2 py-1.5 text-left transition-all focus-visible:outline-none focus-visible:ring-0"
+              className="flex min-w-0 flex-1 items-center gap-1 rounded-xl px-2 py-1.5 text-left transition-all focus-visible:outline-none focus-visible:ring-0"
               title={currentPack?.name ?? "Select a pack"}
             >
-              <span className="min-w-0 flex-1 truncate font-semibold text-lg text-foreground">
+              <span className="min-w-0 flex-1 truncate text-right font-semibold text-lg text-foreground">
                 {currentPack?.name ?? "Select a pack"}
               </span>
               <ChevronDown
@@ -509,78 +509,79 @@ export function SidebarContent({
   return (
     <>
       {header}
-      <nav
-        className={cn(
-          "flex-1 space-y-0.5 overflow-y-auto",
-          isCollapsed ? "p-2" : "p-3",
-        )}
-      >
-        {!isCollapsed && (
-          <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Build
-          </p>
-        )}
-        <div className="space-y-0.5">
-          {buildItems.map((item) => {
-            const isChat = item.pathMatch === "/chat";
-            const isOverview = item.key === "overview";
-            const href = isChat ? chatHref : buildHref(item.href);
-            const isActive = isChat
-              ? isChatActive
-              : isOverview
-                ? effectivePackId
-                  ? pathname === `/packs/${effectivePackId}`
-                  : false
-                : effectivePackId
-                  ? pathname === `/packs/${effectivePackId}${item.href}` ||
-                    pathname.startsWith(`/packs/${effectivePackId}${item.href}/`)
-                  : false;
-            const sectionKey = navToSection[item.href];
-            const section =
-              sectionKey && effectivePackId
-                ? gates?.sections[sectionKey]
-                : undefined;
-            const locked = section ? !section.unlocked : false;
-            return renderNavLink(item, href, isActive, locked);
-          })}
-        </div>
-
-        {!isCollapsed && (
-          <p className="px-3 py-1.5 pt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Result
-          </p>
-        )}
-        <div className="space-y-0.5">
-          {resultItems.map((item) => {
-            const href =
-              item.pathMatch === "/proposals"
-                ? packForLinks
-                  ? `/proposals?pack=${packForLinks}`
-                  : "/proposals"
-                : item.pathMatch === "/invoices"
-                  ? packForLinks
-                    ? `/invoices?pack=${packForLinks}`
-                    : "/invoices"
-                  : resultHref(item.href);
-            const isActive =
-              item.pathMatch === "/proposals"
-                ? isProposalsActive
-                : item.pathMatch === "/invoices"
-                  ? isInvoicesActive
+      <nav className={cn("flex-1 overflow-y-auto", isCollapsed ? "p-2" : "p-3")}>
+        <div className="space-y-1">
+          {!isCollapsed && (
+            <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+              Build
+            </p>
+          )}
+          <div className="space-y-1">
+            {buildItems.map((item) => {
+              const isChat = item.pathMatch === "/chat";
+              const isOverview = item.key === "overview";
+              const href = isChat ? chatHref : buildHref(item.href);
+              const isActive = isChat
+                ? isChatActive
+                : isOverview
+                  ? effectivePackId
+                    ? pathname === `/packs/${effectivePackId}`
+                    : false
                   : effectivePackId
                     ? pathname === `/packs/${effectivePackId}${item.href}` ||
                       pathname.startsWith(
-                        `/packs/${effectivePackId}${item.href}`,
+                        `/packs/${effectivePackId}${item.href}/`,
                       )
                     : false;
-            const sectionKey = navToSection[item.href];
-            const section =
-              sectionKey && effectivePackId
-                ? gates?.sections[sectionKey]
-                : undefined;
-            const locked = section ? !section.unlocked : false;
-            return renderNavLink(item, href, isActive, locked);
-          })}
+              const sectionKey = navToSection[item.href];
+              const section =
+                sectionKey && effectivePackId
+                  ? gates?.sections[sectionKey]
+                  : undefined;
+              const locked = section ? !section.unlocked : false;
+              return renderNavLink(item, href, isActive, locked);
+            })}
+          </div>
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-border/50 space-y-1">
+          {!isCollapsed && (
+            <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+              Result
+            </p>
+          )}
+          <div className="space-y-1">
+            {resultItems.map((item) => {
+              const href =
+                item.pathMatch === "/proposals"
+                  ? packForLinks
+                    ? `/proposals?pack=${packForLinks}`
+                    : "/proposals"
+                  : item.pathMatch === "/invoices"
+                    ? packForLinks
+                      ? `/invoices?pack=${packForLinks}`
+                      : "/invoices"
+                    : resultHref(item.href);
+              const isActive =
+                item.pathMatch === "/proposals"
+                  ? isProposalsActive
+                  : item.pathMatch === "/invoices"
+                    ? isInvoicesActive
+                    : effectivePackId
+                      ? pathname === `/packs/${effectivePackId}${item.href}` ||
+                        pathname.startsWith(
+                          `/packs/${effectivePackId}${item.href}`,
+                        )
+                      : false;
+              const sectionKey = navToSection[item.href];
+              const section =
+                sectionKey && effectivePackId
+                  ? gates?.sections[sectionKey]
+                  : undefined;
+              const locked = section ? !section.unlocked : false;
+              return renderNavLink(item, href, isActive, locked);
+            })}
+          </div>
         </div>
       </nav>
       <div
@@ -607,30 +608,37 @@ export function SidebarContent({
             {subscription.credits_remaining}
           </div>
         )}
-        <Link
-          href="/settings"
-          onClick={handleLinkClick}
-          className={navLinkClass(pathname === "/settings", isCollapsed)}
-          title="Account"
-        >
-          <ProfileAvatar className="h-5 w-5 shrink-0 rounded-full" />
-          {!isCollapsed && <span className="truncate">Account</span>}
-        </Link>
-        <button
-          type="button"
-          onClick={() => logout()}
-          title="Sign out"
-          className={cn(
-            "flex items-center rounded-xl text-sm font-medium transition-all duration-200 w-full",
-            isCollapsed
-              ? "justify-center gap-0 px-2 py-2.5"
-              : "gap-3 px-3 py-2.5",
-            "text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black",
+        <div className="mt-3 pt-3 border-t border-border/50 space-y-1 w-full">
+          {!isCollapsed && (
+            <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+              Account
+            </p>
           )}
-        >
-          <LogOut className="h-5 w-5 shrink-0" />
-          {!isCollapsed && <span>Sign out</span>}
-        </button>
+          <Link
+            href="/settings"
+            onClick={handleLinkClick}
+            className={navLinkClass(pathname === "/settings", isCollapsed)}
+            title="Account"
+          >
+            <ProfileAvatar className="h-5 w-5 shrink-0 rounded-full" />
+            {!isCollapsed && <span className="truncate">Account</span>}
+          </Link>
+          <button
+            type="button"
+            onClick={() => logout()}
+            title="Sign out"
+            className={cn(
+              "flex items-center rounded-xl text-sm font-medium transition-all duration-200 w-full",
+              isCollapsed
+                ? "justify-center gap-0 px-2 py-2.5"
+                : "gap-3 px-3 py-2.5",
+              "text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black",
+            )}
+          >
+            <LogOut className="h-5 w-5 shrink-0" />
+            {!isCollapsed && <span>Sign out</span>}
+          </button>
+        </div>
       </div>
     </>
   );

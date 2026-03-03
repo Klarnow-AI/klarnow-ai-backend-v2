@@ -1,14 +1,10 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { CreativeTemplateGrid } from "./creative-template-grid";
 import { CreativeInputBar } from "./creative-input-bar";
 import { CreativePreviewModal } from "./creative-preview-modal";
-import { MobileNavContent } from "@/components/layout/mobile-nav-content";
-import { useMobileInputNav } from "@/contexts/mobile-input-nav-context";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { LayoutDashboard, X } from "@/components/icons";
-import { IconButton } from "@/components/ui/icon-button";
 import type { CreativeTemplateCardAsset } from "./creative-template-card";
 import type { PromptWithResults } from "./creative-template-grid";
 import type { BrandContext } from "@/app/api/generate/route";
@@ -45,8 +41,6 @@ export function CreativeFactoryLayout({
 }: CreativeFactoryLayoutProps) {
   const bottomPlaceholder = "Type to Generate";
   const isMobile = !useMediaQuery("(min-width: 1024px)");
-  const { showNavInsteadOfInput, setShowNavInsteadOfInput } =
-    useMobileInputNav();
 
   const handleGenerate = useCallback(
     (
@@ -77,44 +71,15 @@ export function CreativeFactoryLayout({
         <div className="w-full min-w-0 max-w-2xl mx-auto flex items-center gap-2">
           {isMobile ? (
             <>
-              {showNavInsteadOfInput ? (
-                <div className="flex-1 min-w-0 min-h-[4.5rem] flex items-center">
-                  <MobileNavContent inline className="h-[4.5rem]" />
-                </div>
-              ) : (
-                <div className="flex-1 min-w-0 min-h-[4.5rem] flex items-center">
-                  <CreativeInputBar
-                    apiRoute="/api/generate-poster"
-                    brandContext={brandContext}
-                    placeholder={bottomPlaceholder}
-                    onGenerate={handleGenerate}
-                    onGeneratingChange={onGeneratingChange}
-                    disabled={isGenerating}
-                  />
-                </div>
-              )}
-              <div className="shrink-0">
-                {showNavInsteadOfInput ? (
-                  <IconButton
-                    type="button"
-                    variant="ghost"
-                    size="md"
-                    aria-label="Back to input"
-                    onClick={() => setShowNavInsteadOfInput(false)}
-                  >
-                    <X className="h-5 w-5" />
-                  </IconButton>
-                ) : (
-                  <IconButton
-                    type="button"
-                    variant="ghost"
-                    size="md"
-                    aria-label="Show navigation"
-                    onClick={() => setShowNavInsteadOfInput(true)}
-                  >
-                    <LayoutDashboard className="h-5 w-5" />
-                  </IconButton>
-                )}
+              <div className="flex-1 min-w-0 min-h-[4.5rem] flex items-center">
+                <CreativeInputBar
+                  apiRoute="/api/generate-poster"
+                  brandContext={brandContext}
+                  placeholder={bottomPlaceholder}
+                  onGenerate={handleGenerate}
+                  onGeneratingChange={onGeneratingChange}
+                  disabled={isGenerating}
+                />
               </div>
             </>
           ) : (
