@@ -1,8 +1,9 @@
+import asyncio
 import logging
 import time
 import traceback
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,11 +34,40 @@ from app.modules.feedback.routes import router as feedback_router
 from app.modules.ad_factory.routes import router as ad_factory_router
 from app.modules.image_context.routes import router as image_context_router
 
+ONBOARDING_RECOVERY_INITIAL_DELAY_SECONDS = 5
+ONBOARDING_RECOVERY_MAX_DELAY_SECONDS = 60
+
+
+async def _recover_onboarding_jobs_with_retry(log: logging.Logger) -> None:
+    from app.modules.packs.onboarding_jobs import recover_pending_onboarding_jobs
+
+    delay_seconds = ONBOARDING_RECOVERY_INITIAL_DELAY_SECONDS
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            started = await asyncio.to_thread(recover_pending_onboarding_jobs)
+            if started:
+                log.info("Recovered %s pending onboarding jobs from previous run.", started)
+            elif attempt > 1:
+                log.info("Onboarding job recovery succeeded on retry (attempt=%s).", attempt)
+            return
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            log.warning(
+                "Onboarding job recovery failed on attempt %s; retrying in %ss: %s",
+                attempt,
+                delay_seconds,
+                exc,
+            )
+            await asyncio.sleep(delay_seconds)
+            delay_seconds = min(ONBOARDING_RECOVERY_MAX_DELAY_SECONDS, delay_seconds * 2)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.modules.agents.register_tools import register_all_tools
-    from app.modules.packs.onboarding_jobs import recover_pending_onboarding_jobs
     from app.modules.image_context.jobs import (
         recover_pending_image_context_jobs,
         start_image_context_worker,
@@ -45,8 +75,12 @@ async def lifespan(app: FastAPI):
     from app.shared.services.reference_kb import get_reference_kb
     log = logging.getLogger("uvicorn.error")
     log.info("CORS allowed origins: %s", settings.cors_allow_origins)
+    onboarding_recovery_task: asyncio.Task | None = None
     register_all_tools()
-    recover_pending_onboarding_jobs()
+    onboarding_recovery_task = asyncio.create_task(
+        _recover_onboarding_jobs_with_retry(log),
+        name="onboarding-job-recovery",
+    )
     if settings.image_context_enabled:
         requeued = recover_pending_image_context_jobs()
         if requeued:
@@ -57,7 +91,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         # Non-fatal: app should start even if reference KB indexing fails.
         log.warning("Reference KB warmup failed: %s", e)
-    yield
+    try:
+        yield
+    finally:
+        if onboarding_recovery_task and not onboarding_recovery_task.done():
+            onboarding_recovery_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await onboarding_recovery_task
 
 
 app = FastAPI(
