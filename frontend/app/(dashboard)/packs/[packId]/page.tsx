@@ -18,6 +18,8 @@ import {
   Receipt,
   ChevronRight,
   Film,
+  Check,
+  Lock,
 } from "@/components/icons";
 import { Spinner } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
@@ -38,6 +40,7 @@ import { Day1Modal } from "@/components/day-1-modal";
 import { Day2Modal } from "@/components/day-2-modal";
 import { Day3Modal } from "@/components/day-3-modal";
 import { DayDetailModal } from "@/components/day-detail-modal";
+import { DAY_TITLES } from "@/lib/sprint-phases";
 import { useDelayedNextActionToast } from "@/hooks/use-delayed-next-action-toast";
 
 /** Fixed pack summary cards — no add/remove. */
@@ -497,6 +500,19 @@ export default function PackOverviewPage() {
   const primaryChipIndex = chips.findIndex((chip) => !!chip.href);
   const primaryChip = primaryChipIndex >= 0 ? chips[primaryChipIndex] : null;
   const hasWhatToDoNext = hasNextStep || hasSprintToday;
+  const activeDayNumber = hasSprintToday ? todayTasks.day_number : null;
+  const currentDayTaskCount = hasSprintToday ? todayTasks.tasks.length : 0;
+  const checkedTaskCount = hasSprintToday
+    ? todayTasks.tasks.filter((task) => task.checked).length
+    : 0;
+  const currentDayCompletionRatio =
+    currentDayTaskCount > 0 ? checkedTaskCount / currentDayTaskCount : 0;
+  const currentStepProgressPercent =
+    activeDayNumber != null
+      ? stepToPercent(activeDayNumber + currentDayCompletionRatio)
+      : 0;
+  const isCurrentDayComplete =
+    currentDayTaskCount > 0 && checkedTaskCount === currentDayTaskCount;
   const renderedActionChips = chips.map((chip, i) => {
     if (!chip.href) return null;
     if (nextAction?.canProceed === false && primaryChipIndex === i) return null;
@@ -626,9 +642,79 @@ export default function PackOverviewPage() {
                           </div>
                         )}
                       </div>
-                      <div className="divide-y divide-border">
+                      {activeDayNumber != null && (
+                        <div className="px-5 py-3 border-b border-border space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/80">
+                              Sprint progress
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Step {activeDayNumber} of {TOTAL_SPRINT_STEPS}
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="relative">
+                              <Progress
+                                value={currentStepProgressPercent}
+                                className="h-2 bg-muted/70"
+                                role="progressbar"
+                                aria-label={`Sprint progress ${Math.round(currentStepProgressPercent)} percent`}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={Math.round(
+                                  currentStepProgressPercent,
+                                )}
+                              />
+                              <div className="pointer-events-none absolute inset-0 flex items-center justify-between px-[1px]">
+                                {Array.from(
+                                  { length: TOTAL_SPRINT_STEPS + 1 },
+                                  (_, stepNumber) => (
+                                    <span
+                                      key={stepNumber}
+                                      className={[
+                                        "h-2 w-px rounded-full",
+                                        stepNumber <= activeDayNumber
+                                          ? "bg-emerald-500/40"
+                                          : "bg-border/80",
+                                      ].join(" ")}
+                                    />
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between gap-2 text-[11px]">
+                              <p className="text-muted-foreground">
+                                {DAY_TITLES[activeDayNumber]}
+                              </p>
+                              {currentDayTaskCount > 0 && (
+                                <p className="text-muted-foreground">
+                                  {checkedTaskCount}/{currentDayTaskCount} tasks
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <p
+                            className={[
+                              "text-[11px] inline-flex items-center gap-1",
+                              isCurrentDayComplete
+                                ? "text-emerald-700 dark:text-emerald-300"
+                                : "text-muted-foreground",
+                            ].join(" ")}
+                          >
+                            {isCurrentDayComplete ? (
+                              <Check className="h-3.5 w-3.5" />
+                            ) : (
+                              <Lock className="h-3.5 w-3.5" />
+                            )}
+                            {isCurrentDayComplete
+                              ? "Current step complete. Next step unlocked."
+                              : "Next step stays locked until this step is complete."}
+                          </p>
+                        </div>
+                      )}
+                      {/* <div className="divide-y divide-border">
                         {renderedActionChips}
-                      </div>
+                      </div> */}
                     </>
                   ) : (
                     <>
