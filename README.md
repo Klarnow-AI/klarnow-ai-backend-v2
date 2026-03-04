@@ -50,7 +50,19 @@ API: `http://localhost:8000`. Docs: `http://localhost:8000/docs`. Health: `http:
 
 ## Environment variables
 
-See [.env.example](.env.example). Required: `DATABASE_URL`, `SECRET_KEY`. Optional: Resend, S3, OpenAI for later phases.
+See [.env.example](.env.example). Required: `DATABASE_URL`, `SECRET_KEY`. Optional: Resend, S3, OpenAI, and Google sign-in.
+
+### Google Sign-In setup (GIS ID token flow)
+
+1. Create a Google OAuth client ID for a Web application.
+2. Add frontend origins (local/staging/production) in Google Cloud Console:
+   - `http://localhost:3000`
+   - your staging frontend origin
+   - your production frontend origin
+3. Set `GOOGLE_OAUTH_CLIENT_ID` in backend `.env`.
+4. Set `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in `frontend/.env.local` (and deployment envs).
+
+After Google token verification, backend still returns the app JWT used by existing protected routes.
 
 ### Published website builder sites (subdomain URLs)
 

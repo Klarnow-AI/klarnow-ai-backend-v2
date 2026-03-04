@@ -83,7 +83,7 @@ export function ResponseRulesEditor({
       <CardHeader>
         <CardTitle className="text-lg">Response rules</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Set templates for automated follow-up. Lock when ready (Day 8
+          Set templates for automated follow-up. Lock when ready (Step 8
           requirement).
         </p>
       </CardHeader>
@@ -164,7 +164,7 @@ export function ResponseRulesEditor({
               )}
               {!allLocked && (
                 <Button size="sm" onClick={handleLock} disabled={locking}>
-                  {locking ? "Locking…" : "Lock rules (Day 8)"}
+                  {locking ? "Locking…" : "Lock rules (Step 8)"}
                 </Button>
               )}
               {allLocked && (

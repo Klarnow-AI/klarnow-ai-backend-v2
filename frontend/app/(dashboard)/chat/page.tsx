@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import { chat as chatApi } from "@/api_requests/chat";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { useDelayedNextActionToast } from "@/hooks/use-delayed-next-action-toast";
 import {
   buildChatUrl,
   buildNewChatUrl,
@@ -158,6 +159,12 @@ export default function ChatPage() {
       .then(setNextAction)
       .catch(() => setNextAction(null));
   }, [packId]);
+
+  useDelayedNextActionToast({
+    nextAction,
+    delayMs: 8_000,
+    durationMs: 10_000,
+  });
 
   async function ensureConversation() {
     if (conversationId) return conversationId;

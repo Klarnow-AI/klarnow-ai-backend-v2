@@ -2,7 +2,6 @@ import type { ComponentType } from "react";
 import {
   MessageSquare,
   LayoutDashboard,
-  Calendar,
   Target,
   FileCode,
   Image as ImageIcon,
@@ -35,14 +34,6 @@ export const buildItems: NavItem[] = [
     packScoped: true,
   },
   { key: "chat", href: "/chat", label: "Chat", icon: MessageSquare, pathMatch: "/chat" },
-  {
-    key: "plan-tracker",
-    href: "/plan-tracker",
-    label: "Plan and tracker",
-    icon: Calendar,
-    pathMatch: "/plan-tracker",
-    packScoped: true,
-  },
   {
     key: "brand-os",
     href: "/brand-os",

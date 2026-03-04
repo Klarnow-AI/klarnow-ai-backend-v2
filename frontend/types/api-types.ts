@@ -86,6 +86,30 @@ export type SprintDayDetail = {
   blocker_message?: string | null;
 };
 
+export type TodayTaskItem = {
+  id: string;
+  label: string;
+  checked: boolean;
+};
+
+export type SprintTodayTasksRead = {
+  has_sprint: boolean;
+  sprint_id: string | null;
+  day_number: number | null;
+  day_title: string | null;
+  overview: string | null;
+  time_estimate: string | null;
+  source: string | null;
+  can_execute: boolean;
+  tasks: TodayTaskItem[];
+};
+
+export type TodayTaskToggleBody = {
+  day_number: number;
+  task_id: string;
+  checked: boolean;
+};
+
 export type Pack = {
   id: string;
   name: string;

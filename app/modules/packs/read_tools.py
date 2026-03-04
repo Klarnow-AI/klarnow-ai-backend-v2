@@ -141,7 +141,7 @@ def _pack_routes(pack_id: UUID) -> dict[str, str]:
     base = f"/packs/{pack_id}"
     return {
         "pack": base,
-        "follow_up_queue": f"{base}/plan-tracker/day/9",
+        "follow_up_queue": f"{base}?step=9",
         "leads": f"{base}/leads",
         "proposals": f"{base}/proposal",
         "invoices": f"{base}/invoice",

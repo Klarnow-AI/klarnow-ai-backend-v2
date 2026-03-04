@@ -17,6 +17,7 @@ type AuthContextValue = {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   checkEmailRegistered: (email: string) => Promise<{ registered: boolean }>;
   requestLoginCode: (email: string) => Promise<void>;
   verifyLoginCode: (email: string, code: string) => Promise<void>;
@@ -63,6 +64,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAuthenticated(true);
   }, []);
 
+  const loginWithGoogle = useCallback(async (idToken: string) => {
+    await authApi.loginWithGoogle(idToken);
+    setIsAuthenticated(true);
+  }, []);
+
   const checkEmailRegistered = useCallback(
     (email: string) => authApi.checkEmailRegistered(email),
     []
@@ -94,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         login,
         register,
+        loginWithGoogle,
         checkEmailRegistered,
         requestLoginCode,
         verifyLoginCode,

@@ -35,7 +35,7 @@ export function resolveTaskAction(
     case "open_website":
       return { type: "route", href: `/packs/${safePackId}/website` };
     case "open_plan_tracker":
-      return { type: "route", href: `/packs/${safePackId}/plan-tracker` };
+      return { type: "route", href: `/packs/${safePackId}` };
     case "open_chat":
       return { type: "route", href: `/chat?pack=${safePackId}` };
     case "open_proposals":

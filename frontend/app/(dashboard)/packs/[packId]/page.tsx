@@ -1,14 +1,18 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import {
+  useParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Target,
   Megaphone,
   FileCode,
-  Calendar,
   Users,
   FileCheck,
   Receipt,
@@ -17,16 +21,27 @@ import {
 } from "@/components/icons";
 import { Spinner } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { packs as packsApi } from "@/api_requests/packs";
 import { me } from "@/api_requests/me";
-import type { PackSummaryResponse } from "@/types/api-types";
+import { sprintApi } from "@/api_requests/sprint";
+import type {
+  PackSummaryResponse,
+  SprintTodayTasksRead,
+} from "@/types/api-types";
 import { PackActionsMenu } from "@/components/pack-actions-menu";
 import { PackChatPanel } from "./_components/pack-chat-panel";
 import { useGet } from "@/hooks/use-get";
+import { Day0Modal } from "@/components/day-0-modal";
+import { Day1Modal } from "@/components/day-1-modal";
+import { Day2Modal } from "@/components/day-2-modal";
+import { Day3Modal } from "@/components/day-3-modal";
+import { DayDetailModal } from "@/components/day-detail-modal";
+import { useDelayedNextActionToast } from "@/hooks/use-delayed-next-action-toast";
 
 /** Fixed pack summary cards — no add/remove. */
-const PACK_SUMMARY_CARDS: string[] = ["brand_os", "plan_tracker"];
+const PACK_SUMMARY_CARDS: string[] = ["brand_os"];
 
 const PACK_OVERVIEW_MODULES: Record<
   string,
@@ -119,42 +134,10 @@ const PACK_OVERVIEW_MODULES: Record<
           )}
           {s.website.published_at && (
             <p className="text-xs text-muted-foreground">
-              Published{" "}
-              {new Date(s.website.published_at).toLocaleDateString()}
+              Published {new Date(s.website.published_at).toLocaleDateString()}
             </p>
           )}
         </>
-      ) : null,
-  },
-  plan_tracker: {
-    title: "Plan & Tracker",
-    hrefSuffix: "/plan-tracker",
-    icon: Calendar,
-    emptyMessage:
-      "Start your 14-day sprint to publish, launch, capture leads, and get paid.",
-    getContent: (s) =>
-      s.plan_tracker?.has_sprint ? (
-        <div className="space-y-3">
-          <p>
-            <span className="font-medium text-muted-foreground">
-              14-day sprint
-            </span>
-            {s.plan_tracker.sprint_day != null && (
-              <> — Day {s.plan_tracker.sprint_day} of 14</>
-            )}
-          </p>
-          <Progress
-            value={
-              (Math.min(
-                Math.max(s.plan_tracker.sprint_day ?? 0, 0),
-                14,
-              ) /
-                14) *
-              100
-            }
-            className="h-2"
-          />
-        </div>
       ) : null,
   },
   leads: {
@@ -232,6 +215,20 @@ const item = {
   visible: { opacity: 1, y: 0 },
 };
 
+const TOTAL_SPRINT_STEPS = 14;
+
+function parseStepNumber(label: string): number | null {
+  const match = /^Step\s*(\d+)/i.exec(label.trim());
+  if (!match) return null;
+  const parsed = Number.parseInt(match[1], 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function stepToPercent(step: number): number {
+  const percent = (step / TOTAL_SPRINT_STEPS) * 100;
+  return Math.min(100, Math.max(0, percent));
+}
+
 function SummarySection({
   title,
   href,
@@ -301,11 +298,19 @@ function SummarySection({
 
 export default function PackOverviewPage() {
   const params = useParams();
+  const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const packId = params.packId as string;
   const [nextAction, setNextAction] = useState<Awaited<
     ReturnType<typeof me.getNextAction>
   > | null>(null);
+  const [dayModalOpen, setDayModalOpen] = useState<number | null>(null);
+  const [todayTasks, setTodayTasks] = useState<SprintTodayTasksRead | null>(
+    null,
+  );
+  const [taskUpdateId, setTaskUpdateId] = useState<string | null>(null);
+  const [startingSprint, setStartingSprint] = useState(false);
 
   const summaryFetcher = useCallback(
     () => packsApi.getSummary(packId),
@@ -317,13 +322,46 @@ export default function PackOverviewPage() {
     error,
     refetch: fetchSummary,
   } = useGet(packId ? ["pack-summary", packId] : null, summaryFetcher);
+  const todayTasksFetcher = useCallback(
+    () => sprintApi.getTodayTasks(packId),
+    [packId],
+  );
+  const {
+    data: todayTasksData,
+    isLoading: todayTasksLoading,
+    error: todayTasksError,
+    refetch: fetchTodayTasks,
+  } = useGet(packId ? ["pack-today-tasks", packId] : null, todayTasksFetcher);
 
-  useEffect(() => {
+  const loadNextAction = useCallback(() => {
     if (!packId) return;
     me.getNextAction(packId)
       .then(setNextAction)
       .catch(() => setNextAction(null));
   }, [packId]);
+
+  useEffect(() => {
+    loadNextAction();
+  }, [loadNextAction]);
+
+  useDelayedNextActionToast({
+    nextAction,
+    delayMs: 8_000,
+    durationMs: 10_000,
+  });
+
+  useEffect(() => {
+    setTodayTasks(todayTasksData ?? null);
+  }, [todayTasksData]);
+
+  const stepFromUrl = searchParams.get("step") ?? searchParams.get("day");
+  useEffect(() => {
+    if (stepFromUrl == null) return;
+    const parsed = Number.parseInt(stepFromUrl, 10);
+    if (Number.isInteger(parsed) && parsed >= 0 && parsed <= 14) {
+      setDayModalOpen(parsed);
+    }
+  }, [stepFromUrl]);
 
   async function handleArchive(id: string) {
     await packsApi.archive(id);
@@ -339,6 +377,96 @@ export default function PackOverviewPage() {
     await packsApi.delete(id);
     router.push("/packs");
   }
+
+  const openDayModal = useCallback(
+    (dayNumber: number) => {
+      if (dayNumber < 0 || dayNumber > 14) return;
+      setDayModalOpen(dayNumber);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("step", String(dayNumber));
+      params.delete("day");
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
+  const closeDayModal = useCallback(() => {
+    setDayModalOpen(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("step");
+    params.delete("day");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+  }, [pathname, router, searchParams]);
+
+  const refreshOverviewState = useCallback(() => {
+    fetchSummary();
+    fetchTodayTasks();
+    loadNextAction();
+  }, [fetchSummary, fetchTodayTasks, loadNextAction]);
+
+  const handleDayComplete = useCallback(() => {
+    closeDayModal();
+    refreshOverviewState();
+    router.refresh();
+    window.setTimeout(() => {
+      refreshOverviewState();
+      router.refresh();
+    }, 250);
+  }, [closeDayModal, refreshOverviewState, router]);
+
+  const handleTaskToggle = useCallback(
+    async (taskId: string, checked: boolean) => {
+      if (!todayTasks || todayTasks.day_number == null) return;
+      const dayNumber = todayTasks.day_number;
+      setTaskUpdateId(taskId);
+      setTodayTasks((prev) =>
+        prev
+          ? {
+              ...prev,
+              tasks: prev.tasks.map((task) =>
+                task.id === taskId ? { ...task, checked } : task,
+              ),
+            }
+          : prev,
+      );
+      try {
+        const updated = await sprintApi.toggleTodayTask(packId, {
+          day_number: dayNumber,
+          task_id: taskId,
+          checked,
+        });
+        setTodayTasks(updated);
+        refreshOverviewState();
+      } catch {
+        fetchTodayTasks();
+      } finally {
+        setTaskUpdateId(null);
+      }
+    },
+    [fetchTodayTasks, packId, refreshOverviewState, todayTasks],
+  );
+
+  const handleStartSprint = useCallback(async () => {
+    setStartingSprint(true);
+    try {
+      const sprint = await sprintApi.createSprint(packId);
+      refreshOverviewState();
+      openDayModal(sprint.current_day);
+      router.refresh();
+    } catch {
+      fetchTodayTasks();
+    } finally {
+      setStartingSprint(false);
+    }
+  }, [fetchTodayTasks, openDayModal, packId, refreshOverviewState, router]);
+
+  const handleExecuteToday = useCallback(() => {
+    if (todayTasks?.day_number == null) return;
+    openDayModal(todayTasks.day_number);
+  }, [openDayModal, todayTasks]);
 
   if (loading) {
     return (
@@ -364,6 +492,53 @@ export default function PackOverviewPage() {
   const { pack } = summary;
   const chips = nextAction?.actionChips ?? [];
   const hasNextStep = !!nextAction?.actionText || chips.length > 0;
+  const hasSprintToday =
+    !!todayTasks?.has_sprint && todayTasks.day_number != null;
+  const primaryChipIndex = chips.findIndex((chip) => !!chip.href);
+  const primaryChip = primaryChipIndex >= 0 ? chips[primaryChipIndex] : null;
+  const hasWhatToDoNext = hasNextStep || hasSprintToday;
+  const renderedActionChips = chips.map((chip, i) => {
+    if (!chip.href) return null;
+    if (nextAction?.canProceed === false && primaryChipIndex === i) return null;
+
+    const stepNumber = parseStepNumber(chip.label);
+
+    if (stepNumber != null) {
+      const progressPercent = stepToPercent(stepNumber);
+      const roundedProgressPercent = Math.round(progressPercent);
+      return (
+        <Link
+          key={i}
+          href={chip.href}
+          className="block px-5 py-3 text-sm hover:bg-muted/40 focus-visible:bg-muted/40 transition-colors"
+        >
+          <div className="space-y-2">
+            <span className="block font-medium truncate">{chip.label}</span>
+            <Progress
+              value={progressPercent}
+              className="h-1.5 bg-muted"
+              role="progressbar"
+              aria-label={`${chip.label} progress ${roundedProgressPercent} percent`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={roundedProgressPercent}
+            />
+          </div>
+        </Link>
+      );
+    }
+
+    return (
+      <Link
+        key={i}
+        href={chip.href}
+        className="flex items-center justify-between gap-3 px-5 py-3 text-sm hover:bg-muted/40 transition-colors"
+      >
+        <span className="font-medium truncate">{chip.label}</span>
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+      </Link>
+    );
+  });
 
   return (
     <div className="flex flex-col p-8 lg:h-full lg:overflow-hidden">
@@ -383,7 +558,7 @@ export default function PackOverviewPage() {
               </motion.section>
             )}
 
-            {hasNextStep && (
+            {hasWhatToDoNext && (
               <motion.section
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -394,61 +569,194 @@ export default function PackOverviewPage() {
                   What to do next
                 </h2>
                 <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-                  {nextAction?.actionText && (
-                    <div className="px-5 py-4 border-b border-border space-y-2">
-                      <p className="text-sm font-medium text-foreground">
-                        {nextAction.actionText}
-                      </p>
-                      {nextAction.whyItMatters && (
-                        <p className="text-xs text-muted-foreground">
-                          {nextAction.whyItMatters}
-                        </p>
-                      )}
-                      {(nextAction.timeEstimate ||
-                        nextAction.progressCounters) && (
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                          {nextAction.timeEstimate && (
-                            <span>{nextAction.timeEstimate}</span>
+                  {hasSprintToday ? (
+                    <>
+                      <div className="px-5 py-4 border-b border-border flex items-start justify-between gap-4">
+                        <div className="space-y-2 min-w-0">
+                          <p className="text-sm font-semibold text-foreground">
+                            Step {todayTasks?.day_number}:{" "}
+                            {todayTasks?.day_title ?? "Current step"}
+                          </p>
+                          {todayTasks?.overview && (
+                            <div className="max-w-prose">
+                              <p className="text-xs text-muted-foreground line-clamp-2">
+                                {todayTasks.overview}
+                              </p>
+                            </div>
                           )}
-                          {nextAction.progressCounters &&
-                            Object.entries(nextAction.progressCounters).map(
-                              ([k, v]) => (
-                                <span key={k}>
-                                  {k}: {v}
-                                </span>
-                              ),
-                            )}
+                          {(todayTasks?.time_estimate ||
+                            nextAction?.progressCounters) && (
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                              {todayTasks?.time_estimate && (
+                                <span>{todayTasks.time_estimate}</span>
+                              )}
+                              {nextAction?.progressCounters &&
+                                Object.entries(nextAction.progressCounters).map(
+                                  ([k, v]) => (
+                                    <span key={k}>
+                                      {k}: {v}
+                                    </span>
+                                  ),
+                                )}
+                            </div>
+                          )}
+                          {nextAction?.blockerMessage && (
+                            <p
+                              className="text-xs text-amber-600 dark:text-amber-400"
+                              role="alert"
+                            >
+                              {nextAction.blockerMessage}
+                            </p>
+                          )}
+                        </div>
+                        {nextAction?.canProceed === false &&
+                        primaryChip?.href ? (
+                          <Link href={primaryChip.href} className="shrink-0">
+                            <Button size="sm">{primaryChip.label}</Button>
+                          </Link>
+                        ) : (
+                          <div className="execute-now-cta-ring shrink-0">
+                            <Button
+                              onClick={handleExecuteToday}
+                              size="sm"
+                              className="execute-now-cta hover:scale-100 focus-visible:scale-100 active:scale-100 hover:!text-white"
+                            >
+                              Execute now
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="divide-y divide-border">
+                        {renderedActionChips}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {nextAction?.actionText && (
+                        <div className="px-5 py-4 border-b border-border space-y-2">
+                          <p className="text-sm font-medium text-foreground">
+                            {nextAction.actionText}
+                          </p>
+                          {nextAction.whyItMatters && (
+                            <p className="text-xs text-muted-foreground">
+                              {nextAction.whyItMatters}
+                            </p>
+                          )}
+                          {(nextAction.timeEstimate ||
+                            nextAction.progressCounters) && (
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                              {nextAction.timeEstimate && (
+                                <span>{nextAction.timeEstimate}</span>
+                              )}
+                              {nextAction.progressCounters &&
+                                Object.entries(nextAction.progressCounters).map(
+                                  ([k, v]) => (
+                                    <span key={k}>
+                                      {k}: {v}
+                                    </span>
+                                  ),
+                                )}
+                            </div>
+                          )}
+                          {nextAction.blockerMessage && (
+                            <p
+                              className="text-xs text-amber-600 dark:text-amber-400"
+                              role="alert"
+                            >
+                              {nextAction.blockerMessage}
+                            </p>
+                          )}
                         </div>
                       )}
-                      {nextAction.blockerMessage && (
-                        <p
-                          className="text-xs text-amber-600 dark:text-amber-400"
-                          role="alert"
-                        >
-                          {nextAction.blockerMessage}
-                        </p>
-                      )}
-                    </div>
+                      <div className="divide-y divide-border">
+                        {renderedActionChips}
+                      </div>
+                    </>
                   )}
-                  <div className="divide-y divide-border">
-                    {chips.map((chip, i) =>
-                      chip.href ? (
-                        <Link
-                          key={i}
-                          href={chip.href}
-                          className="flex items-center justify-between gap-3 px-5 py-3 text-sm hover:bg-muted/40 transition-colors"
-                        >
-                          <span className="font-medium truncate">
-                            {chip.label}
-                          </span>
-                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        </Link>
-                      ) : null,
-                    )}
-                  </div>
                 </div>
               </motion.section>
             )}
+
+            <motion.section
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.06 }}
+              className="shrink-0 space-y-3"
+            >
+              <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Today&apos;s tasks
+              </h2>
+              <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+                {todayTasksLoading ? (
+                  <div className="px-5 py-6">
+                    <p className="text-sm text-muted-foreground">
+                      Loading today&apos;s tasks...
+                    </p>
+                  </div>
+                ) : todayTasksError ? (
+                  <div className="px-5 py-6 space-y-3">
+                    <p className="text-sm text-destructive">
+                      {todayTasksError.message ||
+                        "Could not load today's tasks."}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={fetchTodayTasks}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                ) : !todayTasks?.has_sprint ? (
+                  <div className="px-5 py-6 space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Start your sprint from What to do next to unlock
+                      today&apos;s checklist.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="px-5 py-4 border-b border-border">
+                      <p className="text-sm font-semibold text-foreground">
+                        Checklist
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Track progress for today&apos;s step tasks.
+                      </p>
+                    </div>
+                    <div className="px-5 py-4 space-y-3">
+                      {todayTasks.tasks.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No checklist items generated yet.
+                        </p>
+                      ) : (
+                        todayTasks.tasks.map((task) => {
+                          const disabled = taskUpdateId === task.id;
+                          return (
+                            <label
+                              key={task.id}
+                              className="flex items-start gap-3 text-sm"
+                            >
+                              <Checkbox
+                                checked={task.checked}
+                                disabled={disabled}
+                                onCheckedChange={(checked) =>
+                                  handleTaskToggle(task.id, checked)
+                                }
+                                className="mt-0.5"
+                              />
+                              <span className="leading-relaxed">
+                                {task.label}
+                              </span>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </motion.section>
 
             <motion.section
               variants={container}
@@ -498,6 +806,52 @@ export default function PackOverviewPage() {
           <PackChatPanel packId={packId} />
         </div>
       </div>
+
+      {dayModalOpen !== null && (
+        <>
+          {dayModalOpen === 0 && (
+            <Day0Modal
+              open={true}
+              onClose={closeDayModal}
+              packId={packId}
+              onComplete={handleDayComplete}
+            />
+          )}
+          {dayModalOpen === 1 && (
+            <Day1Modal
+              open={true}
+              onClose={closeDayModal}
+              packId={packId}
+              onComplete={handleDayComplete}
+            />
+          )}
+          {dayModalOpen === 2 && (
+            <Day2Modal
+              open={true}
+              onClose={closeDayModal}
+              packId={packId}
+              onComplete={handleDayComplete}
+            />
+          )}
+          {dayModalOpen === 3 && (
+            <Day3Modal
+              open={true}
+              onClose={closeDayModal}
+              packId={packId}
+              onComplete={handleDayComplete}
+            />
+          )}
+          {dayModalOpen >= 4 && dayModalOpen <= 14 && (
+            <DayDetailModal
+              packId={packId}
+              dayNumber={dayModalOpen}
+              open={true}
+              onClose={closeDayModal}
+              onComplete={handleDayComplete}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }

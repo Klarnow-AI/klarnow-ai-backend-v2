@@ -104,7 +104,7 @@ export function Day2Modal({
     const outcome = primaryOutcome.trim();
     if (!pain || !outcome) return;
     if (!sprintId) {
-      setError("No active sprint. Start a sprint from the plan tracker.");
+      setError("No active sprint. Start a sprint from Overview.");
       return;
     }
     setSaving(true);
@@ -116,7 +116,7 @@ export function Day2Modal({
       });
       onComplete?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to complete Day 2");
+      setError(err instanceof Error ? err.message : "Failed to complete Step 2");
     } finally {
       setSaving(false);
     }
@@ -156,7 +156,7 @@ export function Day2Modal({
               id="day2-modal-title"
               className="font-heading text-2xl font-bold text-foreground pr-10"
             >
-              Day 2: USP + Audience
+              Step 2: USP + Audience
             </h2>
             <p className="mt-3 text-sm text-muted-foreground">
               Define the primary pain point your audience faces and the outcome they desire.
@@ -169,7 +169,7 @@ export function Day2Modal({
             ) : !sprintId ? (
               <div className="mt-6 min-h-[120px] flex items-center">
                 <p className="text-sm text-amber-600 dark:text-amber-400">
-                  No active sprint. Go to Plan tracker and start a sprint first.
+                  No active sprint. Go to Overview and start a sprint first.
                 </p>
               </div>
             ) : (
@@ -258,7 +258,7 @@ export function Day2Modal({
                     Cancel
                   </Button>
                   <Button type="submit" disabled={!isValid || saving || dayComplete}>
-                    {saving ? "Saving…" : dayComplete ? "Day 2 complete" : "Complete Day 2"}
+                    {saving ? "Saving…" : dayComplete ? "Step 2 complete" : "Complete Step 2"}
                   </Button>
                 </div>
               </form>

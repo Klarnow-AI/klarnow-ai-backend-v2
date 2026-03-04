@@ -131,7 +131,7 @@ export function SprintCalendar({ sprint, onDayClick }: SprintCalendarProps) {
           {sprint.mode === "build" ? "Build Mode" : "Improve Mode"}
         </Badge>
         <span className="text-sm text-muted-foreground">
-          Day {sprint.current_day} of 14
+          Step {sprint.current_day} of 14
         </span>
       </div>
 
@@ -196,7 +196,7 @@ export function SprintCalendar({ sprint, onDayClick }: SprintCalendarProps) {
                       }
                       title={
                         isLocked
-                          ? `Complete Day ${sprint.current_day} first`
+                          ? `Complete Step ${sprint.current_day} first`
                           : undefined
                       }
                     >
@@ -235,7 +235,7 @@ export function SprintCalendar({ sprint, onDayClick }: SprintCalendarProps) {
                                     : "text-primary",
                                 )}
                               >
-                                Day {dayCard.day_number}
+                                Step {dayCard.day_number}
                               </div>
                               <div className="text-xs text-muted-foreground line-clamp-2">
                                 {DAY_TITLES[dayCard.day_number]}
@@ -261,7 +261,7 @@ export function SprintCalendar({ sprint, onDayClick }: SprintCalendarProps) {
         </div>
         <div className="flex items-center gap-2">
           <AlertCircle className="h-4 w-4 text-primary shrink-0" />
-          <span className="text-sm text-muted-foreground">Current Day</span>
+          <span className="text-sm text-muted-foreground">Current Step</span>
         </div>
         <div className="flex items-center gap-2">
           <Lock className="h-4 w-4 text-muted-foreground/60 shrink-0" />

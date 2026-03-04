@@ -22,6 +22,15 @@ export const auth = {
       localStorage.setItem("klarnow_token", data.access_token);
     return data;
   },
+  async loginWithGoogle(idToken: string) {
+    const data = await api<AuthAccessToken>(`${AUTH_PREFIX}/google`, {
+      method: "POST",
+      body: JSON.stringify({ id_token: idToken }),
+    });
+    if (typeof window !== "undefined")
+      localStorage.setItem("klarnow_token", data.access_token);
+    return data;
+  },
   async checkEmailRegistered(email: string) {
     return api<AuthCheckEmail>(`${AUTH_PREFIX}/check-email`, {
       method: "POST",

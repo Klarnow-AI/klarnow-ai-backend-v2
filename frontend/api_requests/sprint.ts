@@ -1,5 +1,10 @@
 import { api } from "@/lib/http";
-import type { SprintRead, SprintDayDetail } from "@/types/api-types";
+import type {
+  SprintRead,
+  SprintDayDetail,
+  SprintTodayTasksRead,
+  TodayTaskToggleBody,
+} from "@/types/api-types";
 
 const PACKS_PREFIX = "/api/v1/packs";
 
@@ -18,6 +23,15 @@ export const sprintApi = {
     api<SprintDayDetail | null>(
       `${PACKS_PREFIX}/${packId}/sprint/day/${dayNumber}`
     ),
+
+  getTodayTasks: (packId: string) =>
+    api<SprintTodayTasksRead>(`${PACKS_PREFIX}/${packId}/sprint/today-tasks`),
+
+  toggleTodayTask: (packId: string, body: TodayTaskToggleBody) =>
+    api<SprintTodayTasksRead>(`${PACKS_PREFIX}/${packId}/sprint/today-tasks`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
 
   completeDay: (
     packId: string, 

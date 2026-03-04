@@ -4,59 +4,76 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 export interface CheckboxProps extends Omit<
-  React.InputHTMLAttributes<HTMLInputElement>,
-  "type" | "checked"
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  "checked" | "onChange"
 > {
   checked?: boolean | "indeterminate";
   onCheckedChange?: (checked: boolean) => void;
 }
 
-const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
-  ({ className, checked, onCheckedChange, onChange, ...props }, ref) => {
-    const internalRef = React.useRef<HTMLInputElement | null>(null);
-    const setRefs = React.useCallback(
-      (el: HTMLInputElement | null) => {
-        internalRef.current = el;
-        if (typeof ref === "function") ref(el);
-        else if (ref) ref.current = el;
-      },
-      [ref],
-    );
+const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
+  (
+    {
+      className,
+      checked = false,
+      onCheckedChange,
+      onClick,
+      disabled,
+      type,
+      ...props
+    },
+    ref,
+  ) => {
+    const state =
+      checked === "indeterminate"
+        ? "indeterminate"
+        : checked
+          ? "checked"
+          : "unchecked";
 
-    React.useEffect(() => {
-      const el = internalRef.current;
-      if (!el) return;
-      if (checked === "indeterminate") {
-        el.indeterminate = true;
-        el.checked = false;
-      } else {
-        el.indeterminate = false;
-        el.checked = !!checked;
-      }
-    }, [checked]);
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      onChange?.(e);
-      onCheckedChange?.(e.target.checked);
+    const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+      onClick?.(event);
+      if (event.defaultPrevented || disabled) return;
+      const nextValue = checked === "indeterminate" ? true : !checked;
+      onCheckedChange?.(nextValue);
     };
 
-    const isChecked = checked === "indeterminate" ? false : !!checked;
-
     return (
-      <input
-        type="checkbox"
-        ref={setRefs}
-        checked={isChecked}
-        onChange={handleChange}
+      <button
+        {...props}
+        type={type ?? "button"}
+        role="checkbox"
+        aria-checked={state === "indeterminate" ? "mixed" : !!checked}
+        data-state={state}
+        disabled={disabled}
+        ref={ref}
+        onClick={handleClick}
         className={cn(
-          "h-4 w-4 shrink-0 rounded border border-border bg-card shadow-sm transition-transform",
-          "focus-visible:outline-none focus-visible:scale-110",
+          "peer inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-md border border-primary/50 bg-card shadow-sm transition-colors",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           "disabled:cursor-not-allowed disabled:opacity-50",
-          "accent-primary",
+          "data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground",
+          "data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-primary-foreground",
           className,
         )}
-        {...props}
-      />
+      >
+        {state === "checked" ? (
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            className="h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        ) : state === "indeterminate" ? (
+          <span className="h-0.5 w-2.5 rounded-full bg-current" />
+        ) : null}
+      </button>
     );
   },
 );

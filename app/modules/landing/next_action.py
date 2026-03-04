@@ -66,7 +66,7 @@ def get_next_action(
         }
 
     pack_path = f"/packs/{pack.id}"
-    plan_tracker_day = lambda n: f"{pack_path}/plan-tracker?day={n}"
+    overview_day = lambda n: f"{pack_path}?step={n}"
 
     # --- 0. Inactivity recovery (spec section 10) ---
     user = db.query(User).filter(User.id == user_id).first()
@@ -76,7 +76,7 @@ def get_next_action(
         if inactive_hours >= 72:
             return {
                 "action_text": "Simplify your offer",
-                "action_chips": [_chip("Day 1", plan_tracker_day(1)), _chip("Day 0", plan_tracker_day(0))],
+                "action_chips": [_chip("Step 1", overview_day(1)), _chip("Step 0", overview_day(0))],
                 "stage": "inactivity",
                 "can_proceed": True,
                 "blocker_message": None,
@@ -87,7 +87,7 @@ def get_next_action(
         if inactive_hours >= 24:
             return {
                 "action_text": "Restart in 5 minutes",
-                "action_chips": [_chip("Plan tracker", f"{pack_path}/plan-tracker"), _chip("Leads", f"{pack_path}/leads")],
+                "action_chips": [_chip("Overview", pack_path), _chip("Leads", f"{pack_path}/leads")],
                 "stage": "inactivity",
                 "can_proceed": True,
                 "blocker_message": None,
@@ -108,7 +108,7 @@ def get_next_action(
             "stage": "blocked",
             "can_proceed": False,
             "blocker_message": paywall_msg,
-            "why_it_matters": "Free plan includes Days 0–4. Unlock the full sprint with Standard or Premium.",
+            "why_it_matters": "Free plan includes Steps 0-4. Unlock the full sprint with Standard or Premium.",
             "time_estimate": None,
             "progress_counters": None,
         }
@@ -117,7 +117,7 @@ def get_next_action(
     if not can_pack:
         return {
             "action_text": "Complete pack basics",
-            "action_chips": [_chip("Day 0 / Offer", plan_tracker_day(0)), _chip("Set CTA", plan_tracker_day(0))],
+            "action_chips": [_chip("Step 0 / Offer", overview_day(0)), _chip("Set CTA", overview_day(0))],
             "stage": "blocked",
             "can_proceed": False,
             "blocker_message": pack_msg,
@@ -130,7 +130,7 @@ def get_next_action(
         can_d7, d7_msg = can_pass_day7_gate(db, pack)
         if not can_d7:
             return {
-                "action_text": "Unlock Day 7",
+                "action_text": "Unlock Step 7",
                 "action_chips": [_chip("Website", f"{pack_path}/website"), _chip("Add proof", f"{pack_path}")],
                 "stage": "blocked",
                 "can_proceed": False,
@@ -145,7 +145,7 @@ def get_next_action(
         if not can_d8:
             return {
                 "action_text": "Lock response rules",
-                "action_chips": [_chip("Response rules", f"{pack_path}/plan-tracker/day/8")],
+                "action_chips": [_chip("Response rules", overview_day(8))],
                 "stage": "blocked",
                 "can_proceed": False,
                 "blocker_message": d8_msg,
@@ -160,7 +160,7 @@ def get_next_action(
     if overdue:
         return {
             "action_text": f"Follow up with {len(overdue)} lead(s)",
-            "action_chips": [_chip("Follow-up queue", f"{pack_path}/plan-tracker/day/9"), _chip("Leads", f"{pack_path}/leads")],
+            "action_chips": [_chip("Follow-up queue", overview_day(9)), _chip("Leads", f"{pack_path}/leads")],
             "stage": "revenue_leak",
             "can_proceed": True,
             "blocker_message": None,
@@ -174,14 +174,14 @@ def get_next_action(
         sprint = active_sprint
         day_num = sprint.current_day
         card = get_day_card(db, sprint.id, day_num)
-        sprint_path = f"{pack_path}/plan-tracker"
-        day_path = f"{sprint_path}/day/{day_num}"
+        sprint_path = pack_path
+        day_path = overview_day(day_num)
 
         # Day 14: check-in state
         if day_num == 14 and card and not card.completed_at:
             return {
                 "action_text": "Complete weekly check-in",
-                "action_chips": [_chip("Day 14 check-in", day_path), _chip("Plan tracker", sprint_path)],
+                "action_chips": [_chip("Step 14 check-in", day_path), _chip("Overview", sprint_path)],
                 "stage": "checkin",
                 "can_proceed": True,
                 "blocker_message": None,
@@ -190,18 +190,17 @@ def get_next_action(
                 "progress_counters": None,
             }
 
-        # Default: work on current day (all days open plan-tracker modal)
-        day_href = plan_tracker_day(day_num) if 0 <= day_num <= 3 else day_path
-        chips = [_chip(f"Day {day_num}", day_href), _chip("Sprint", sprint_path)]
+        day_href = day_path
+        chips = [_chip(f"Step {day_num}", day_href), _chip("Overview", sprint_path)]
         if credits == 0 and day_num >= 4:
             chips.append(_chip("Buy credits", "/settings"))
         return {
-            "action_text": f"Day {day_num}: work on today's tasks",
+            "action_text": f"Step {day_num}: work on today's tasks",
             "action_chips": chips,
             "stage": "sprint",
             "can_proceed": True,
             "blocker_message": None,
-            "why_it_matters": "Staying on the sprint day keeps momentum.",
+            "why_it_matters": "Staying on the current step keeps momentum.",
             "time_estimate": "15–30 mins",
             "progress_counters": None,
         }
@@ -217,7 +216,7 @@ def get_next_action(
     if new_leads:
         return {
             "action_text": "Contact new lead(s)",
-            "action_chips": [_chip("Leads", f"{pack_path}/leads"), _chip("Follow-up", f"{pack_path}/plan-tracker/day/9")],
+            "action_chips": [_chip("Leads", f"{pack_path}/leads"), _chip("Follow-up", overview_day(9))],
             "stage": "leads",
             "can_proceed": True,
             "blocker_message": None,
@@ -255,8 +254,8 @@ def get_next_action(
 
     if not day_0_done or not has_basics:
         return {
-            "action_text": "Complete Day 0 setup",
-            "action_chips": [_chip("Day 0", plan_tracker_day(0)), _chip("Set CTA & USP", plan_tracker_day(0))],
+            "action_text": "Complete Step 0 setup",
+            "action_chips": [_chip("Step 0", overview_day(0)), _chip("Set CTA & USP", overview_day(0))],
             "stage": "brand_os_done",
             "can_proceed": True,
             "blocker_message": None,
@@ -277,19 +276,19 @@ def get_next_action(
         }
     if not active_sprint:
         return {
-            "action_text": "Start 14-day sprint",
-            "action_chips": [_chip("Start Sprint", f"{pack_path}/plan-tracker")],
+            "action_text": "Start 14-step sprint",
+            "action_chips": [_chip("Start Sprint", pack_path)],
             "stage": "page_live",
             "can_proceed": True,
             "blocker_message": None,
-            "why_it_matters": "Your sprint guides you day by day to offers, assets and revenue.",
+            "why_it_matters": "Your sprint guides you step by step to offers, assets and revenue.",
             "time_estimate": "1 min",
             "progress_counters": None,
         }
 
     return {
         "action_text": "Check-in or start next sprint",
-        "action_chips": [_chip("Plan tracker", f"{pack_path}/plan-tracker")],
+        "action_chips": [_chip("Overview", pack_path)],
         "stage": "leads",
         "can_proceed": True,
         "blocker_message": None,

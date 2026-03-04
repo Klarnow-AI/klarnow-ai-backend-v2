@@ -63,10 +63,10 @@ export function CreativeTemplateGrid({
           <Lock className="h-8 w-8 text-muted-foreground" />
         </div>
         <p className="text-sm font-medium text-foreground mb-1">
-          Complete Day 0–3 to unlock starter templates
+          Complete Step 0–3 to unlock starter templates
         </p>
         <p className="max-w-sm text-sm text-muted-foreground leading-relaxed">
-          Finish your sprint setup (Days 0–3) to access and create{" "}
+          Finish your sprint setup (Steps 0–3) to access and create{" "}
           posters and flyers.
         </p>
       </div>

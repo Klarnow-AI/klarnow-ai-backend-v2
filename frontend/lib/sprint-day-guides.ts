@@ -23,14 +23,14 @@ export const dayGuides: Record<number, DayGuide> = {
       "Lock your brand name",
       "Define your USP (Unique Selling Proposition)",
       "Set your primary call-to-action",
-      "Complete the Day 0 checklist"
+      "Complete the Step 0 checklist"
     ],
     tips: [
       "Be specific - your USP should be unique to you",
       "Your CTA should be one clear action (e.g. Book a call)",
       "Don't overthink it - you can refine as you go"
     ],
-    expectedOutcome: "USP locked and CTA confirmed. You're ready for Day 1."
+    expectedOutcome: "USP locked and CTA confirmed. You're ready for Step 1."
   },
   1: {
     dayNumber: 1,
@@ -107,7 +107,7 @@ export const dayGuides: Record<number, DayGuide> = {
     ],
     tips: [
       "Hook formula: start with the outcome - 'How to [result] without [pain]'",
-      "Keep messaging consistent with Day 2 pain/outcome"
+      "Keep messaging consistent with Step 2 pain/outcome"
     ],
     expectedOutcome: "Scripts and shot list generated. First ad shipped."
   },
@@ -255,7 +255,7 @@ export const dayGuides: Record<number, DayGuide> = {
     tasks: [
       {
         label: "Identify one leak (unclear CTA, slow response, confusing offer)",
-        action: { type: "route", key: "open_plan_tracker", ctaLabel: "Open Plan Tracker" },
+        action: { type: "route", key: "open_plan_tracker", ctaLabel: "Open Overview" },
       },
       {
         label: "Fix it live",
@@ -351,7 +351,7 @@ export const dayGuides: Record<number, DayGuide> = {
     tasks: [
       {
         label: "Review sprint metrics",
-        action: { type: "route", key: "open_plan_tracker", ctaLabel: "Open Plan Tracker" },
+        action: { type: "route", key: "open_plan_tracker", ctaLabel: "Open Overview" },
       },
       {
         label: "Document wins and lessons",

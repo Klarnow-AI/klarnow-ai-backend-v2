@@ -72,6 +72,34 @@ class SprintDayDetail(BaseModel):
     blocker_message: str | None = None
 
 
+class TodayTaskItem(BaseModel):
+    id: str
+    label: str
+    checked: bool = False
+
+    model_config = {"extra": "forbid"}
+
+
+class SprintTodayTasksRead(BaseModel):
+    has_sprint: bool
+    sprint_id: UUID | None = None
+    day_number: int | None = None
+    day_title: str | None = None
+    overview: str | None = None
+    time_estimate: str | None = None
+    source: str | None = None
+    can_execute: bool = False
+    tasks: list[TodayTaskItem] = Field(default_factory=list)
+
+
+class TodayTaskToggleBody(BaseModel):
+    day_number: int = Field(..., ge=0, le=14)
+    task_id: str = Field(..., min_length=1)
+    checked: bool
+
+    model_config = {"extra": "forbid"}
+
+
 class DayCompleteRequest(BaseModel):
     """
     Request body for completing a day.

@@ -53,7 +53,7 @@ const DELETED_DATA_LIST = [
   "Brand OS",
   "Campaigns",
   "Websites",
-  "Plan Tracker",
+  "Sprint progress / day tasks",
   "Assets (images, videos, etc.)",
   "Proposals",
   "Invoices",

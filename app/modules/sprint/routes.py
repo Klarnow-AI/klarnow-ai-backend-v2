@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
@@ -15,6 +15,8 @@ from app.modules.sprint.schemas import (
     DayCardRead,
     DayCardUpdate,
     SprintDayDetail,
+    SprintTodayTasksRead,
+    TodayTaskToggleBody,
     DayCompleteRequest,
     SuggestDayResponse,
     SuggestFieldRequest,
@@ -29,6 +31,9 @@ from app.modules.sprint.services import (
     complete_day,
     complete_sprint_and_reload,
     get_sprint_day_detail,
+    get_or_generate_today_tasks,
+    toggle_today_task_check,
+    StaleDayError,
 )
 from app.modules.sprint.suggestions import suggest_day_fields, suggest_sprint_field
 
@@ -70,7 +75,6 @@ def create_sprint(
     try:
         sprint = create_sprint_for_pack(db, pack_id)
     except ValueError as e:
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail=str(e))
     return SprintRead.model_validate(sprint)
 
@@ -91,6 +95,48 @@ def get_sprint_day(
     return SprintDayDetail.model_validate(detail) if detail else None
 
 
+@router.get(
+    "/packs/{pack_id}/sprint/today-tasks",
+    response_model=SprintTodayTasksRead,
+)
+def get_today_tasks(
+    pack_id: UUID,
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get current sprint-day checklist for the pack overview page."""
+    _ensure_pack_access(db, pack_id, current_user.id)
+    data = get_or_generate_today_tasks(db, pack_id)
+    return SprintTodayTasksRead.model_validate(data)
+
+
+@router.patch(
+    "/packs/{pack_id}/sprint/today-tasks",
+    response_model=SprintTodayTasksRead,
+)
+def patch_today_task(
+    pack_id: UUID,
+    body: TodayTaskToggleBody,
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Toggle one checklist item for the current sprint day."""
+    _ensure_pack_access(db, pack_id, current_user.id)
+    try:
+        data = toggle_today_task_check(
+            db=db,
+            pack_id=pack_id,
+            day_number=body.day_number,
+            task_id=body.task_id,
+            checked=body.checked,
+        )
+    except StaleDayError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return SprintTodayTasksRead.model_validate(data)
+
+
 @router.post(
     "/packs/{pack_id}/sprint/suggest-day/{day_number}",
     response_model=SuggestDayResponse,
@@ -104,7 +150,6 @@ def suggest_day(
     """Return suggested values for a sprint day's fields (Day 1, 2, or 3). Used to pre-fill modals."""
     _ensure_pack_access(db, pack_id, current_user.id)
     if day_number not in (1, 2, 3):
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="day_number must be 1, 2, or 3")
     data = suggest_day_fields(db, pack_id, day_number)
     return SuggestDayResponse(**data)
@@ -173,7 +218,6 @@ def complete_sprint_day(
     try:
         sprint = complete_day(db, sprint, day_number, user_selections)
     except ValueError as e:
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail=str(e))
     
     return SprintRead.model_validate(sprint)
@@ -195,6 +239,5 @@ def day_14_checkin(
     try:
         new_sprint = complete_sprint_and_reload(db, pack_id, sprint_id)
     except ValueError as e:
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail=str(e))
     return SprintRead.model_validate(new_sprint)

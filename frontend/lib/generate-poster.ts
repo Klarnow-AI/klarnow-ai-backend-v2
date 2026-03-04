@@ -1,5 +1,11 @@
 import type { BrandContext } from "@/app/api/generate/route";
 
+export type PosterReferenceImage = {
+  name: string;
+  mimeType: string;
+  dataUrl: string;
+};
+
 export function parseFileTags(text: string): Record<string, string> {
   const files: Record<string, string> = {};
   const regex = /<file name="([^"]+)">([\s\S]*?)<\/file>/g;
@@ -14,14 +20,29 @@ export function parseFileTags(text: string): Record<string, string> {
 export async function generatePosters(
   apiRoute: string,
   userContent: string,
-  brandContext?: BrandContext | null
+  brandContext?: BrandContext | null,
+  referenceImages?: PosterReferenceImage[],
+  packId?: string,
+  authToken?: string | null,
 ): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (authToken) {
+    headers.Authorization = `Bearer ${authToken}`;
+  }
+
   const res = await fetch(apiRoute, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
       messages: [{ role: "user", content: userContent }],
       brandContext: brandContext ?? undefined,
+      packId: packId ?? undefined,
+      referenceImages:
+        referenceImages && referenceImages.length > 0
+          ? referenceImages
+          : undefined,
     }),
   });
 

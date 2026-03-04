@@ -1,14 +1,19 @@
 """Application configuration from environment."""
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # Load backend env from repository root regardless of process working dir.
+        env_file=str(PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -19,6 +24,7 @@ class Settings(BaseSettings):
     cors_allow_origins: list[str] = ["http://localhost:3000"]
     access_token_expiry_time: int = 60  # minutes
     frontend_url: str = "http://localhost:3000"
+    google_oauth_client_id: str = ""
     # Optional: when set, published sites use subdomains (e.g. sites.klarnow.com → acme.sites.klarnow.com)
     sites_domain: str = ""
 
@@ -63,6 +69,17 @@ class Settings(BaseSettings):
     reference_doc_min_score: float = 0.2
     reference_doc_max_chars: int = 250000
     reference_doc_cache_ttl_seconds: int = 300
+    # Optional: Pack image context retrieval (pgvector-backed)
+    image_context_enabled: bool = False
+    image_context_top_k: int = 3
+    image_context_min_score: float = 0.2
+    image_context_embedding_model: str = "text-embedding-3-small"
+    image_context_caption_model: str = "gpt-4o-mini"
+    image_context_job_poll_seconds: int = 2
+    image_context_job_max_attempts: int = 3
+    image_context_preview_url_ttl_seconds: int = 900
+    image_context_chat_enabled: bool = True
+    image_context_poster_enabled: bool = True
 
     # Optional: Kling API (official - api-singapore.klingai.com, JWT auth)
     kling_access_key: str = ""

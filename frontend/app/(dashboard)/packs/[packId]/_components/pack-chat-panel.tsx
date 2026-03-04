@@ -328,6 +328,9 @@ export function PackChatPanel({ packId }: { packId: string }) {
                 Ask Klaro anything about this pack, get suggestions, update your
                 campaign, or plan your next steps.
               </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Tip: attach up to 3 images for visual context in your prompt.
+              </p>
               {suggestedPrompts.length > 0 ? (
                 <div className="mt-4 flex flex-wrap justify-center gap-2 max-w-[360px]">
                   {suggestedPrompts.map((prompt) => (

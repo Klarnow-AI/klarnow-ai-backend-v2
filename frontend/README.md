@@ -6,7 +6,7 @@ Next.js 14 (App Router), Tailwind CSS, Framer Motion. Modern AI-product aestheti
 
 ```bash
 npm install
-cp .env.local.example .env.local   # set NEXT_PUBLIC_API_URL if backend is not on localhost:8000
+cp .env.local.example .env.local   # set NEXT_PUBLIC_API_URL and NEXT_PUBLIC_GOOGLE_CLIENT_ID
 npm run dev
 ```
 
@@ -21,7 +21,7 @@ npm run start
 
 ## Features
 
-- **Auth**: Login / Register (JWT stored in localStorage).
+- **Auth**: Email/password, email login code, and Google sign-in (JWT stored in localStorage).
 - **Global nav**: Command Center (Chat), Packs, Studio, Clients, Money, Exports, Settings, Help.
 - **Packs**: List, create, onboarding wizard (max 6 questions), then Pack Overview.
 - **Pack-scoped**: Overview, Brand OS, Marketing Plan, Campaign, Conversion Page, Plan & Tracker, Posters, Ad Factory, Proposal, Invoice, Proof Vault.

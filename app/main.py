@@ -31,17 +31,27 @@ from app.modules.builder.routes import router as builder_router, public_router a
 from app.modules.builder.subdomain_routes import router as builder_subdomain_router
 from app.modules.feedback.routes import router as feedback_router
 from app.modules.ad_factory.routes import router as ad_factory_router
+from app.modules.image_context.routes import router as image_context_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.modules.agents.register_tools import register_all_tools
     from app.modules.packs.onboarding_jobs import recover_pending_onboarding_jobs
+    from app.modules.image_context.jobs import (
+        recover_pending_image_context_jobs,
+        start_image_context_worker,
+    )
     from app.shared.services.reference_kb import get_reference_kb
     log = logging.getLogger("uvicorn.error")
     log.info("CORS allowed origins: %s", settings.cors_allow_origins)
     register_all_tools()
     recover_pending_onboarding_jobs()
+    if settings.image_context_enabled:
+        requeued = recover_pending_image_context_jobs()
+        if requeued:
+            log.info("Requeued %s image-context jobs from previous run.", requeued)
+        start_image_context_worker()
     try:
         get_reference_kb().warmup()
     except Exception as e:
@@ -147,5 +157,6 @@ app.include_router(builder_router, prefix="/api/v1/builder", tags=["builder"])
 app.include_router(builder_public_router, prefix="/p", tags=["sites"])
 app.include_router(feedback_router, tags=["feedback"])
 app.include_router(ad_factory_router, prefix="/api/v1/ad-factory", tags=["ad-factory"])
+app.include_router(image_context_router, prefix="/api/v1", tags=["image-context"])
 # Subdomain site serving: GET / and POST /lead when Host is *.sites_domain
 app.include_router(builder_subdomain_router, prefix="", tags=["sites-subdomain"])

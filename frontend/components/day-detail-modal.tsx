@@ -18,26 +18,26 @@ import type { SprintDayDetail } from "@/types/api-types";
 import {
   getDayGuide,
   type DayGuideTaskItem,
-} from "@/app/(dashboard)/packs/[packId]/plan-tracker/day/[dayNumber]/_data/dayGuides";
+} from "@/lib/sprint-day-guides";
 import { resolveTaskAction } from "@/lib/plan-tracker-task-actions";
 import { ResponseRulesEditor } from "@/components/response-rules-editor";
 
 const DAY_LABELS: Record<number, string> = {
-  0: "Day 0: Foundation",
-  1: "Day 1: Offer",
-  2: "Day 2: USP + Audience",
-  3: "Day 3: Confidence script",
-  4: "Day 4: Ad Factory",
-  5: "Day 5: Posters",
-  6: "Day 6: Conversion destination",
-  7: "Day 7: Publish / Confirm",
-  8: "Day 8: Response rules",
-  9: "Day 9: Follow-up",
-  10: "Day 10: Fix the leak",
-  11: "Day 11: Close path",
-  12: "Day 12: Close conversations",
-  13: "Day 13: Invoice / Payment",
-  14: "Day 14: Check-in",
+  0: "Step 0: Foundation",
+  1: "Step 1: Offer",
+  2: "Step 2: USP + Audience",
+  3: "Step 3: Confidence script",
+  4: "Step 4: Ad Factory",
+  5: "Step 5: Posters",
+  6: "Step 6: Conversion destination",
+  7: "Step 7: Publish / Confirm",
+  8: "Step 8: Response rules",
+  9: "Step 9: Follow-up",
+  10: "Step 10: Fix the leak",
+  11: "Step 11: Close path",
+  12: "Step 12: Close conversations",
+  13: "Step 13: Invoice / Payment",
+  14: "Step 14: Check-in",
 };
 
 const DEFAULT_DEFINITION_OF_DONE: Record<number, string> = {
@@ -194,7 +194,7 @@ export function DayDetailModal({
               id="day-detail-modal-title"
               className="font-heading text-xl  font-[600] text-foreground pr-10"
             >
-              {DAY_LABELS[dayNumber] ?? `Day ${dayNumber}`}
+              {DAY_LABELS[dayNumber] ?? `Step ${dayNumber}`}
             </h2>
           </div>
 
@@ -211,11 +211,11 @@ export function DayDetailModal({
                       <Lock className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
                       <div>
                         <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                          Day {dayNumber} is locked
+                          Step {dayNumber} is locked
                         </p>
                         <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
                           {detail.blocker_message ??
-                            `Complete the previous day to unlock Day ${dayNumber}.`}
+                            `Complete the previous step to unlock Step ${dayNumber}.`}
                         </p>
                       </div>
                     </CardContent>
@@ -230,7 +230,7 @@ export function DayDetailModal({
                       <p className="text-sm">
                         {detail.definition_of_done ??
                           DEFAULT_DEFINITION_OF_DONE[dayNumber] ??
-                          `Complete the tasks for Day ${dayNumber}.`}
+                          `Complete the tasks for Step ${dayNumber}.`}
                       </p>
                     </div>
                     {detail.completed_at && (
@@ -350,7 +350,7 @@ export function DayDetailModal({
                       >
                         {checkingIn
                           ? "Checking in…"
-                          : "Day 14 check-in & start Sprint 2"}
+                          : "Step 14 check-in & start Sprint 2"}
                       </Button>
                     ) : (
                       <Button

@@ -1,13 +1,15 @@
-"""Auth routes: login, register, email sign-in code, and account deletion."""
+"""Auth routes: login/register, Google sign-in, password reset, and account deletion."""
 
 import secrets
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, EmailStr
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.auth.deps import get_current_user
+from app.core.auth.google import verify_google_identity_token
 from app.core.auth.jwt import create_access_token
 from app.core.auth.password import hash_password, verify_password
 from app.core.config import get_settings
@@ -29,6 +31,10 @@ class LoginBody(BaseModel):
 class RegisterBody(BaseModel):
     email: EmailStr
     password: str
+
+
+class GoogleLoginBody(BaseModel):
+    id_token: str
 
 
 class SendLoginCodeBody(BaseModel):
@@ -198,6 +204,52 @@ def login(
     user = db.query(User).filter(User.email == body.email).first()
     if not user or not verify_password(body.password, user.hashed_password):
         raise UnauthorizedError("Invalid email or password")
+    token = create_access_token(user.id)
+    return TokenResponse(access_token=token)
+
+
+@router.post("/google", response_model=TokenResponse)
+def google_login(
+    body: GoogleLoginBody,
+    db: Session = Depends(get_db),
+):
+    """Authenticate with a Google ID token, then return app JWT."""
+    identity = verify_google_identity_token(body.id_token)
+    email = identity.email.strip().lower()
+    google_sub = identity.sub.strip()
+
+    # Prefer direct provider link when present.
+    user = db.query(User).filter(User.google_sub == google_sub).first()
+    if user:
+        token = create_access_token(user.id)
+        return TokenResponse(access_token=token)
+
+    # Fallback: link to existing account by verified email.
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        user = db.query(User).filter(func.lower(User.email) == email).first()
+    if user:
+        if user.google_sub and user.google_sub != google_sub:
+            raise AppError(
+                "This email is already linked to another Google account",
+                status_code=status.HTTP_409_CONFLICT,
+            )
+        user.google_sub = google_sub
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        token = create_access_token(user.id)
+        return TokenResponse(access_token=token)
+
+    # New account via Google: keep local password optional.
+    user = User(
+        email=email,
+        google_sub=google_sub,
+        hashed_password=hash_password(secrets.token_urlsafe(32)),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
     token = create_access_token(user.id)
     return TokenResponse(access_token=token)
 

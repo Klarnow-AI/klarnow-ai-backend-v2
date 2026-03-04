@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.core.storage import get_presigned_url
 from app.modules.agents.orchestrator import assemble_context, CHAT_CONTEXT_LAST_N_MESSAGES
 from app.modules.agents.registry import REGISTRY, execute
 from app.modules.packs.services import get_pack_for_user
@@ -39,6 +40,9 @@ PROPOSAL_KEYWORDS = ("proposal", "proposals", "offer")
 INVOICE_KEYWORDS = ("invoice", "invoices", "payment")
 WEBSITE_KEYWORDS = ("website", "site", "landing page", "page")
 BRAND_OS_KEYWORDS = ("brand os", "brand strategy", "positioning", "messaging")
+IMAGE_ATTACHMENT_CONTENT_TYPE_PREFIX = "image/"
+IMAGE_ATTACHMENT_MAX_FOR_MODEL = 3
+IMAGE_ATTACHMENT_URL_TTL_SECONDS = 900
 
 
 def get_openai_tools(allowed_tool_names: set[str] | None = None) -> list[dict]:
@@ -93,16 +97,31 @@ def _attachment_text_excerpt(text: str | None, max_chars: int) -> str | None:
     return cleaned[: max(200, max_chars)]
 
 
+def _is_image_attachment(content_type: str | None) -> bool:
+    return bool(content_type and content_type.lower().startswith(IMAGE_ATTACHMENT_CONTENT_TYPE_PREFIX))
+
+
 def _serialize_attachment_snapshot(
     attachment,
     excerpt_chars: int,
 ) -> dict:
+    content_type = getattr(attachment, "content_type", None)
+    image_url: str | None = None
+    storage_key = getattr(attachment, "storage_key", None)
+    if _is_image_attachment(content_type) and isinstance(storage_key, str) and storage_key:
+        try:
+            image_url = get_presigned_url(storage_key, expires_in=IMAGE_ATTACHMENT_URL_TTL_SECONDS)
+        except Exception as e:
+            logger.warning("chat_attachment_presign_failed | attachment_id=%s | error=%s", attachment.id, e)
+
     excerpt = _attachment_text_excerpt(getattr(attachment, "text_content", None), excerpt_chars)
     return {
         "id": str(attachment.id),
         "file_name": attachment.file_name,
-        "content_type": attachment.content_type,
+        "content_type": content_type,
         "size_bytes": attachment.size_bytes,
+        "has_image_content": bool(image_url),
+        "image_url": image_url,
         "has_text_content": bool(excerpt),
         "text_excerpt": excerpt,
     }
@@ -194,6 +213,71 @@ def _merge_content_with_attachments(
     return f"{base}\n\n{attachment_context}"
 
 
+def _collect_attachment_image_urls(
+    attachments: list[dict] | None,
+    max_images: int = IMAGE_ATTACHMENT_MAX_FOR_MODEL,
+) -> list[str]:
+    if not attachments:
+        return []
+    urls: list[str] = []
+    for item in attachments:
+        if not isinstance(item, dict):
+            continue
+        image_url = item.get("image_url")
+        if isinstance(image_url, str) and image_url.strip():
+            urls.append(image_url.strip())
+        if len(urls) >= max(1, max_images):
+            break
+    return urls
+
+
+def _merge_image_urls(
+    primary_urls: list[str] | None,
+    additional_urls: list[str] | None,
+    max_images: int = IMAGE_ATTACHMENT_MAX_FOR_MODEL,
+) -> list[str]:
+    merged: list[str] = []
+    for source in (primary_urls or [], additional_urls or []):
+        if not isinstance(source, str):
+            continue
+        cleaned = source.strip()
+        if not cleaned or cleaned in merged:
+            continue
+        merged.append(cleaned)
+        if len(merged) >= max(1, max_images):
+            break
+    return merged
+
+
+def _build_user_message_for_model(
+    content: str | None,
+    attachments: list[dict] | None,
+    max_attachment_chars: int,
+    additional_image_urls: list[str] | None = None,
+) -> dict:
+    merged_content = _merge_content_with_attachments(
+        content,
+        attachments,
+        max_attachment_chars,
+    )
+    image_urls = _merge_image_urls(
+        _collect_attachment_image_urls(
+            attachments,
+            max_images=IMAGE_ATTACHMENT_MAX_FOR_MODEL,
+        ),
+        additional_image_urls,
+        max_images=IMAGE_ATTACHMENT_MAX_FOR_MODEL,
+    )
+    if not image_urls:
+        return {"role": "user", "content": merged_content}
+
+    text = merged_content or "Use the attached images as context."
+    parts: list[dict] = [{"type": "text", "text": text}]
+    for url in image_urls:
+        parts.append({"type": "image_url", "image_url": {"url": url}})
+    return {"role": "user", "content": parts}
+
+
 def build_system_message(
     pack_context: dict | None,
     reference_context: str | None = None,
@@ -257,6 +341,89 @@ def _get_reference_context(query: str) -> tuple[str | None, list[dict]]:
     return context_text, references
 
 
+def _augment_user_content_with_image_context(
+    user_content: str,
+    image_context_text: str | None,
+) -> str:
+    if not image_context_text:
+        return user_content
+    cleaned_user_content = user_content.strip()
+    cleaned_context = image_context_text.strip()
+    if not cleaned_context:
+        return user_content
+    if cleaned_user_content:
+        return f"{cleaned_user_content}\n\nPack image library context:\n{cleaned_context}"
+    return f"Pack image library context:\n{cleaned_context}"
+
+
+def _merge_references(
+    base_references: list[dict] | None,
+    extra_references: list[dict] | None,
+) -> list[dict]:
+    merged: list[dict] = []
+    seen_chunk_ids: set[str] = set()
+    for collection in (base_references or [], extra_references or []):
+        for ref in collection:
+            if not isinstance(ref, dict):
+                continue
+            chunk_id = str(ref.get("chunk_id") or "").strip()
+            if chunk_id and chunk_id in seen_chunk_ids:
+                continue
+            if chunk_id:
+                seen_chunk_ids.add(chunk_id)
+            merged.append(ref)
+    return merged
+
+
+def _get_image_context_for_chat(
+    db: Session,
+    user_id: UUID,
+    pack_id: UUID | None,
+    user_content: str,
+) -> dict:
+    settings = get_settings()
+    if (
+        not settings.image_context_enabled
+        or not settings.image_context_chat_enabled
+        or not pack_id
+        or not user_content.strip()
+    ):
+        return {"context_text": None, "references": [], "image_urls": []}
+
+    try:
+        from app.modules.image_context.services import retrieve_pack_image_context
+
+        payload = retrieve_pack_image_context(
+            db,
+            user_id=user_id,
+            pack_id=pack_id,
+            query=user_content,
+            top_k=settings.image_context_top_k,
+            min_score=settings.image_context_min_score,
+            max_image_urls=IMAGE_ATTACHMENT_MAX_FOR_MODEL,
+        )
+    except Exception as e:
+        logger.warning("chat_image_context_retrieval_failed | error=%s", e)
+        return {"context_text": None, "references": [], "image_urls": []}
+
+    context_text = payload.get("context_text") if isinstance(payload, dict) else None
+    references = payload.get("references") if isinstance(payload, dict) else None
+    image_urls = payload.get("image_urls") if isinstance(payload, dict) else None
+
+    if not isinstance(context_text, str):
+        context_text = None
+    if not isinstance(references, list):
+        references = []
+    if not isinstance(image_urls, list):
+        image_urls = []
+
+    return {
+        "context_text": context_text,
+        "references": references,
+        "image_urls": image_urls,
+    }
+
+
 def _parse_tool_args(arguments: str) -> dict:
     try:
         return json.loads(arguments) if isinstance(arguments, str) else arguments
@@ -318,7 +485,7 @@ def _build_action_chips(
         return [
             {
                 "label": "Open Follow-up queue",
-                "href": _pack_route(pack_id, "/plan-tracker/day/9"),
+                "href": _pack_route(pack_id, "?step=9"),
             }
         ]
     if _has_any(text, LEADS_KEYWORDS):
@@ -507,7 +674,32 @@ def run_chat_turn(
             "preview": False,
         }
 
-    reference_context, references = _get_reference_context(user_content)
+    reference_context, base_references = _get_reference_context(user_content)
+    image_context_payload = _get_image_context_for_chat(
+        db=db,
+        user_id=user_id,
+        pack_id=pack_id,
+        user_content=user_content,
+    )
+    merged_references = _merge_references(
+        base_references,
+        image_context_payload.get("references")
+        if isinstance(image_context_payload, dict)
+        else [],
+    )
+    effective_user_content = _augment_user_content_with_image_context(
+        user_content,
+        image_context_payload.get("context_text")
+        if isinstance(image_context_payload, dict)
+        else None,
+    )
+    retrieved_image_urls = (
+        image_context_payload.get("image_urls")
+        if isinstance(image_context_payload, dict)
+        else []
+    )
+    if not isinstance(retrieved_image_urls, list):
+        retrieved_image_urls = []
     system_content = build_system_message(
         pack_context,
         reference_context=reference_context,
@@ -529,14 +721,12 @@ def run_chat_turn(
     history_msgs = _trim_messages_to_token_budget(history_msgs, max_tokens=6000)
     openai_messages = [{"role": "system", "content": system_content}] + history_msgs
     openai_messages.append(
-        {
-            "role": "user",
-            "content": _merge_content_with_attachments(
-                user_content,
-                attachment_snapshots,
-                settings.chat_attachment_prompt_max_chars,
-            ),
-        }
+        _build_user_message_for_model(
+            effective_user_content,
+            attachment_snapshots,
+            settings.chat_attachment_prompt_max_chars,
+            additional_image_urls=retrieved_image_urls,
+        )
     )
 
     if not settings.openai_api_key:
@@ -552,7 +742,7 @@ def run_chat_turn(
         return {
             "assistant_content": stub_msg.content,
             "message_id": str(stub_msg.id),
-            "references": references,
+            "references": merged_references,
             "preview": False,
         }
 
@@ -571,7 +761,7 @@ def run_chat_turn(
         return {
             "assistant_content": "",
             "message_id": None,
-            "references": references,
+            "references": merged_references,
             "preview": False,
         }
 
@@ -605,7 +795,7 @@ def run_chat_turn(
             "assistant_content": preview_msg.content,
             "message_id": str(preview_msg.id),
             "tool_calls": tool_calls_payload,
-            "references": references,
+            "references": merged_references,
             "preview": True,
         }
 
@@ -681,7 +871,7 @@ def run_chat_turn(
             "tool_calls": tool_calls_payload,
             "tool_results": tool_results_payload,
             "action_chips": action_chips,
-            "references": references,
+            "references": merged_references,
             "preview": False,
         }
 
@@ -707,7 +897,7 @@ def run_chat_turn(
     out = {
         "assistant_content": assistant_msg.content,
         "message_id": str(assistant_msg.id),
-        "references": references,
+        "references": merged_references,
         "preview": False,
     }
     if tool_results_payload:
@@ -809,7 +999,32 @@ def run_chat_turn_stream(
             if pack_id
             else None
         )
-        reference_context, references = _get_reference_context(user_content)
+        reference_context, base_references = _get_reference_context(user_content)
+        image_context_payload = _get_image_context_for_chat(
+            db=db,
+            user_id=user_id,
+            pack_id=pack_id,
+            user_content=user_content,
+        )
+        merged_references = _merge_references(
+            base_references,
+            image_context_payload.get("references")
+            if isinstance(image_context_payload, dict)
+            else [],
+        )
+        effective_user_content = _augment_user_content_with_image_context(
+            user_content,
+            image_context_payload.get("context_text")
+            if isinstance(image_context_payload, dict)
+            else None,
+        )
+        retrieved_image_urls = (
+            image_context_payload.get("image_urls")
+            if isinstance(image_context_payload, dict)
+            else []
+        )
+        if not isinstance(retrieved_image_urls, list):
+            retrieved_image_urls = []
         system_content = build_system_message(
             pack_context,
             reference_context=reference_context,
@@ -830,14 +1045,12 @@ def run_chat_turn_stream(
         history_msgs = _trim_messages_to_token_budget(history_msgs, max_tokens=6000)
         openai_messages = [{"role": "system", "content": system_content}] + history_msgs
         openai_messages.append(
-            {
-                "role": "user",
-                "content": _merge_content_with_attachments(
-                    user_content,
-                    attachment_snapshots,
-                    settings.chat_attachment_prompt_max_chars,
-                ),
-            }
+            _build_user_message_for_model(
+                effective_user_content,
+                attachment_snapshots,
+                settings.chat_attachment_prompt_max_chars,
+                additional_image_urls=retrieved_image_urls,
+            )
         )
 
         yield _sse_status("thinking", "Thinking...")
@@ -856,7 +1069,7 @@ def run_chat_turn_stream(
                 {
                     "assistant_content": stub_msg.content,
                     "message_id": str(stub_msg.id),
-                    "references": references,
+                    "references": merged_references,
                     "preview": False,
                 },
             )
@@ -931,7 +1144,7 @@ def run_chat_turn_stream(
                     "assistant_content": preview_msg.content,
                     "message_id": str(preview_msg.id),
                     "tool_calls": tool_calls_raw,
-                    "references": references,
+                    "references": merged_references,
                     "preview": True,
                 },
             )
@@ -1020,7 +1233,7 @@ def run_chat_turn_stream(
                     "tool_calls": tool_calls_payload,
                     "tool_results": tool_results_payload,
                     "action_chips": action_chips,
-                    "references": references,
+                    "references": merged_references,
                     "preview": False,
                 },
             )
@@ -1047,7 +1260,7 @@ def run_chat_turn_stream(
         done_payload = {
             "assistant_content": assistant_msg.content,
             "message_id": str(assistant_msg.id),
-            "references": references,
+            "references": merged_references,
             "preview": False,
         }
         if tool_results_payload:

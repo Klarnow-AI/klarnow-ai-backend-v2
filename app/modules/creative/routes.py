@@ -5,8 +5,17 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 
 from app.core.auth.deps import get_current_user
+from app.core.config import get_settings
 from app.core.db.session import get_db
 from app.core.errors import NotFoundError
+from app.core.logging import get_logger
+from app.modules.image_context.jobs import start_image_context_worker
+from app.modules.image_context.services import (
+    JOB_OPERATION_DELETE,
+    JOB_OPERATION_UPSERT,
+    SOURCE_TYPE_ASSET,
+    enqueue_image_context_job,
+)
 from app.modules.creative.schemas import AssetCreate, AssetList, AssetRead
 from app.modules.creative.services import (
     create_asset,
@@ -19,6 +28,8 @@ from app.modules.packs.models import User
 from app.modules.packs.services import get_pack_for_user
 
 router = APIRouter()
+logger = get_logger("klarnow.image_context.hooks")
+settings = get_settings()
 
 
 def _ensure_pack_access(db, pack_id: UUID, user_id: UUID) -> None:
@@ -44,6 +55,23 @@ def create_asset_route(
         template_id=body.template_id,
         chat_messages=body.chat_messages,
     )
+    if settings.image_context_enabled:
+        try:
+            enqueue_image_context_job(
+                db,
+                user_id=current_user.id,
+                pack_id=asset.pack_id,
+                source_type=SOURCE_TYPE_ASSET,
+                source_id=asset.id,
+                operation=JOB_OPERATION_UPSERT,
+            )
+            start_image_context_worker()
+        except Exception as e:
+            logger.warning(
+                "image_context_enqueue_failed | source=asset_create | asset_id=%s | error=%s",
+                asset.id,
+                e,
+            )
     return AssetRead.model_validate(asset)
 
 
@@ -83,6 +111,23 @@ def regenerate_asset_route(
     if not asset:
         raise NotFoundError("Asset not found")
     new_asset = regenerate_asset(db, asset, current_user.id)
+    if settings.image_context_enabled:
+        try:
+            enqueue_image_context_job(
+                db,
+                user_id=current_user.id,
+                pack_id=new_asset.pack_id,
+                source_type=SOURCE_TYPE_ASSET,
+                source_id=new_asset.id,
+                operation=JOB_OPERATION_UPSERT,
+            )
+            start_image_context_worker()
+        except Exception as e:
+            logger.warning(
+                "image_context_enqueue_failed | source=asset_regenerate | asset_id=%s | error=%s",
+                new_asset.id,
+                e,
+            )
     return AssetRead.model_validate(new_asset)
 
 
@@ -96,4 +141,22 @@ def delete_asset_route(
     asset = get_asset_for_pack_user(db, asset_id, current_user.id)
     if not asset:
         raise NotFoundError("Asset not found")
+    pack_id = asset.pack_id
     delete_asset_service(db, asset_id, current_user.id)
+    if settings.image_context_enabled:
+        try:
+            enqueue_image_context_job(
+                db,
+                user_id=current_user.id,
+                pack_id=pack_id,
+                source_type=SOURCE_TYPE_ASSET,
+                source_id=asset_id,
+                operation=JOB_OPERATION_DELETE,
+            )
+            start_image_context_worker()
+        except Exception as e:
+            logger.warning(
+                "image_context_enqueue_failed | source=asset_delete | asset_id=%s | error=%s",
+                asset_id,
+                e,
+            )

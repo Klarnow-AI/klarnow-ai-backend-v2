@@ -47,7 +47,7 @@ export function SprintDayCard({ dayCard, sprint, onDayClick }: SprintDayCardProp
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-semibold">
-              Day {dayCard.day_number}: {DAY_TITLES[dayCard.day_number]}
+              Step {dayCard.day_number}: {DAY_TITLES[dayCard.day_number]}
             </span>
             {status === "in_progress" && (
               <span className="rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary">

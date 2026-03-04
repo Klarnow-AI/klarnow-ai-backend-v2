@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Sparkles, X } from "@/components/icons";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -76,7 +77,7 @@ export function Day3Modal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sprintId) {
-      setError("No active sprint. Start a sprint from the plan tracker.");
+      setError("No active sprint. Start a sprint from Overview.");
       return;
     }
     setSaving(true);
@@ -88,7 +89,7 @@ export function Day3Modal({
       });
       onComplete?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to complete Day 3");
+      setError(err instanceof Error ? err.message : "Failed to complete Step 3");
     } finally {
       setSaving(false);
     }
@@ -126,7 +127,7 @@ export function Day3Modal({
               id="day3-modal-title"
               className="font-heading text-2xl font-bold text-foreground pr-10"
             >
-              Day 3: Confidence script
+              Step 3: Confidence script
             </h2>
             <p className="mt-3 text-sm text-muted-foreground">
               Build: write your pitch script and send 3 voice notes. Improve: list common objections and craft responses.
@@ -139,7 +140,7 @@ export function Day3Modal({
             ) : !sprintId ? (
               <div className="mt-6 min-h-[120px] flex items-center">
                 <p className="text-sm text-amber-600 dark:text-amber-400">
-                  No active sprint. Go to Plan tracker and start a sprint first.
+                  No active sprint. Go to Overview and start a sprint first.
                 </p>
               </div>
             ) : (
@@ -178,12 +179,10 @@ export function Day3Modal({
                   )}
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={voiceNotesSent}
-                    onChange={(e) => setVoiceNotesSent(e.target.checked)}
+                    onCheckedChange={setVoiceNotesSent}
                     disabled={saving}
-                    className="h-4 w-4 rounded border-border"
                   />
                   <span className="text-sm">I&apos;ve sent 3 voice notes to potential customers</span>
                 </label>
@@ -197,7 +196,7 @@ export function Day3Modal({
                     Cancel
                   </Button>
                   <Button type="submit" disabled={saving || dayComplete}>
-                    {saving ? "Saving…" : dayComplete ? "Day 3 complete" : "Complete Day 3"}
+                    {saving ? "Saving…" : dayComplete ? "Step 3 complete" : "Complete Step 3"}
                   </Button>
                 </div>
               </form>

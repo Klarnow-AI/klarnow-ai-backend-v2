@@ -143,7 +143,7 @@ export function ChatMessageItem({
             {isStreaming ? (
               <div aria-live="polite" aria-atomic="false">
                 {streamingStatusLabel ? (
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground">
                     {streamingStatusLabel}
                   </p>
                 ) : null}
@@ -180,17 +180,19 @@ export function ChatMessageItem({
                   </Button>
                 </div>
               )}
-            {message.role === "assistant" && !isStreaming && actionChips.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {actionChips.map((chip) => (
-                  <Link key={`${chip.label}-${chip.href}`} href={chip.href}>
-                    <Button size="sm" variant="outline" className="text-xs">
-                      {chip.label}
-                    </Button>
-                  </Link>
-                ))}
-              </div>
-            )}
+            {message.role === "assistant" &&
+              !isStreaming &&
+              actionChips.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {actionChips.map((chip) => (
+                    <Link key={`${chip.label}-${chip.href}`} href={chip.href}>
+                      <Button size="sm" variant="outline" className="text-xs">
+                        {chip.label}
+                      </Button>
+                    </Link>
+                  ))}
+                </div>
+              )}
             {showChipRow && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {optionChips?.map((chip) => (

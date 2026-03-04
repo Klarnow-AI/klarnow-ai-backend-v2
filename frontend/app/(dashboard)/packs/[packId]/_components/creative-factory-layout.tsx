@@ -74,6 +74,7 @@ export function CreativeFactoryLayout({
               <div className="flex-1 min-w-0 min-h-[4.5rem] flex items-center">
                 <CreativeInputBar
                   apiRoute="/api/generate-poster"
+                  packId={packId}
                   brandContext={brandContext}
                   placeholder={bottomPlaceholder}
                   onGenerate={handleGenerate}
@@ -85,6 +86,7 @@ export function CreativeFactoryLayout({
           ) : (
             <CreativeInputBar
               apiRoute="/api/generate-poster"
+              packId={packId}
               brandContext={brandContext}
               placeholder={bottomPlaceholder}
               onGenerate={handleGenerate}

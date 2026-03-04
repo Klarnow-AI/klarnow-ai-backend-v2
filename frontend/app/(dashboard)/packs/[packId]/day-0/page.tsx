@@ -9,12 +9,12 @@ export default function Day0Redirect() {
   const packId = params.packId as string;
 
   useEffect(() => {
-    router.replace(`/packs/${packId}/plan-tracker?day=0`);
+    router.replace(`/packs/${packId}?step=0`);
   }, [packId, router]);
 
   return (
     <div className="flex items-center justify-center min-h-[40vh]">
-      <p className="text-sm text-muted-foreground">Opening Day 0…</p>
+      <p className="text-sm text-muted-foreground">Opening Step 0…</p>
     </div>
   );
 }

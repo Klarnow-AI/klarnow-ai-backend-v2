@@ -306,7 +306,7 @@ export function Day0Modal({
           setError(
             completeErr instanceof Error
               ? completeErr.message
-              : "Day 0 saved but generating Brand OS failed. Try again from the pack."
+              : "Step 0 saved but generating Brand OS failed. Try again from the pack."
           );
           return;
         }
@@ -359,11 +359,11 @@ export function Day0Modal({
               id="day0-modal-title"
               className="font-heading text-2xl font-bold text-foreground pr-10"
             >
-              Day 0 setup
+              Step 0 setup
             </h2>
             <p className="mt-3 text-sm text-muted-foreground">
               Brand name, Primary CTA, and USP are required. Proof is optional.
-              Finish these to complete Day 0.
+              Finish these to complete Step 0.
             </p>
 
             {loading ? (
@@ -383,13 +383,13 @@ export function Day0Modal({
               <div className="mt-6 space-y-4">
                 <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                   <Check className="h-5 w-5 shrink-0" />
-                  <span className="text-sm font-medium">Day 0 complete</span>
+                  <span className="text-sm font-medium">Step 0 complete</span>
                 </div>
                 <p className="text-sm text-muted-foreground">
                   You&apos;re all set. No need to go through the process again.
                 </p>
                 <Button disabled size="md" className="w-full sm:w-auto">
-                  Day 0 complete
+                  Step 0 complete
                 </Button>
                 {error && (
                   <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">
@@ -552,7 +552,7 @@ export function Day0Modal({
                                 {saving ? (
                                   <Spinner className="h-5 w-5" />
                                 ) : (
-                                  "Complete Day 0"
+                                  "Complete Step 0"
                                 )}
                               </Button>
                             </div>

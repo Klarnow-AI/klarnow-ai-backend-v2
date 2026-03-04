@@ -1,4 +1,5 @@
 openai
+pgvector
 requests
 pydantic-settings
 fastapi[standard]
@@ -24,5 +25,6 @@ Pillow
 numpy
 tenacity
 google-genai
+google-auth
 reportlab
 stripe

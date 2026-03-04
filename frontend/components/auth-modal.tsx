@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "@/components/icons";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type View = "main" | "code-email" | "code-entry" | "password";
+const GOOGLE_SCRIPT_ID = "google-identity-services-script";
 
 export function AuthModal({
   open,
@@ -31,6 +32,10 @@ export function AuthModal({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingEmail, setCheckingEmail] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
+  const [googleSigningIn, setGoogleSigningIn] = useState(false);
+  const googleButtonRef = useRef<HTMLDivElement | null>(null);
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
   const router = useRouter();
   const {
     checkEmailRegistered,
@@ -38,6 +43,7 @@ export function AuthModal({
     verifyLoginCode,
     login,
     register,
+    loginWithGoogle,
   } = useAuth();
 
   useEffect(() => {
@@ -48,8 +54,94 @@ export function AuthModal({
       setCode("");
       setPasswordMode("login");
       setError("");
+      setGoogleSigningIn(false);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!googleClientId || typeof window === "undefined") return;
+    if (window.google?.accounts?.id) {
+      setGoogleReady(true);
+      return;
+    }
+    const existing = document.getElementById(
+      GOOGLE_SCRIPT_ID,
+    ) as HTMLScriptElement | null;
+    const onLoad = () => setGoogleReady(true);
+    const onError = () => setError("Google sign-in is unavailable right now");
+
+    if (existing) {
+      existing.addEventListener("load", onLoad);
+      existing.addEventListener("error", onError);
+      return () => {
+        existing.removeEventListener("load", onLoad);
+        existing.removeEventListener("error", onError);
+      };
+    }
+
+    const script = document.createElement("script");
+    script.id = GOOGLE_SCRIPT_ID;
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.addEventListener("load", onLoad);
+    script.addEventListener("error", onError);
+    document.head.appendChild(script);
+    return () => {
+      script.removeEventListener("load", onLoad);
+      script.removeEventListener("error", onError);
+    };
+  }, [googleClientId]);
+
+  useEffect(() => {
+    if (
+      !open ||
+      view !== "main" ||
+      !googleClientId ||
+      !googleReady ||
+      !googleButtonRef.current ||
+      !window.google?.accounts?.id
+    ) {
+      return;
+    }
+
+    window.google.accounts.id.initialize({
+      client_id: googleClientId,
+      callback: async (response) => {
+        const credential = response.credential;
+        if (!credential) {
+          setError("Google sign-in did not return a credential");
+          return;
+        }
+        setError("");
+        setGoogleSigningIn(true);
+        try {
+          await loginWithGoogle(credential);
+          onOpenChange(false);
+        } catch (err) {
+          setError(
+            err instanceof Error ? err.message : "Google sign-in failed",
+          );
+        } finally {
+          setGoogleSigningIn(false);
+        }
+      },
+      ux_mode: "popup",
+      auto_select: false,
+      cancel_on_tap_outside: true,
+    });
+
+    const container = googleButtonRef.current;
+    container.innerHTML = "";
+    window.google.accounts.id.renderButton(container, {
+      type: "standard",
+      theme: "outline",
+      size: "large",
+      text: "continue_with",
+      shape: "pill",
+      width: Math.min(372, Math.max(container.clientWidth || 0, 280)),
+    });
+  }, [open, view, googleClientId, googleReady, loginWithGoogle, onOpenChange]);
 
   async function handleRequestCode(e: React.FormEvent) {
     e.preventDefault();
@@ -171,6 +263,39 @@ export function AuthModal({
                       exit={{ opacity: 0 }}
                       className="mt-6 space-y-4"
                     >
+                      {googleClientId && (
+                        <>
+                          <div className="space-y-2">
+                            <div
+                              ref={googleButtonRef}
+                              className="w-full min-h-[44px] flex items-center justify-center"
+                            />
+                            {!googleReady && (
+                              <p className="text-xs text-muted-foreground text-center">
+                                Loading Google sign-in…
+                              </p>
+                            )}
+                            {googleSigningIn && (
+                              <div className="flex items-center justify-center">
+                                <Spinner className="h-5 w-5" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* OR */}
+                          {/* <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                              <div className="w-full h-px bg-border/40" />
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase tracking-wider">
+                              <span className="bg-card px-3 text-muted-foreground">
+                                or
+                              </span>
+                            </div>
+                          </div> */}
+                        </>
+                      )}
+
                       {/* Button: Continue with email sign-in code */}
                       <Button
                         type="button"
@@ -178,7 +303,7 @@ export function AuthModal({
                         className="w-full justify-center gap-3 rounded-full border-0 bg-border/40 text-foreground"
                         onClick={() => setView("code-email")}
                       >
-                        Continue with email Log In code
+                        Continue with email sign-in code
                       </Button>
 
                       {/* OR */}

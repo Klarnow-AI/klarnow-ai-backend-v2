@@ -3,6 +3,12 @@ import OpenAI from "openai";
 import { NextRequest } from "next/server";
 import type { BrandContext } from "@/app/api/generate/route";
 
+const MAX_REFERENCE_IMAGES = 3;
+const MAX_REFERENCE_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_MODEL_IMAGE_PARTS = 3;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function buildBrandSection(brand: BrandContext): string {
   const sections: string[] = [];
 
@@ -140,12 +146,323 @@ ${brandSection}`;
 
 type ChatMessage = { role: string; content: string };
 
+type ReferenceImageInput = {
+  name: string;
+  mimeType: string;
+  dataUrl: string;
+};
+
+type ValidReferenceImage = {
+  name: string;
+  mimeType: string;
+  dataUrl: string;
+  base64Data: string;
+};
+
+type RetrievedImageContextItem = {
+  preview_url?: string | null;
+};
+
+type RetrievedImageContextResponse = {
+  context_text?: string | null;
+  items?: RetrievedImageContextItem[] | null;
+};
+
+type RetrievedImageContext = {
+  contextText: string | null;
+  imageUrls: string[];
+};
+
+const DATA_URL_PATTERN = /^data:([a-zA-Z0-9./+\-]+);base64,([A-Za-z0-9+/=]+)$/;
+
+function estimateBase64Bytes(base64Data: string): number {
+  const padding = base64Data.endsWith("==") ? 2 : base64Data.endsWith("=") ? 1 : 0;
+  return Math.floor((base64Data.length * 3) / 4) - padding;
+}
+
+function normalizeMessages(raw: unknown): ChatMessage[] | null {
+  if (!Array.isArray(raw)) return null;
+  const messages: ChatMessage[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") return null;
+    const role = (item as { role?: unknown }).role;
+    const content = (item as { content?: unknown }).content;
+    if (typeof role !== "string" || typeof content !== "string") return null;
+    if (!["user", "assistant", "system"].includes(role)) return null;
+    messages.push({ role, content });
+  }
+  return messages;
+}
+
+function normalizeReferenceImages(
+  raw: unknown,
+): { images: ValidReferenceImage[]; error: string | null } {
+  if (raw == null) return { images: [], error: null };
+  if (!Array.isArray(raw)) {
+    return {
+      images: [],
+      error:
+        "referenceImages must be an array of { name, mimeType, dataUrl }.",
+    };
+  }
+  if (raw.length > MAX_REFERENCE_IMAGES) {
+    return {
+      images: [],
+      error: `You can attach up to ${MAX_REFERENCE_IMAGES} reference images.`,
+    };
+  }
+
+  const parsed: ValidReferenceImage[] = [];
+  for (let index = 0; index < raw.length; index += 1) {
+    const item = raw[index];
+    if (!item || typeof item !== "object") {
+      return { images: [], error: `referenceImages[${index}] is invalid.` };
+    }
+    const name = (item as { name?: unknown }).name;
+    const mimeType = (item as { mimeType?: unknown }).mimeType;
+    const dataUrl = (item as { dataUrl?: unknown }).dataUrl;
+
+    if (
+      typeof name !== "string" ||
+      typeof mimeType !== "string" ||
+      typeof dataUrl !== "string"
+    ) {
+      return {
+        images: [],
+        error: `referenceImages[${index}] must include name, mimeType, and dataUrl strings.`,
+      };
+    }
+
+    if (!mimeType.toLowerCase().startsWith("image/")) {
+      return {
+        images: [],
+        error: `referenceImages[${index}] must be an image mime type.`,
+      };
+    }
+
+    const match = DATA_URL_PATTERN.exec(dataUrl.trim());
+    if (!match) {
+      return {
+        images: [],
+        error: `referenceImages[${index}] has an invalid dataUrl format.`,
+      };
+    }
+
+    const dataUrlMime = match[1].toLowerCase();
+    const base64Data = match[2];
+    if (!dataUrlMime.startsWith("image/")) {
+      return {
+        images: [],
+        error: `referenceImages[${index}] dataUrl must be an image.`,
+      };
+    }
+
+    const sizeBytes = estimateBase64Bytes(base64Data);
+    if (sizeBytes > MAX_REFERENCE_IMAGE_BYTES) {
+      return {
+        images: [],
+        error: `referenceImages[${index}] is larger than 4MB.`,
+      };
+    }
+
+    parsed.push({
+      name: name.trim() || `image-${index + 1}`,
+      mimeType: dataUrlMime,
+      dataUrl: dataUrl.trim(),
+      base64Data,
+    });
+  }
+
+  return { images: parsed, error: null };
+}
+
+function normalizePackId(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  return UUID_PATTERN.test(trimmed) ? trimmed : null;
+}
+
+function mergeImageUrls(
+  dataUrlImages: ValidReferenceImage[],
+  retrievedImageUrls: string[],
+): string[] {
+  const merged: string[] = [];
+  for (const image of dataUrlImages) {
+    if (!image.dataUrl || merged.includes(image.dataUrl)) continue;
+    merged.push(image.dataUrl);
+    if (merged.length >= MAX_MODEL_IMAGE_PARTS) return merged;
+  }
+  for (const url of retrievedImageUrls) {
+    if (!url || merged.includes(url)) continue;
+    merged.push(url);
+    if (merged.length >= MAX_MODEL_IMAGE_PARTS) return merged;
+  }
+  return merged;
+}
+
+function appendRetrievedContextToLatestUserMessage(
+  messages: ChatMessage[],
+  contextText: string | null,
+): ChatMessage[] {
+  if (!contextText || !contextText.trim()) return messages;
+  const latestUserIndex = findLatestUserMessageIndex(messages);
+  if (latestUserIndex < 0) return messages;
+
+  return messages.map((message, index) => {
+    if (index !== latestUserIndex) return message;
+    const base = (message.content || "").trim();
+    const context = contextText.trim();
+    const merged = base
+      ? `${base}\n\nPack image library context:\n${context}`
+      : `Pack image library context:\n${context}`;
+    return { ...message, content: merged };
+  });
+}
+
+async function fetchPosterImageContext(options: {
+  packId: string;
+  query: string;
+  authorizationHeader: string | null;
+}): Promise<RetrievedImageContext> {
+  if (!options.authorizationHeader) {
+    return { contextText: null, imageUrls: [] };
+  }
+
+  const backendBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const url = `${backendBase}/api/v1/image-context/packs/${options.packId}/retrieve`;
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: options.authorizationHeader,
+      },
+      body: JSON.stringify({
+        query: options.query,
+        top_k: MAX_MODEL_IMAGE_PARTS,
+      }),
+    });
+    if (!res.ok) {
+      return { contextText: null, imageUrls: [] };
+    }
+
+    const payload = (await res.json()) as RetrievedImageContextResponse;
+    const contextText =
+      typeof payload.context_text === "string" ? payload.context_text : null;
+    const imageUrls = Array.isArray(payload.items)
+      ? payload.items
+          .map((item) =>
+            typeof item?.preview_url === "string" ? item.preview_url : null,
+          )
+          .filter((url): url is string => Boolean(url))
+          .slice(0, MAX_MODEL_IMAGE_PARTS)
+      : [];
+
+    return { contextText, imageUrls };
+  } catch {
+    return { contextText: null, imageUrls: [] };
+  }
+}
+
+function findLatestUserMessageIndex(messages: ChatMessage[]): number {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].role === "user") return index;
+  }
+  return -1;
+}
+
+function buildAnthropicMessages(
+  messages: ChatMessage[],
+  referenceImages: ValidReferenceImage[],
+): Array<Record<string, unknown>> {
+  if (referenceImages.length === 0) {
+    return messages.map((message) => ({
+      role: message.role === "system" ? "assistant" : message.role,
+      content: message.content,
+    }));
+  }
+
+  const latestUserIndex = findLatestUserMessageIndex(messages);
+  return messages.map((message, index) => {
+    const role = message.role === "system" ? "assistant" : message.role;
+    if (role !== "user" || index !== latestUserIndex) {
+      return { role, content: message.content };
+    }
+
+    const contentBlocks: Array<Record<string, unknown>> = [
+      {
+        type: "text",
+        text: message.content || "Use the attached reference images as context.",
+      },
+    ];
+
+    for (const image of referenceImages) {
+      contentBlocks.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: image.mimeType,
+          data: image.base64Data,
+        },
+      });
+    }
+
+    return { role, content: contentBlocks };
+  });
+}
+
+function buildOpenAiMessages(
+  messages: ChatMessage[],
+  referenceImages: ValidReferenceImage[],
+  retrievedImageUrls: string[],
+): Array<Record<string, unknown>> {
+  const mergedImageUrls = mergeImageUrls(referenceImages, retrievedImageUrls);
+  if (mergedImageUrls.length === 0) {
+    return messages.map((message) => ({
+      role: message.role,
+      content: message.content,
+    }));
+  }
+
+  const latestUserIndex = findLatestUserMessageIndex(messages);
+  return messages.map((message, index) => {
+    if (message.role !== "user" || index !== latestUserIndex) {
+      return { role: message.role, content: message.content };
+    }
+
+    const contentParts: Array<Record<string, unknown>> = [
+      {
+        type: "text",
+        text: message.content || "Use the attached reference images as context.",
+      },
+    ];
+
+    for (const url of mergedImageUrls) {
+      contentParts.push({
+        type: "image_url",
+        image_url: {
+          url,
+        },
+      });
+    }
+
+    return {
+      role: message.role,
+      content: contentParts,
+    };
+  });
+}
+
 function streamWithAnthropic(
   anthropic: Anthropic,
   systemPrompt: string,
   messages: ChatMessage[],
+  referenceImages: ValidReferenceImage[],
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
+  const anthropicMessages = buildAnthropicMessages(messages, referenceImages);
 
   return new ReadableStream({
     async start(controller) {
@@ -153,10 +470,7 @@ function streamWithAnthropic(
         model: "claude-sonnet-4-6",
         max_tokens: 8192,
         system: systemPrompt,
-        messages: messages.map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        })),
+        messages: anthropicMessages as never,
       });
 
       for await (const event of stream) {
@@ -176,8 +490,15 @@ function streamWithOpenAI(
   openai: OpenAI,
   systemPrompt: string,
   messages: ChatMessage[],
+  referenceImages: ValidReferenceImage[],
+  retrievedImageUrls: string[],
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
+  const openAiMessages = buildOpenAiMessages(
+    messages,
+    referenceImages,
+    retrievedImageUrls,
+  );
 
   return new ReadableStream({
     async start(controller) {
@@ -187,11 +508,8 @@ function streamWithOpenAI(
         stream: true,
         messages: [
           { role: "system", content: systemPrompt },
-          ...messages.map((m) => ({
-            role: m.role as "user" | "assistant",
-            content: m.content,
-          })),
-        ],
+          ...openAiMessages,
+        ] as never,
       });
 
       for await (const chunk of stream) {
@@ -205,16 +523,86 @@ function streamWithOpenAI(
   });
 }
 
+async function createPassthroughStream(
+  readable: ReadableStream<Uint8Array>,
+): Promise<ReadableStream<Uint8Array>> {
+  const reader = readable.getReader();
+  const firstChunk = await reader.read();
+
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      if (firstChunk.value) controller.enqueue(firstChunk.value);
+      if (firstChunk.done) {
+        controller.close();
+        return;
+      }
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          controller.enqueue(value);
+        }
+        controller.close();
+      } catch (err) {
+        controller.error(err);
+      }
+    },
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { messages, brandContext } = body;
+    const messages = normalizeMessages(body.messages);
+    const packId = normalizePackId(body.packId);
+    const brandContext = body.brandContext as BrandContext | undefined;
+    const {
+      images: referenceImages,
+      error: referenceImageError,
+    } = normalizeReferenceImages(body.referenceImages as ReferenceImageInput[] | undefined);
 
-    if (!messages) {
+    if (!messages || messages.length === 0) {
       return new Response(JSON.stringify({ error: "Missing messages" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
+    }
+
+    if (referenceImageError) {
+      return new Response(JSON.stringify({ error: referenceImageError }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (body.packId != null && !packId) {
+      return new Response(JSON.stringify({ error: "Invalid packId" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    let messagesForGeneration = messages;
+    let retrievedImageUrls: string[] = [];
+    const imageContextPosterEnabled =
+      (process.env.IMAGE_CONTEXT_POSTER_ENABLED ?? "true").toLowerCase() !==
+      "false";
+    if (packId && imageContextPosterEnabled) {
+      const latestUserIndex = findLatestUserMessageIndex(messages);
+      const latestUserContent =
+        latestUserIndex >= 0 ? messages[latestUserIndex].content : "";
+      if (latestUserContent.trim()) {
+        const retrieval = await fetchPosterImageContext({
+          packId,
+          query: latestUserContent,
+          authorizationHeader: req.headers.get("authorization"),
+        });
+        messagesForGeneration = appendRetrievedContextToLatestUserMessage(
+          messagesForGeneration,
+          retrieval.contextText,
+        );
+        retrievedImageUrls = retrieval.imageUrls;
+      }
     }
 
     const hasAnthropic = !!process.env.ANTHROPIC_API_KEY?.trim();
@@ -231,72 +619,82 @@ export async function POST(req: NextRequest) {
 
     const systemPrompt = buildSystemPrompt(brandContext);
 
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const anthropic = hasAnthropic
+      ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+      : null;
+    const openai = hasOpenAI
+      ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+      : null;
 
     let readable: ReadableStream<Uint8Array>;
-    try {
-      readable = streamWithAnthropic(anthropic, systemPrompt, messages);
-      const reader = readable.getReader();
-      const firstChunk = await reader.read();
 
-      const passthrough = new ReadableStream<Uint8Array>({
-        async start(controller) {
-          if (firstChunk.value) controller.enqueue(firstChunk.value);
-          if (firstChunk.done) {
-            controller.close();
-            return;
-          }
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              controller.enqueue(value);
-            }
-            controller.close();
-          } catch (err) {
-            controller.error(err);
-          }
-        },
-      });
-
-      readable = passthrough;
-    } catch (anthropicError) {
-      console.error(
-        "Anthropic failed, falling back to OpenAI:",
-        anthropicError,
-      );
+    if (anthropic) {
       try {
-        readable = streamWithOpenAI(openai, systemPrompt, messages);
-        const reader = readable.getReader();
-        const firstChunk = await reader.read();
-
-        const passthrough = new ReadableStream<Uint8Array>({
-          async start(controller) {
-            if (firstChunk.value) controller.enqueue(firstChunk.value);
-            if (firstChunk.done) {
-              controller.close();
-              return;
-            }
-            try {
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                controller.enqueue(value);
-              }
-              controller.close();
-            } catch (err) {
-              controller.error(err);
-            }
-          },
-        });
-
-        readable = passthrough;
-      } catch (openaiError) {
-        console.error(
-          "OpenAI fallback failed (both providers failed):",
-          openaiError,
+        readable = await createPassthroughStream(
+          streamWithAnthropic(
+            anthropic,
+            systemPrompt,
+            messagesForGeneration,
+            referenceImages,
+          ),
         );
+      } catch (anthropicError) {
+        console.error(
+          "Anthropic failed, falling back to OpenAI:",
+          anthropicError,
+        );
+        if (!openai) {
+          return new Response(
+            JSON.stringify({
+              error:
+                "We're having trouble generating right now. Please try again in a few moments.",
+            }),
+            {
+              status: 503,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        try {
+          readable = await createPassthroughStream(
+            streamWithOpenAI(
+              openai,
+              systemPrompt,
+              messagesForGeneration,
+              referenceImages,
+              retrievedImageUrls,
+            ),
+          );
+        } catch (openaiError) {
+          console.error(
+            "OpenAI fallback failed (both providers failed):",
+            openaiError,
+          );
+          return new Response(
+            JSON.stringify({
+              error:
+                "We're having trouble generating right now. Please try again in a few moments.",
+            }),
+            {
+              status: 503,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+      }
+    } else {
+      try {
+        readable = await createPassthroughStream(
+          streamWithOpenAI(
+            openai!,
+            systemPrompt,
+            messagesForGeneration,
+            referenceImages,
+            retrievedImageUrls,
+          ),
+        );
+      } catch (openaiError) {
+        console.error("OpenAI generation failed:", openaiError);
         return new Response(
           JSON.stringify({
             error:
