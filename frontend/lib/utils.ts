@@ -7,4 +7,6 @@ export function cn(...inputs: ClassValue[]) {
 
 /** Backend API base URL. Frontend calls backend directly (CORS allows all origins). */
 export const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  process.env.BACKEND_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:8000";

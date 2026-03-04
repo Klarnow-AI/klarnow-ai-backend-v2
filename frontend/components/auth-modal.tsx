@@ -35,7 +35,10 @@ export function AuthModal({
   const [googleReady, setGoogleReady] = useState(false);
   const [googleSigningIn, setGoogleSigningIn] = useState(false);
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
-  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
+  const googleClientId =
+    process.env.GOOGLE_CLIENT_ID ??
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ??
+    "";
   const router = useRouter();
   const {
     checkEmailRegistered,

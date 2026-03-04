@@ -329,7 +329,10 @@ async function fetchPosterImageContext(options: {
     return { contextText: null, imageUrls: [] };
   }
 
-  const backendBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const backendBase =
+    process.env.BACKEND_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:8000";
   const url = `${backendBase}/api/v1/image-context/packs/${options.packId}/retrieve`;
 
   try {
