@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # App
     app_env: str = "development"
     secret_key: str = ""
-    cors_allow_origins: list[str] = ["http://localhost:3000"]
+    cors_allow_origins: list[str] = ["http://localhost:3000", "https://staging.klarnow.ai"]
     access_token_expiry_time: int = 60  # minutes
     frontend_url: str = "http://localhost:3000"
     google_oauth_client_id: str = ""
