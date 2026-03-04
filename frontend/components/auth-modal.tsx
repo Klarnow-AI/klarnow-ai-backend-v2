@@ -35,10 +35,7 @@ export function AuthModal({
   const [googleReady, setGoogleReady] = useState(false);
   const [googleSigningIn, setGoogleSigningIn] = useState(false);
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
-  const googleClientId =
-    process.env.GOOGLE_CLIENT_ID ??
-    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ??
-    "";
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
   const router = useRouter();
   const {
     checkEmailRegistered,
@@ -60,6 +57,20 @@ export function AuthModal({
       setGoogleSigningIn(false);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (
+      !open ||
+      googleClientId ||
+      process.env.NODE_ENV === "development" ||
+      typeof window === "undefined"
+    ) {
+      return;
+    }
+    console.warn(
+      "NEXT_PUBLIC_GOOGLE_CLIENT_ID is not set for this deployment. Google sign-in button will remain hidden.",
+    );
+  }, [open, googleClientId]);
 
   useEffect(() => {
     if (!googleClientId || typeof window === "undefined") return;

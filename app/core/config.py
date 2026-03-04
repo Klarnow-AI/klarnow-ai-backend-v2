@@ -1,9 +1,10 @@
 """Application configuration from environment."""
 
+import json
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,7 +22,7 @@ class Settings(BaseSettings):
     # App
     app_env: str = "development"
     secret_key: str = ""
-    cors_allow_origins: list[str] = ["http://localhost:3000", "https://staging.klarnow.ai"]
+    cors_allow_origins: list[str] = ["http://localhost:3000"]
     access_token_expiry_time: int = 60  # minutes
     frontend_url: str = "http://localhost:3000"
     google_oauth_client_id: str = ""
@@ -96,6 +97,23 @@ class Settings(BaseSettings):
     # Orchestrator cost/safety (Phase 7)
     max_tool_chain_length: int = 5
     retry_cap_per_tool: int = 2
+
+    @field_validator("cors_allow_origins", mode="before")
+    @classmethod
+    def parse_cors_allow_origins(cls, value: object):
+        if value is None:
+            return value
+        if isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                return []
+            if raw.startswith("["):
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    return [str(origin).strip() for origin in parsed if str(origin).strip()]
+                raise ValueError("CORS_ALLOW_ORIGINS JSON value must be a list")
+            return [origin.strip() for origin in raw.split(",") if origin.strip()]
+        return value
 
     @model_validator(mode="after")
     def validate_required_settings(self):

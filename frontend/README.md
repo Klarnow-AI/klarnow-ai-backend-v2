@@ -19,6 +19,13 @@ npm run build
 npm run start
 ```
 
+## Deployment env (staging/production)
+
+- `NEXT_PUBLIC_API_URL` must point to a reachable hosted backend URL (for example `https://api.staging.example.com`), not `http://localhost:8000`.
+- `NEXT_PUBLIC_GOOGLE_CLIENT_ID` must be set or the Google sign-in button is intentionally hidden.
+- `BACKEND_URL` is server-only and used by Next.js route handlers. Keep it aligned with your backend host.
+- After changing any `NEXT_PUBLIC_*` env variable, rebuild and redeploy the frontend so the client bundle picks it up.
+
 ## Features
 
 - **Auth**: Email/password, email login code, and Google sign-in (JWT stored in localStorage).

@@ -52,6 +52,14 @@ API: `http://localhost:8000`. Docs: `http://localhost:8000/docs`. Health: `http:
 
 See [.env.example](.env.example). Required: `DATABASE_URL`, `SECRET_KEY`. Optional: Resend, S3, OpenAI, and Google sign-in.
 
+### Staging/production API + CORS checklist
+
+1. Backend: set `CORS_ALLOW_ORIGINS` to include your frontend origin, e.g. `["https://staging.klarnow.ai"]`.
+2. Backend: set `GOOGLE_OAUTH_CLIENT_ID` to your web OAuth client ID.
+3. Frontend: set `NEXT_PUBLIC_API_URL` to your hosted backend URL (never localhost).
+4. Frontend: set `NEXT_PUBLIC_GOOGLE_CLIENT_ID` to the same OAuth client ID.
+5. Rebuild and redeploy frontend after any `NEXT_PUBLIC_*` env change.
+
 ### Google Sign-In setup (GIS ID token flow)
 
 1. Create a Google OAuth client ID for a Web application.
