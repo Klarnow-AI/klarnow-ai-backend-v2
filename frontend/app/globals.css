@@ -128,6 +128,68 @@ html {
   padding-top: env(safe-area-inset-top, 0);
 }
 
+/* Next-action reminder toast: translucent body + theme-aware gradient border */
+.next-action-toast[data-sonner-toast][data-styled="true"] {
+  border: 1px solid transparent !important;
+  border-radius: 14px !important;
+  color: hsl(var(--foreground)) !important;
+  background:
+    linear-gradient(
+      hsl(var(--background) / 0.78),
+      hsl(var(--background) / 0.72)
+    )
+    padding-box,
+    linear-gradient(
+      130deg,
+      hsl(var(--foreground) / 0.34) 0%,
+      hsl(var(--ring) / 0.5) 40%,
+      hsl(var(--primary) / 0.28) 72%,
+      hsl(var(--foreground) / 0.2) 100%
+    )
+    border-box !important;
+  backdrop-filter: blur(14px) saturate(135%);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+  box-shadow:
+    0 20px 40px -28px hsl(var(--foreground) / 0.75),
+    0 8px 20px -14px hsl(var(--foreground) / 0.38);
+}
+
+.light .next-action-toast[data-sonner-toast][data-styled="true"] {
+  background:
+    linear-gradient(
+      hsl(var(--background) / 0.9),
+      hsl(var(--background) / 0.86)
+    )
+    padding-box,
+    linear-gradient(
+      125deg,
+      hsl(var(--foreground) / 0.1) 0%,
+      hsl(var(--ring) / 0.28) 45%,
+      hsl(var(--foreground) / 0.14) 100%
+    )
+    border-box !important;
+  box-shadow:
+    0 20px 34px -28px hsl(var(--foreground) / 0.35),
+    0 10px 20px -16px hsl(var(--foreground) / 0.22);
+}
+
+.next-action-toast[data-sonner-toast][data-styled="true"] [data-description] {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.next-action-toast[data-sonner-toast][data-styled="true"] [data-button] {
+  border-radius: 999px;
+  border: 1px solid hsl(var(--border) / 0.8);
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+}
+
+.next-action-toast[data-sonner-toast][data-styled="true"] [data-close-button] {
+  background: hsl(var(--background) / 0.9);
+  border-color: hsl(var(--border) / 0.9);
+  color: hsl(var(--foreground));
+}
+
 /* CTA treatment for the "Execute now" action in pack dashboard. */
 .execute-now-cta-ring {
   position: relative;

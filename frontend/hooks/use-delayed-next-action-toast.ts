@@ -57,6 +57,7 @@ export function useDelayedNextActionToast({
 
       toast.message("Next action", {
         duration: durationMs,
+        className: "next-action-toast",
         description: createElement(
           "div",
           { className: "space-y-1" },
