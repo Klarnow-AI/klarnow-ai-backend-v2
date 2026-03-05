@@ -16,11 +16,13 @@ export function Day1Modal({
   onClose,
   packId,
   onComplete,
+  onGoToNextStep,
 }: {
   open: boolean;
   onClose: () => void;
   packId: string;
   onComplete?: () => void;
+  onGoToNextStep?: () => void;
 }) {
   const [pack, setPack] = useState<Pack | null>(null);
   const [sprintId, setSprintId] = useState<string | null>(null);
@@ -91,6 +93,7 @@ export function Day1Modal({
       await sprintApi.completeDay(packId, sprintId, 1, {
         offer_one_liner: value,
       });
+      setDayComplete(true);
       onComplete?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to complete Step 1");
@@ -198,6 +201,15 @@ export function Day1Modal({
                   <Button type="submit" disabled={!offerOneLiner.trim() || saving || dayComplete}>
                     {saving ? "Saving…" : dayComplete ? "Step 1 complete" : "Lock offer & complete Step 1"}
                   </Button>
+                  {dayComplete && (
+                    <Button
+                      type="button"
+                      onClick={onGoToNextStep}
+                      disabled={saving || !onGoToNextStep}
+                    >
+                      Go to next step
+                    </Button>
+                  )}
                 </div>
               </form>
             )}

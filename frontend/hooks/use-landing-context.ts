@@ -9,6 +9,7 @@ import { useGet } from "./use-get";
 export function useLandingContext(): {
   context: LandingContext | null;
   isLoading: boolean;
+  error: Error | null;
 } {
   const { isAuthenticated } = useAuth();
   const fetcher = useCallback(async (): Promise<LandingContext> => {
@@ -24,9 +25,9 @@ export function useLandingContext(): {
       leadCount: raw.leadCount ?? raw.lead_count ?? null,
     };
   }, []);
-  const { data, isLoading } = useGet<LandingContext>(
+  const { data, isLoading, error } = useGet<LandingContext>(
     isAuthenticated ? "landing-context" : null,
     fetcher
   );
-  return { context: data ?? null, isLoading };
+  return { context: data ?? null, isLoading, error };
 }

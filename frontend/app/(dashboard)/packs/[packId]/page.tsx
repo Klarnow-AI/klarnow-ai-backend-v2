@@ -25,6 +25,7 @@ import { Spinner } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { NotFoundView } from "@/components/not-found-view";
 import { packs as packsApi } from "@/api_requests/packs";
 import { me } from "@/api_requests/me";
 import { sprintApi } from "@/api_requests/sprint";
@@ -410,15 +411,19 @@ export default function PackOverviewPage() {
     loadNextAction();
   }, [fetchSummary, fetchTodayTasks, loadNextAction]);
 
-  const handleDayComplete = useCallback(() => {
-    closeDayModal();
+  const handleDaySaved = useCallback(() => {
     refreshOverviewState();
     router.refresh();
     window.setTimeout(() => {
       refreshOverviewState();
       router.refresh();
     }, 250);
-  }, [closeDayModal, refreshOverviewState, router]);
+  }, [refreshOverviewState, router]);
+
+  const handleDayComplete = useCallback(() => {
+    closeDayModal();
+    handleDaySaved();
+  }, [closeDayModal, handleDaySaved]);
 
   const handleTaskToggle = useCallback(
     async (taskId: string, checked: boolean) => {
@@ -480,6 +485,21 @@ export default function PackOverviewPage() {
   }
 
   if (error || !summary) {
+    const maybeNotFound = /not found|404/i.test(error?.message ?? "");
+    if (maybeNotFound) {
+      return (
+        <NotFoundView
+          title="Pack not found"
+          description="The campaign pack you requested does not exist or has been removed."
+          primaryHref="/packs"
+          primaryLabel="Back to packs"
+          secondaryHref="/packs/new"
+          secondaryLabel="Create new pack"
+          className="min-h-[60vh]"
+        />
+      );
+    }
+
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
         <p className="text-sm text-destructive">
@@ -634,7 +654,7 @@ export default function PackOverviewPage() {
                           <div className="execute-now-cta-ring shrink-0">
                             <Button
                               onClick={handleExecuteToday}
-                              size="sm"
+                              size="md"
                               className="execute-now-cta hover:scale-100 focus-visible:scale-100 active:scale-100 hover:!text-white"
                             >
                               Execute now
@@ -908,7 +928,8 @@ export default function PackOverviewPage() {
               open={true}
               onClose={closeDayModal}
               packId={packId}
-              onComplete={handleDayComplete}
+              onComplete={handleDaySaved}
+              onGoToNextStep={() => openDayModal(2)}
             />
           )}
           {dayModalOpen === 2 && (
@@ -916,7 +937,8 @@ export default function PackOverviewPage() {
               open={true}
               onClose={closeDayModal}
               packId={packId}
-              onComplete={handleDayComplete}
+              onComplete={handleDaySaved}
+              onGoToNextStep={() => openDayModal(3)}
             />
           )}
           {dayModalOpen === 3 && (
@@ -924,7 +946,8 @@ export default function PackOverviewPage() {
               open={true}
               onClose={closeDayModal}
               packId={packId}
-              onComplete={handleDayComplete}
+              onComplete={handleDaySaved}
+              onGoToNextStep={() => openDayModal(4)}
             />
           )}
           {dayModalOpen >= 4 && dayModalOpen <= 14 && (

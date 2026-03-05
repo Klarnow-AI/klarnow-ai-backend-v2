@@ -16,11 +16,13 @@ export function Day2Modal({
   onClose,
   packId,
   onComplete,
+  onGoToNextStep,
 }: {
   open: boolean;
   onClose: () => void;
   packId: string;
   onComplete?: () => void;
+  onGoToNextStep?: () => void;
 }) {
   const [pack, setPack] = useState<Pack | null>(null);
   const [sprintId, setSprintId] = useState<string | null>(null);
@@ -114,6 +116,7 @@ export function Day2Modal({
         primary_pain: pain,
         primary_outcome: outcome,
       });
+      setDayComplete(true);
       onComplete?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to complete Step 2");
@@ -260,6 +263,15 @@ export function Day2Modal({
                   <Button type="submit" disabled={!isValid || saving || dayComplete}>
                     {saving ? "Saving…" : dayComplete ? "Step 2 complete" : "Complete Step 2"}
                   </Button>
+                  {dayComplete && (
+                    <Button
+                      type="button"
+                      onClick={onGoToNextStep}
+                      disabled={saving || !onGoToNextStep}
+                    >
+                      Go to next step
+                    </Button>
+                  )}
                 </div>
               </form>
             )}

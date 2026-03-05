@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import time
-import traceback
 import uuid
 from contextlib import asynccontextmanager, suppress
 
@@ -36,6 +35,7 @@ from app.modules.image_context.routes import router as image_context_router
 
 ONBOARDING_RECOVERY_INITIAL_DELAY_SECONDS = 5
 ONBOARDING_RECOVERY_MAX_DELAY_SECONDS = 60
+GENERIC_SERVER_ERROR_MESSAGE = "Something went wrong on our side. Please try again."
 
 
 async def _recover_onboarding_jobs_with_retry(log: logging.Logger) -> None:
@@ -82,10 +82,17 @@ async def lifespan(app: FastAPI):
         name="onboarding-job-recovery",
     )
     if settings.image_context_enabled:
-        requeued = recover_pending_image_context_jobs()
-        if requeued:
-            log.info("Requeued %s image-context jobs from previous run.", requeued)
-        start_image_context_worker()
+        can_start_image_context_worker = True
+        try:
+            requeued = recover_pending_image_context_jobs()
+            if requeued:
+                log.info("Requeued %s image-context jobs from previous run.", requeued)
+        except Exception as e:
+            # Non-fatal: app should start even if DB is temporarily unavailable.
+            log.warning("Image-context job recovery skipped: %s", e)
+            can_start_image_context_worker = False
+        if can_start_image_context_worker:
+            start_image_context_worker()
     try:
         get_reference_kb().warmup()
     except Exception as e:
@@ -120,16 +127,15 @@ app.add_exception_handler(AppError, app_error_handler)  # pyright: ignore[report
 
 
 def _generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Log unhandled exceptions and return consistent JSON 500."""
+    """Log unhandled exceptions and return a user-safe JSON 500."""
     log = logging.getLogger("uvicorn.error")
     log.exception("Unhandled exception: %s", exc)
-    if settings.app_env == "development":
-        detail = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    else:
-        detail = "Internal server error"
     response = JSONResponse(
         status_code=500,
-        content={"detail": detail, "request_id": getattr(request.state, "request_id", None)},
+        content={
+            "detail": GENERIC_SERVER_ERROR_MESSAGE,
+            "request_id": getattr(request.state, "request_id", None),
+        },
     )
     # Add CORS headers so browser doesn't report CORS instead of 500
     origin = request.headers.get("origin")

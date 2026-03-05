@@ -15,11 +15,13 @@ export function Day3Modal({
   onClose,
   packId,
   onComplete,
+  onGoToNextStep,
 }: {
   open: boolean;
   onClose: () => void;
   packId: string;
   onComplete?: () => void;
+  onGoToNextStep?: () => void;
 }) {
   const [sprintId, setSprintId] = useState<string | null>(null);
   const [dayComplete, setDayComplete] = useState(false);
@@ -87,6 +89,7 @@ export function Day3Modal({
         ...(pitchScript.trim() && { pitch_script: pitchScript.trim() }),
         voice_notes_sent: String(voiceNotesSent),
       });
+      setDayComplete(true);
       onComplete?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to complete Step 3");
@@ -198,6 +201,15 @@ export function Day3Modal({
                   <Button type="submit" disabled={saving || dayComplete}>
                     {saving ? "Saving…" : dayComplete ? "Step 3 complete" : "Complete Step 3"}
                   </Button>
+                  {dayComplete && (
+                    <Button
+                      type="button"
+                      onClick={onGoToNextStep}
+                      disabled={saving || !onGoToNextStep}
+                    >
+                      Go to next step
+                    </Button>
+                  )}
                 </div>
               </form>
             )}

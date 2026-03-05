@@ -104,12 +104,14 @@ export const LayoutDashboard = createIcon(
   DashboardSquare01Icon,
   "LayoutDashboard",
 );
+export const BarChart3 = createIcon(DashboardSquare01Icon, "BarChart3");
 export const Target = createIcon(Target01Icon, "Target");
 export const FileText = createIcon(File01Icon, "FileText");
 export const Megaphone = createIcon(Megaphone01Icon, "Megaphone");
 export const FileCode = createIcon(CodeIcon, "FileCode");
 export const Calendar = createIcon(Calendar01Icon, "Calendar");
 export const Image = createIcon(Image01Icon, "Image");
+export const Layers = createIcon(StructureFolderIcon, "Layers");
 export const Film = createIcon(Film01Icon, "Film");
 export const FileCheck = createIcon(CheckmarkCircle01Icon, "FileCheck");
 export const Receipt = createIcon(ReceiptDollarIcon, "Receipt");

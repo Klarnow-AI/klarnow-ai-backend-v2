@@ -195,8 +195,8 @@ export function useOnboardingChat(options: {
           where_are_you_based: answers.where_are_you_based || "",
         };
         const final = await meApi.landingComplete(payload);
-        options.onComplete?.(final.pack_id);
-        router.push(final.redirect);
+        if (options.onComplete) options.onComplete(final.pack_id);
+        else router.push(final.redirect);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
       } finally {

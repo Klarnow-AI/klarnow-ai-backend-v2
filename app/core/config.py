@@ -3,9 +3,10 @@
 import json
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -22,7 +23,7 @@ class Settings(BaseSettings):
     # App
     app_env: str = "development"
     secret_key: str = ""
-    cors_allow_origins: list[str] = ["http://localhost:3000"]
+    cors_allow_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
     access_token_expiry_time: int = 60  # minutes
     frontend_url: str = "http://localhost:3000"
     google_oauth_client_id: str = ""
@@ -103,17 +104,52 @@ class Settings(BaseSettings):
     def parse_cors_allow_origins(cls, value: object):
         if value is None:
             return value
+        if isinstance(value, (list, tuple, set)):
+            return cls._normalize_cors_allow_origins(value)
         if isinstance(value, str):
             raw = value.strip()
             if not raw:
                 return []
             if raw.startswith("["):
-                parsed = json.loads(raw)
+                try:
+                    parsed = json.loads(raw)
+                except json.JSONDecodeError:
+                    bracket_trimmed = raw[1:]
+                    if bracket_trimmed.endswith("]"):
+                        bracket_trimmed = bracket_trimmed[:-1]
+                    return cls._split_and_normalize_cors_allow_origins(bracket_trimmed)
                 if isinstance(parsed, list):
-                    return [str(origin).strip() for origin in parsed if str(origin).strip()]
+                    return cls._normalize_cors_allow_origins(parsed)
                 raise ValueError("CORS_ALLOW_ORIGINS JSON value must be a list")
-            return [origin.strip() for origin in raw.split(",") if origin.strip()]
-        return value
+            if raw.startswith("{"):
+                try:
+                    parsed = json.loads(raw)
+                except json.JSONDecodeError as exc:
+                    raise ValueError(
+                        "CORS_ALLOW_ORIGINS must be a JSON list, bracketed list, or comma-separated string"
+                    ) from exc
+                if isinstance(parsed, list):
+                    return cls._normalize_cors_allow_origins(parsed)
+                raise ValueError("CORS_ALLOW_ORIGINS JSON value must be a list")
+            return cls._split_and_normalize_cors_allow_origins(raw)
+        raise ValueError("CORS_ALLOW_ORIGINS must be a string or list of strings")
+
+    @classmethod
+    def _split_and_normalize_cors_allow_origins(cls, value: str) -> list[str]:
+        return cls._normalize_cors_allow_origins(value.split(","))
+
+    @classmethod
+    def _normalize_cors_allow_origins(cls, values: object) -> list[str]:
+        if not isinstance(values, (list, tuple, set)):
+            raise ValueError("CORS_ALLOW_ORIGINS must be a list")
+        normalized: list[str] = []
+        for origin in values:
+            text = str(origin).strip()
+            if len(text) >= 2 and text[0] == text[-1] and text[0] in {'"', "'"}:
+                text = text[1:-1].strip()
+            if text:
+                normalized.append(text)
+        return normalized
 
     @model_validator(mode="after")
     def validate_required_settings(self):

@@ -11,6 +11,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { SidebarContent } from "@/components/layout/sidebar-content";
 import { PageLoader } from "@/components/ui/page-loader";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { NotFoundView } from "@/components/not-found-view";
 import {
   MobileSidebarProvider,
   useMobileSidebar,
@@ -64,20 +65,41 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { isAuthenticated, isLoading } = useAuth();
-  const { hasPacks, isLoading: packsLoading } = useHasPacks();
+  const { hasPacks, isLoading: packsLoading, error: packsError } = useHasPacks();
   const router = useRouter();
   const pathname = usePathname();
+  const isNewPackRoute = pathname === "/packs/new";
+  const isPacksRoute = pathname === "/packs";
+  const isPackScopedRoute =
+    pathname.startsWith("/packs/") && pathname !== "/packs/new";
 
   useEffect(() => {
     if (isLoading) return;
+    const onNewPackRoute = pathname === "/packs/new";
+    const onPackScopedRoute =
+      pathname.startsWith("/packs/") && pathname !== "/packs/new";
     if (!isAuthenticated) {
       router.replace("/");
       return;
     }
-    if (!packsLoading && !hasPacks && pathname !== "/packs/new") {
+    if (
+      !packsLoading &&
+      !packsError &&
+      !hasPacks &&
+      !onNewPackRoute &&
+      !onPackScopedRoute
+    ) {
       router.replace("/packs/new");
     }
-  }, [isAuthenticated, isLoading, hasPacks, packsLoading, pathname, router]);
+  }, [
+    isAuthenticated,
+    isLoading,
+    hasPacks,
+    packsLoading,
+    packsError,
+    pathname,
+    router,
+  ]);
 
   if (isLoading) {
     return <PageLoader variant="screen" />;
@@ -87,11 +109,24 @@ export default function DashboardLayout({
     return null;
   }
 
-  if (packsLoading) {
+  if (!isNewPackRoute && !isPackScopedRoute && packsLoading) {
     return <PageLoader variant="screen" />;
   }
 
-  if (!hasPacks && pathname !== "/packs/new") {
+  if (!isNewPackRoute && !isPackScopedRoute && !isPacksRoute && packsError) {
+    return (
+      <NotFoundView
+        title="Packs could not be loaded"
+        description={packsError.message}
+        primaryHref="/packs"
+        primaryLabel="Retry packs"
+        secondaryHref="/"
+        secondaryLabel="Back home"
+      />
+    );
+  }
+
+  if (!hasPacks && !isNewPackRoute && !isPacksRoute && !isPackScopedRoute) {
     return null;
   }
 

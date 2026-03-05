@@ -51,6 +51,7 @@ API: `http://localhost:8000`. Docs: `http://localhost:8000/docs`. Health: `http:
 ## Environment variables
 
 See [.env.example](.env.example). Required: `DATABASE_URL`, `SECRET_KEY`. Optional: Resend, S3, OpenAI, and Google sign-in.
+`CORS_ALLOW_ORIGINS` accepts a JSON list (recommended), comma-separated values, and bracketed forms that are normalized.
 
 ### Staging/production API + CORS checklist
 
