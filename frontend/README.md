@@ -26,6 +26,29 @@ npm run start
 - `BACKEND_URL` is server-only and used by Next.js route handlers. Keep it aligned with your backend host.
 - After changing any `NEXT_PUBLIC_*` env variable, rebuild and redeploy the frontend so the client bundle picks it up.
 
+### Docker build/run (staging example)
+
+Build from repo root:
+
+```bash
+docker build -f frontend/Dockerfile \
+  --build-arg NEXT_PUBLIC_API_URL=https://api.staging.klarnow.ai \
+  --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID=<staging-google-client-id> \
+  -t klarnow-frontend:staging .
+```
+
+Run with server runtime env for Next.js route handlers:
+
+```bash
+docker run --rm -p 3000:3000 \
+  -e BACKEND_URL=https://api.staging.klarnow.ai \
+  klarnow-frontend:staging
+```
+
+GitHub Actions CI (`.github/workflows/frontend-build.yml`) injects:
+- `NEXT_PUBLIC_API_URL=https://api.staging.klarnow.ai`
+- `NEXT_PUBLIC_GOOGLE_CLIENT_ID` from repository/environment variable `STAGING_NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
+
 ## Features
 
 - **Auth**: Email/password, email login code, and Google sign-in (JWT stored in localStorage).

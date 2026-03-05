@@ -17,6 +17,7 @@ from app.core.storage import get_presigned_url
 from app.modules.creative.models import Asset
 from app.modules.image_context.models import (
     EMBEDDING_DIMENSION,
+    GlobalImageContextItem,
     ImageContextItem,
     ImageContextJob,
 )
@@ -27,6 +28,7 @@ logger = get_logger("klarnow.image_context")
 
 SOURCE_TYPE_PROOF = "proof"
 SOURCE_TYPE_ASSET = "asset"
+SOURCE_TYPE_GLOBAL = "global"
 JOB_OPERATION_UPSERT = "upsert"
 JOB_OPERATION_DELETE = "delete"
 JOB_STATUSES_IN_FLIGHT = {"queued", "running"}
@@ -101,7 +103,7 @@ def _build_fallback_caption(source_name: str | None, metadata_json: dict[str, An
         return f"{source_name}."
     if tags_text:
         return f"Tags: {tags_text}."
-    return "Image reference from pack library."
+    return "Image reference from library."
 
 
 def _build_embedding_text(
@@ -636,5 +638,198 @@ def retrieve_pack_image_context(
         "items": items,
         "references": references,
         "context_text": context_text,
+        "image_urls": image_urls,
+    }
+
+
+def _upsert_global_item(
+    db: Session,
+    *,
+    source_storage_key: str,
+    source_name: str | None,
+    source_content_type: str | None,
+    caption: str,
+    metadata_json: dict[str, Any],
+    embedding: list[float],
+) -> GlobalImageContextItem:
+    item = (
+        db.query(GlobalImageContextItem)
+        .filter(GlobalImageContextItem.source_storage_key == source_storage_key)
+        .first()
+    )
+    if not item:
+        item = GlobalImageContextItem(source_storage_key=source_storage_key)
+        db.add(item)
+
+    item.source_name = source_name
+    item.source_content_type = source_content_type
+    item.caption = caption
+    item.metadata_json = metadata_json
+    item.embedding = embedding
+    item.status = "ready"
+    item.error_message = None
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def upsert_global_image_context_item(
+    db: Session,
+    *,
+    source_storage_key: str,
+    source_name: str | None = None,
+    source_content_type: str | None = None,
+    caption: str | None = None,
+    tags: list[str] | None = None,
+) -> GlobalImageContextItem:
+    settings = get_settings()
+    client = _openai_client()
+    if not client:
+        raise ValueError("OPENAI_API_KEY is required for image context indexing")
+
+    metadata_json: dict[str, Any] = {}
+    normalized_tags = _normalize_tags(tags)
+    if normalized_tags:
+        metadata_json["tags"] = normalized_tags
+
+    has_caption_override = isinstance(caption, str) and bool(caption.strip())
+    resolved_caption = (caption or "").strip() or _build_fallback_caption(
+        source_name, metadata_json
+    )
+    preview_url = get_presigned_url(
+        source_storage_key,
+        expires_in=max(60, settings.image_context_preview_url_ttl_seconds),
+    )
+
+    if preview_url and not has_caption_override:
+        try:
+            generated_caption = _generate_caption_from_image(
+                client,
+                settings.image_context_caption_model,
+                preview_url,
+                source_name or SOURCE_TYPE_GLOBAL,
+            )
+            if generated_caption:
+                resolved_caption = generated_caption
+        except Exception as e:
+            logger.warning(
+                "global_image_context_caption_generation_failed | source=%s | error=%s",
+                source_storage_key,
+                e,
+            )
+
+    embedding_text = _build_embedding_text(
+        caption=resolved_caption,
+        source_type=SOURCE_TYPE_GLOBAL,
+        source_name=source_name,
+        metadata_json=metadata_json,
+    )
+    embedding = _embed_text(
+        client,
+        settings.image_context_embedding_model,
+        embedding_text,
+    )
+
+    return _upsert_global_item(
+        db,
+        source_storage_key=source_storage_key,
+        source_name=source_name,
+        source_content_type=source_content_type,
+        caption=resolved_caption,
+        metadata_json=metadata_json,
+        embedding=embedding,
+    )
+
+
+def retrieve_global_image_context(
+    db: Session,
+    *,
+    query: str,
+    top_k: int | None = None,
+    min_score: float | None = None,
+    max_image_urls: int = 3,
+) -> dict[str, Any]:
+    settings = get_settings()
+
+    if not settings.image_context_enabled:
+        return {"items": [], "references": [], "context_text": "", "image_urls": []}
+
+    trimmed_query = query.strip()
+    if not trimmed_query:
+        return {"items": [], "references": [], "context_text": "", "image_urls": []}
+
+    client = _openai_client()
+    if not client:
+        logger.warning("global_image_context_retrieve_skip_no_openai_key")
+        return {"items": [], "references": [], "context_text": "", "image_urls": []}
+
+    query_embedding = _embed_text(
+        client,
+        settings.image_context_embedding_model,
+        trimmed_query,
+    )
+    effective_top_k = max(1, top_k or settings.image_context_top_k)
+    effective_min_score = (
+        float(min_score)
+        if min_score is not None
+        else float(settings.image_context_min_score)
+    )
+
+    score_expr = (
+        1 - GlobalImageContextItem.embedding.cosine_distance(query_embedding)
+    ).label("score")
+
+    rows = (
+        db.query(GlobalImageContextItem, score_expr)
+        .filter(
+            GlobalImageContextItem.status == "ready",
+            GlobalImageContextItem.embedding.is_not(None),
+            score_expr >= effective_min_score,
+        )
+        .order_by(score_expr.desc())
+        .limit(effective_top_k)
+        .all()
+    )
+
+    items: list[dict[str, Any]] = []
+    references: list[dict[str, Any]] = []
+    context_lines: list[str] = []
+    image_urls: list[str] = []
+
+    for item, score in rows:
+        preview_url = get_presigned_url(
+            item.source_storage_key,
+            expires_in=max(60, settings.image_context_preview_url_ttl_seconds),
+        )
+        numeric_score = round(float(score or 0.0), 4)
+        caption = (item.caption or "Image reference").strip()
+        metadata_json = item.metadata_json if isinstance(item.metadata_json, dict) else None
+
+        items.append(
+            {
+                "id": item.id,
+                "source_name": item.source_name,
+                "caption": caption,
+                "metadata_json": metadata_json,
+                "score": numeric_score,
+                "preview_url": preview_url,
+            }
+        )
+        references.append(
+            {
+                "chunk_id": f"global-img-{item.id}",
+                "score": numeric_score,
+                "excerpt": caption[:280],
+            }
+        )
+        context_lines.append(f"- [global] {caption}")
+
+        if preview_url and preview_url not in image_urls and len(image_urls) < max(1, max_image_urls):
+            image_urls.append(preview_url)
+
+    return {
+        "items": items,
+        "references": references,
+        "context_text": "\n".join(context_lines),
         "image_urls": image_urls,
     }

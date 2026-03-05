@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -21,6 +22,21 @@ import { Dialog } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
 import { CreativeInput } from "./creative-input";
 import { patchPosterHtmlForImages } from "@/lib/poster-html";
+import { inferPosterCanvasDimensions } from "@/lib/poster-canvas";
+import {
+  TsxSandboxRenderer,
+  type TsxSandboxSnapshot,
+} from "./tsx-sandbox-renderer";
+import { toast } from "sonner";
+
+declare global {
+  interface Window {
+    html2canvas?: (
+      element: HTMLElement,
+      options?: Record<string, unknown>,
+    ) => Promise<HTMLCanvasElement>;
+  }
+}
 
 export type CreativePreviewAsset = {
   id?: string;
@@ -30,6 +46,11 @@ export type CreativePreviewAsset = {
 
 function isHtmlAsset(name: string): boolean {
   return name.toLowerCase().endsWith(".html");
+}
+
+function isTsxAsset(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.endsWith(".tsx") || lower.endsWith(".jsx");
 }
 
 function assetLabel(name: string, fallback: string): string {
@@ -70,16 +91,25 @@ export function CreativePreviewModal({
   const [scale, setScale] = useState(1);
   const [isDownloading, setIsDownloading] = useState(false);
   const [editPrompt, setEditPrompt] = useState("");
+  const [tsxSnapshot, setTsxSnapshot] = useState<TsxSandboxSnapshot | null>(null);
+  const [tsxSnapshotError, setTsxSnapshotError] = useState<string | null>(null);
   const isMobile = !useMediaQuery("(min-width: 768px)");
+
+  const canvas = useMemo(() => {
+    if (!asset) {
+      return { width: 1080, height: 1350, sizeId: null };
+    }
+    return inferPosterCanvasDimensions(asset.name, asset.code);
+  }, [asset]);
 
   const updateScale = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
     const w = el.clientWidth - 32;
     const h = el.clientHeight - 48;
-    const s = Math.min(1, w / 600, h / 850);
+    const s = Math.min(1, w / canvas.width, h / canvas.height);
     setScale(Math.max(0.1, s));
-  }, []);
+  }, [canvas.height, canvas.width]);
 
   useLayoutEffect(() => {
     updateScale();
@@ -102,36 +132,95 @@ export function CreativePreviewModal({
     document.head.appendChild(script);
   }, []);
 
+  useEffect(() => {
+    setTsxSnapshot(null);
+    setTsxSnapshotError(null);
+  }, [asset?.name, asset?.code]);
+
   const handleDownloadPng = useCallback(async () => {
     if (!asset || isDownloading) return;
-    if (!isHtmlAsset(asset.name)) return;
-    const target = posterRef.current;
-    const html2canvas = (
-      window as Window & {
-        html2canvas?: (
-          el: HTMLElement,
-          opts?: Record<string, unknown>,
-        ) => Promise<HTMLCanvasElement>;
-      }
-    ).html2canvas;
-    if (!target || typeof html2canvas !== "function") return;
+
+    const html2canvas = window.html2canvas;
+    if (typeof html2canvas !== "function") {
+      toast.error("Download failed", {
+        description: "Preview renderer is still loading. Please try again.",
+      });
+      return;
+    }
+
+    const fileName = `${assetLabel(asset.name, "poster")}.png`;
+    const isTsx = isTsxAsset(asset.name);
 
     setIsDownloading(true);
     try {
-      const canvas = await html2canvas(target, {
+      if (isTsx) {
+        if (!tsxSnapshot) {
+          toast.error("Download failed", {
+            description:
+              tsxSnapshotError ??
+              "TSX preview snapshot is not ready yet. Please try again.",
+          });
+          return;
+        }
+
+        const offscreen = document.createElement("div");
+        offscreen.style.position = "fixed";
+        offscreen.style.left = "-99999px";
+        offscreen.style.top = "0";
+        offscreen.style.width = `${tsxSnapshot.width}px`;
+        offscreen.style.height = `${tsxSnapshot.height}px`;
+        offscreen.style.overflow = "hidden";
+        offscreen.style.background = "transparent";
+        offscreen.style.pointerEvents = "none";
+        offscreen.innerHTML = patchPosterHtmlForImages(tsxSnapshot.html);
+        document.body.appendChild(offscreen);
+
+        try {
+          const canvasEl = await html2canvas(offscreen, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: false,
+            backgroundColor: null,
+            logging: false,
+          });
+
+          canvasEl.toBlob(
+            (blob) => {
+              if (blob) {
+                downloadBlob(blob, fileName);
+              }
+            },
+            "image/png",
+            1,
+          );
+        } finally {
+          offscreen.remove();
+        }
+
+        return;
+      }
+
+      if (!isHtmlAsset(asset.name)) {
+        toast.error("Download unavailable", {
+          description: "This asset format is not supported for PNG export.",
+        });
+        return;
+      }
+
+      const target = posterRef.current;
+      if (!target) return;
+
+      const canvasEl = await html2canvas(target, {
         scale: 2,
         useCORS: true,
         allowTaint: false,
         backgroundColor: null,
         logging: false,
       });
-      canvas.toBlob(
+      canvasEl.toBlob(
         (blob) => {
           if (blob) {
-            downloadBlob(
-              blob,
-              `${assetLabel(asset.name, "poster")}.png`,
-            );
+            downloadBlob(blob, fileName);
           }
         },
         "image/png",
@@ -139,10 +228,13 @@ export function CreativePreviewModal({
       );
     } catch (e) {
       console.error("PNG download failed:", e);
+      toast.error("Download failed", {
+        description: e instanceof Error ? e.message : "Unexpected error",
+      });
     } finally {
       setIsDownloading(false);
     }
-  }, [asset, isDownloading, variant]);
+  }, [asset, isDownloading, tsxSnapshot, tsxSnapshotError, variant]);
 
   const handleDelete = useCallback(() => {
     if (asset?.id && onDelete) {
@@ -154,6 +246,7 @@ export function CreativePreviewModal({
   if (!asset) return null;
 
   const isHtml = isHtmlAsset(asset.name);
+  const isTsx = isTsxAsset(asset.name);
 
   const actionButtons = (
     <>
@@ -176,7 +269,7 @@ export function CreativePreviewModal({
       >
         <X className="h-5 w-5" />
       </IconButton>
-      {isHtml && (
+      {(isHtml || isTsx) && (
         <IconButton
           type="button"
           variant="solid"
@@ -228,7 +321,6 @@ export function CreativePreviewModal({
         className="fixed inset-0 z-50 flex flex-col bg-background pt-safe pl-safe pr-safe pb-safe"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Top-left: Back button */}
         <div className="absolute left-4 top-4 z-10 pt-safe pl-safe">
           <IconButton
             type="button"
@@ -242,7 +334,6 @@ export function CreativePreviewModal({
           </IconButton>
         </div>
 
-        {/* Action buttons: right side on desktop, bottom bar on mobile */}
         {isMobile ? (
           <div className="absolute bottom-20 left-0 right-0 z-10 flex items-center justify-center gap-2 px-4 pb-safe overflow-x-auto">
             {actionButtons}
@@ -253,24 +344,50 @@ export function CreativePreviewModal({
           </div>
         )}
 
-        {/* Center: Poster content - scales to fit viewport on mobile */}
         <div
           ref={containerRef}
           className="flex flex-1 items-center justify-center overflow-auto p-4 pt-16 pb-28 min-h-0"
         >
-          {isHtml ? (
+          {isTsx ? (
             <div
-              ref={posterRef}
               data-poster-content
-              className="flex items-center justify-center overflow-hidden origin-center"
+              className="flex items-start justify-start overflow-hidden origin-center"
               style={{
-                width: 600,
-                height: 850,
+                width: canvas.width,
+                height: canvas.height,
                 position: "relative",
                 overflow: "hidden",
                 flexShrink: 0,
                 boxSizing: "border-box",
                 transform: `scale(${scale})`,
+                transformOrigin: "center center",
+              }}
+            >
+              <TsxSandboxRenderer
+                code={asset.code}
+                name={asset.name}
+                width={canvas.width}
+                height={canvas.height}
+                onSnapshot={(snapshot, error) => {
+                  setTsxSnapshot(snapshot);
+                  setTsxSnapshotError(error ?? null);
+                }}
+              />
+            </div>
+          ) : isHtml ? (
+            <div
+              ref={posterRef}
+              data-poster-content
+              className="flex items-start justify-start overflow-hidden origin-center"
+              style={{
+                width: canvas.width,
+                height: canvas.height,
+                position: "relative",
+                overflow: "hidden",
+                flexShrink: 0,
+                boxSizing: "border-box",
+                transform: `scale(${scale})`,
+                transformOrigin: "center center",
               }}
               dangerouslySetInnerHTML={{
                 __html: patchPosterHtmlForImages(asset.code),
@@ -279,16 +396,15 @@ export function CreativePreviewModal({
           ) : (
             <div
               className="flex items-center justify-center rounded-lg bg-muted max-w-full max-h-[70vh]"
-              style={{ width: 600, height: 850, minHeight: 200 }}
+              style={{ width: canvas.width, height: canvas.height, minHeight: 200 }}
             >
               <p className="text-sm text-muted-foreground p-4 text-center">
-                Legacy format — full preview in Posters page
+                Unsupported format.
               </p>
             </div>
           )}
         </div>
 
-        {/* Bottom: Input bar */}
         <div className="shrink-0 border-t border-border bg-card px-4 py-4 pb-safe">
           <div className="mx-auto max-w-2xl">
             <CreativeInput

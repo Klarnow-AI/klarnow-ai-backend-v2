@@ -34,6 +34,22 @@ class ImageContextRetrieveResponse(BaseModel):
     context_text: str
 
 
+class GlobalImageContextItemRead(BaseModel):
+    id: UUID
+    source_name: str | None = None
+    caption: str | None = None
+    metadata_json: dict | None = None
+    score: float | None = None
+    preview_url: str | None = None
+
+
+class GlobalImageContextRetrieveResponse(BaseModel):
+    query: str
+    items: list[GlobalImageContextItemRead]
+    references: list[ReferenceSnippet]
+    context_text: str
+
+
 class ImageContextBackfillRequest(BaseModel):
     include_proofs: bool = True
     include_assets: bool = True

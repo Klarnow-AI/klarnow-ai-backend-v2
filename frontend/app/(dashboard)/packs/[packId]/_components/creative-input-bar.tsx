@@ -27,20 +27,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { BrandContext } from "@/app/api/generate/route";
 import type { PosterReferenceImage } from "@/lib/generate-poster";
 import { getToken } from "@/lib/http";
+import {
+  parsePosterResponseEnvelope,
+  validatePosterTsxFiles,
+  type PosterConversationMessage,
+} from "@/lib/poster-output";
 
 const POSTER_IMAGE_MAX_FILES = 3;
 const POSTER_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
-
-function parseFileTags(text: string): Record<string, string> {
-  const files: Record<string, string> = {};
-  const regex = /<file name="([^"]+)">([\s\S]*?)<\/file>/g;
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    const name = match[1].startsWith("/") ? match[1] : `/${match[1]}`;
-    files[name] = match[2].trim();
-  }
-  return files;
-}
 
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -91,6 +85,11 @@ export function CreativeInputBar({
   const [referenceImages, setReferenceImages] = useState<PosterReferenceImage[]>(
     [],
   );
+  const [conversation, setConversation] = useState<PosterConversationMessage[]>(
+    [],
+  );
+  const [latestAssistantMessage, setLatestAssistantMessage] =
+    useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -143,8 +142,17 @@ export function CreativeInputBar({
     submenuRefs.floating,
   ]);
 
+  useEffect(() => {
+    setConversation([]);
+    setLatestAssistantMessage("");
+  }, [packId]);
+
   const sendRequest = useCallback(
-    async (userContent: string, images: PosterReferenceImage[]) => {
+    async (
+      userContent: string,
+      messagesForRequest: PosterConversationMessage[],
+      images: PosterReferenceImage[],
+    ) => {
       setIsStreaming(true);
       onGeneratingChange?.(true, userContent);
       const controller = new AbortController();
@@ -162,7 +170,7 @@ export function CreativeInputBar({
           method: "POST",
           headers,
           body: JSON.stringify({
-            messages: [{ role: "user", content: userContent }],
+            messages: messagesForRequest,
             brandContext: brandContext ?? undefined,
             packId: packId ?? undefined,
             referenceImages: images.length > 0 ? images : undefined,
@@ -199,17 +207,49 @@ export function CreativeInputBar({
           accumulated += decoder.decode(value, { stream: true });
         }
 
-        const extractedFiles = parseFileTags(accumulated);
-        if (Object.keys(extractedFiles).length > 0) {
-          const messages = [
-            { role: "user" as const, content: userContent },
-            {
-              role: "assistant" as const,
-              content: "Done! Your design has been generated.",
-            },
+        const parsed = parsePosterResponseEnvelope(accumulated);
+        const hasFiles = Object.keys(parsed.files).length > 0;
+
+        if (hasFiles) {
+          const validation = validatePosterTsxFiles(parsed.files);
+          if (!validation.ok) {
+            const detail = validation.errors.join(" ");
+            const assistantText =
+              parsed.assistantText ||
+              parsed.summary ||
+              "Generation did not return a valid 16-file TSX set.";
+            const nextConversation: PosterConversationMessage[] = [
+              ...messagesForRequest,
+              { role: "assistant", content: assistantText },
+            ];
+            setConversation(nextConversation);
+            setLatestAssistantMessage(assistantText);
+            toast.error("Generation failed", { description: detail });
+            return;
+          }
+
+          const assistantText =
+            parsed.summary || "Done! Your designs have been generated.";
+          const nextConversation: PosterConversationMessage[] = [
+            ...messagesForRequest,
+            { role: "assistant", content: assistantText },
           ];
-          onGenerate(extractedFiles, messages);
+          setConversation(nextConversation);
+          setLatestAssistantMessage("");
+          onGenerate(validation.files, nextConversation);
+          return;
         }
+
+        const assistantText =
+          parsed.assistantText ||
+          parsed.summary ||
+          "I need more context before I can generate posters.";
+        const nextConversation: PosterConversationMessage[] = [
+          ...messagesForRequest,
+          { role: "assistant", content: assistantText },
+        ];
+        setConversation(nextConversation);
+        setLatestAssistantMessage(assistantText);
       } finally {
         setReferenceImages([]);
         setIsStreaming(false);
@@ -223,8 +263,14 @@ export function CreativeInputBar({
   const handleSubmit = async (trimmed: string) => {
     if (!trimmed || isStreaming || disabled) return;
     const selectedImages = referenceImages.slice(0, POSTER_IMAGE_MAX_FILES);
+    const nextConversation: PosterConversationMessage[] = [
+      ...conversation,
+      { role: "user", content: trimmed },
+    ];
+    setConversation(nextConversation);
+    setLatestAssistantMessage("");
     setInput("");
-    await sendRequest(trimmed, selectedImages);
+    await sendRequest(trimmed, nextConversation, selectedImages);
   };
 
   const handleUploadFile = () => {
@@ -301,6 +347,12 @@ export function CreativeInputBar({
 
   return (
     <div className="w-full min-w-0">
+      {latestAssistantMessage && (
+        <div className="mb-2 rounded-xl border border-border bg-muted/30 px-3 py-2 text-sm text-foreground whitespace-pre-wrap">
+          {latestAssistantMessage}
+        </div>
+      )}
+
       {referenceImages.length > 0 && (
         <div className="mb-2 flex w-full flex-wrap gap-2">
           {referenceImages.map((image, index) => (

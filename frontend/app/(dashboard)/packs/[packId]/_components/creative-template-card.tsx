@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { patchPosterHtmlForImages } from "@/lib/poster-html";
 import { Play } from "@/components/icons";
-
-const POSTER_WIDTH = 600;
-const POSTER_HEIGHT = 850;
+import { inferPosterCanvasDimensions } from "@/lib/poster-canvas";
+import { TsxSandboxRenderer } from "./tsx-sandbox-renderer";
 
 export type CreativeTemplateCardAsset = {
   id?: string;
@@ -24,20 +23,30 @@ function isHtmlAsset(name: string): boolean {
   return name.toLowerCase().endsWith(".html");
 }
 
+function isTsxAsset(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.endsWith(".tsx") || lower.endsWith(".jsx");
+}
+
 /** Renders a thumbnail preview of the poster/ad HTML, scaled to fit the container. */
 function ThumbnailPreview({ code, name }: { code: string; name: string }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.2);
   const isHtml = isHtmlAsset(name);
+  const isTsx = isTsxAsset(name);
+  const canvas = useMemo(
+    () => inferPosterCanvasDimensions(name, code),
+    [name, code],
+  );
 
   useEffect(() => {
-    if (!isHtml || !wrapperRef.current) return;
+    if ((!isHtml && !isTsx) || !wrapperRef.current) return;
     const el = wrapperRef.current;
     const updateScale = () => {
       const w = el.clientWidth;
       const h = el.clientHeight;
       if (w > 0 && h > 0) {
-        const s = Math.min(w / POSTER_WIDTH, h / POSTER_HEIGHT);
+        const s = Math.min(w / canvas.width, h / canvas.height);
         setScale(Math.max(0.1, s));
       }
     };
@@ -45,15 +54,35 @@ function ThumbnailPreview({ code, name }: { code: string; name: string }) {
     const ro = new ResizeObserver(updateScale);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [isHtml, code]);
+  }, [canvas.height, canvas.width, code, isHtml, isTsx]);
 
-  if (!isHtml) {
+  if (!isHtml && !isTsx) {
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-muted">
         <span className="text-xs text-muted-foreground">Preview</span>
       </div>
     );
   }
+
+  if (isTsx) {
+    return (
+      <div
+        ref={wrapperRef}
+        className="absolute inset-0 overflow-hidden"
+        style={{ width: "100%", height: "100%" }}
+      >
+        <TsxSandboxRenderer
+          code={code}
+          name={name}
+          width={canvas.width}
+          height={canvas.height}
+          scale={scale}
+          className="absolute inset-0"
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       ref={wrapperRef}
@@ -66,8 +95,8 @@ function ThumbnailPreview({ code, name }: { code: string; name: string }) {
           position: "absolute",
           top: "50%",
           left: "50%",
-          width: POSTER_WIDTH,
-          height: POSTER_HEIGHT,
+          width: canvas.width,
+          height: canvas.height,
           overflow: "hidden",
           transform: `translate(-50%, -50%) scale(${scale})`,
           transformOrigin: "center center",
@@ -83,13 +112,18 @@ export function CreativeTemplateCard({
   onClick,
   className,
 }: CreativeTemplateCardProps) {
+  const canvas = useMemo(
+    () => inferPosterCanvasDimensions(asset.name, asset.code),
+    [asset.code, asset.name],
+  );
+
   return (
     <button
       type="button"
       onClick={onClick}
+      style={{ aspectRatio: `${canvas.width} / ${canvas.height}` }}
       className={cn(
         "group relative flex w-full min-w-0 overflow-hidden rounded-xl",
-        "aspect-[600/850]",
         "hover:ring-2 hover:ring-primary/50 hover:shadow-lg transition-all duration-200",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
         className,

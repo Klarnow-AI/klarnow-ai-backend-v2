@@ -101,3 +101,36 @@ class ImageContextJob(Base):
     )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class GlobalImageContextItem(Base):
+    __tablename__ = "global_image_context_item"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_storage_key",
+            name="uq_global_image_context_item_storage_key",
+        ),
+        Index(
+            "ix_global_image_context_item_status",
+            "status",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    source_storage_key: Mapped[str] = mapped_column(String(1024), nullable=False)
+    source_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_content_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    caption: Mapped[str | None] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(EMBEDDING_DIMENSION),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(String(32), default="ready", nullable=False)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )

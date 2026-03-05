@@ -60,6 +60,29 @@ See [.env.example](.env.example). Required: `DATABASE_URL`, `SECRET_KEY`. Option
 4. Frontend: set `NEXT_PUBLIC_GOOGLE_CLIENT_ID` to the same OAuth client ID.
 5. Rebuild and redeploy frontend after any `NEXT_PUBLIC_*` env change.
 
+Staging Docker build/run example:
+
+```bash
+docker build -f frontend/Dockerfile \
+  --build-arg NEXT_PUBLIC_API_URL=https://api.staging.klarnow.ai \
+  --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID=<staging-google-client-id> \
+  -t klarnow-frontend:staging .
+
+docker run --rm -p 3000:3000 \
+  -e BACKEND_URL=https://api.staging.klarnow.ai \
+  klarnow-frontend:staging
+```
+
+GitHub Actions CI (`.github/workflows/frontend-build.yml`) builds with:
+- `NEXT_PUBLIC_API_URL=https://api.staging.klarnow.ai`
+- `NEXT_PUBLIC_GOOGLE_CLIENT_ID` from repository/environment variable `STAGING_NEXT_PUBLIC_GOOGLE_CLIENT_ID`
+
+Staging backend env example:
+
+```bash
+CORS_ALLOW_ORIGINS='["https://staging.klarnow.ai"]'
+```
+
 ### Google Sign-In setup (GIS ID token flow)
 
 1. Create a Google OAuth client ID for a Web application.

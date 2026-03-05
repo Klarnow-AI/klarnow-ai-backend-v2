@@ -126,7 +126,7 @@ export function CreativeTemplateGrid({
           </div>
           <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] sm:grid-cols-[repeat(3,minmax(0,1fr))] md:grid-cols-[repeat(4,minmax(0,1fr))] gap-4">
             <div className="min-w-0">
-              <div className="flex aspect-[600/850] items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 min-w-0">
+              <div className="flex aspect-[4/5] items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 min-w-0">
                 <div className="flex flex-col items-center gap-3">
                   <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-foreground" />
                   <p className="text-xs text-muted-foreground">Generating…</p>

@@ -6,6 +6,17 @@ import type { BrandContext } from "@/app/api/generate/route";
 const MAX_REFERENCE_IMAGES = 3;
 const MAX_REFERENCE_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_MODEL_IMAGE_PARTS = 3;
+const POSTER_MAX_OUTPUT_TOKENS = Number.isFinite(
+  Number.parseInt(process.env.POSTER_MAX_OUTPUT_TOKENS ?? "16384", 10),
+)
+  ? Math.max(
+      4096,
+      Math.min(
+        20000,
+        Number.parseInt(process.env.POSTER_MAX_OUTPUT_TOKENS ?? "16384", 10),
+      ),
+    )
+  : 16384;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -33,6 +44,7 @@ function buildBrandSection(brand: BrandContext): string {
   if (brand.elevatorPitch)
     messaging.push(`Elevator pitch: ${brand.elevatorPitch}`);
   if (brand.uspStatement) messaging.push(`USP: ${brand.uspStatement}`);
+  if (brand.uspProof) messaging.push(`USP proof: ${brand.uspProof}`);
   if (brand.primaryPain)
     messaging.push(`Customer pain point: ${brand.primaryPain}`);
   if (brand.primaryOutcome)
@@ -70,77 +82,149 @@ function buildSystemPrompt(brandContext?: BrandContext): string {
   const brandSection = brandContext ? buildBrandSection(brandContext) : "";
   const brandName = brandContext?.brandName;
 
-  return `You are an expert graphic designer AI that creates stunning posters and flyers as self-contained HTML with inline styles only. Each design must be visually striking, print-ready, and brand-consistent.
+  return `# POSTER GENERATOR SYSTEM PROMPT (V3)
 
-POSTER CANVAS — CRITICAL RULES:
-- Every poster MUST have a single root <div> as the outermost element with EXACTLY:
-  style="width:600px;height:850px;position:relative;overflow:hidden;box-sizing:border-box;[plus background/font styles]"
-- Root div dimensions: width 600px, height 850px — NO exceptions, NO other sizes
-- Use ONLY inline styles on EVERY element — ZERO CSS classes, ZERO Tailwind, ZERO external stylesheets, ZERO <style> tags
-- Use ONLY web-safe / system fonts: Arial, Helvetica, Georgia, 'Times New Roman', Verdana, Courier New, or system-ui
-- All colors must be hex values (e.g. #1a1a2e) — no rgb(), no named colors
-- All sizes in px — no em, rem, %, vw, vh
+## Campaign Designer Mode (2026) - Multi-Size Default
 
-TWO RESPONSE MODES:
+You are an award-winning campaign designer and direct-response copywriter with 25 years of experience creating high-converting posters, billboards, and OOH creatives.
 
-Mode 1 — ASKING (first message, not enough design info):
-- Ask 1-2 short clarifying questions about the poster's purpose and preferred visual style
-- Response is plain conversational text only — NO <file> or <summary> tags, NO code
+Your job is to create posters that grab attention, connect to a real buyer problem, and drive one clear action. Prioritize clarity, legibility, and conversion over decoration.
 
-Mode 2 — GENERATING (when you have enough context to make a specific design):
-- Output ONLY the <summary> and <file> tags — nothing else
+INPUTS YOU RECEIVE
+1. messages: chat history (user + assistant)
+2. brandContext (optional object)
 
-Do NOT generate code until you have enough context for a specific, on-brand design.
+MODE SELECTION (IMPORTANT)
 
-DESIGN PRINCIPLES:
-- Bold typography with clear visual hierarchy: large headline → supporting text → CTA
-- Eye-catching background using inline gradient or solid color
-- Use geometric shapes / decorative elements via absolutely positioned divs with border-radius
-- Include a clear, prominent call-to-action section
-- Layer content using position:absolute for visual depth
-- All text must have strong contrast against its background
-${brandName ? `- Brand name is "${brandName}" — NEVER use placeholder text` : ""}
-${brandContext?.logoUrl ? `- Include the logo using: <img src="${brandContext.logoUrl}" alt="${brandName}" style="..." />` : ""}
+Mode 1 (asking):
+- If you do not have enough context to design a converting poster, ask ONLY 1 or 2 short questions, then stop.
+- Ask about:
+1. Poster purpose and desired action (one action only)
+2. Preferred visual style (choose from 3 to 5 options)
+- Do not generate code in Mode 1.
+
+Mode 2 (generating):
+- If enough context exists, generate one <summary> block and sixteen TSX files.
+- Do not ask questions in Mode 2.
+
+WHAT COUNTS AS ENOUGH CONTEXT
+- Who the poster is for (audience or persona)
+- What is being sold (offer)
+- What action they should take (CTA)
+- If any are missing, use Mode 1.
+
+NON-NEGOTIABLE OOH RULES
+- 3-second rule: message must be understood fast.
+- One poster equals one idea.
+- Headline must be 3 to 7 words, unless deliberately a big type wall that still reads instantly.
+- Use plain language. No jargon. No fake hype.
+- Claims must be believable. Add proof or specificity when possible.
+- One primary CTA only.
+- Legibility first. High contrast, large type, strong hierarchy.
+- Avoid em dashes. Use full stops or commas.
+
+DESIGN STYLE TARGET
+- Bold minimal layouts with negative space
+- Smart typography with strong hierarchy
+- Occasional pattern interrupt
+- Premium feel, not generic marketing flyer
+
+COPY RULES
+- Headline must sound like a real person.
+- Prefer short words and clean punctuation.
+- Avoid: revolutionary, game-changer, world-class, unlock, synergy.
+- Use one device when it helps: brutal truth, clever twist, or proof-led confidence.
+- Match voiceArchetype when provided.
+- Respect designCues as constraints.
+
+BRAND RULES
+${brandName ? `- Brand name is "${brandName}". Never use placeholder brand names.` : "- Use brand name from provided context when available."}
+${brandContext?.logoUrl ? `- logoUrl is "${brandContext.logoUrl}". Use it subtly when suitable.` : "- If no logoUrl exists, use brandName as a text-based mark."}
 ${
   brandContext?.colorPalette
-    ? `- Use these brand colors as the dominant palette: ${Object.entries(
+    ? `- Use brandContext color palette as primary direction: ${Object.entries(
         brandContext.colorPalette,
       )
         .filter(([, v]) => v)
         .map(([k, v]) => `${k}: ${v}`)
-        .join(", ")}`
-    : "- Choose a bold, cohesive color palette that fits the brand and industry"
+        .join(", ")}.`
+    : "- If palette is missing, choose a clean modern palette with neutral base and one accent."
 }
+- Do not use neon or electric glow unless the palette clearly calls for it.
 
-INLINE STYLE CHEATSHEET (html2canvas requires ALL styles to be inline):
-- Background gradient: style="background:linear-gradient(135deg,#color1 0%,#color2 100%)"
-- Centered flex column: style="display:flex;flex-direction:column;align-items:center;justify-content:center"
-- Absolute element: style="position:absolute;top:Xpx;left:Xpx;width:Xpx;height:Xpx"
-- Text: style="font-family:Arial,sans-serif;font-size:48px;font-weight:700;color:#ffffff;line-height:1.1"
-- Circle shape: style="position:absolute;border-radius:50%;background:#color;width:Xpx;height:Xpx"
-- Semi-transparent overlay: style="position:absolute;inset:0;background:rgba(0,0,0,0.35)"
+MULTI-SIZE REQUIREMENT (MANDATORY)
+For every concept, produce FOUR size-specific layouts:
+1. 4x5 Feed: 1080 x 1350
+2. 9x16 Story: 1080 x 1920
+3. 16x9 Landscape: 1920 x 1080
+4. 1x1 Square: 1080 x 1080
 
-LAYOUT PATTERN (use as a guide):
-- Full-bleed background: the root div itself has the main background
-- Decorative circles/shapes: position:absolute elements for visual interest
-- Content stack: a flex column positioned in the main content area
-- Logo area (if available): top 60px, centered
-- Headline: bold, 40-56px, centered or left-aligned
-- Subheadline / body: 16-20px, lighter weight
-- CTA button: inline-block styled div, contrasting color, rounded corners via border-radius
-- Footer strip: position:absolute, bottom:0, full-width band for contact / tagline
+Do not stretch one layout across sizes. Re-layout each size for legibility and balance.
 
-OUTPUT FORMAT (Mode 2 only):
-<summary>One sentence describing what was created.</summary>
-<file name="/DescriptivePosterName.html">
-<div style="width:600px;height:850px;position:relative;overflow:hidden;box-sizing:border-box;background:linear-gradient(...);">
-  <!-- all poster content here using inline styles only -->
-</div>
-</file>
+SAFE ZONES
+- 9x16 Story: keep critical text away from top 200px and bottom 260px.
+- 4x5 and 1x1: use generous margins.
+- 16x9: prioritize horizontal reading flow and avoid tiny text.
 
-- File name must end in .html and describe the design (e.g. /SummerPromoFlyer.html, /EventAnnouncement.html)
-- ALWAYS output exactly 4 <file> tags with distinct design variations (different layouts, color schemes, or visual styles). Each variation should be a unique interpretation of the request.
-- When generating, do NOT write ANY text outside <summary> and <file> tags — no markdown, no explanations
+OUTPUT REQUIREMENTS (Mode 2)
+Return exactly:
+1. <summary>...</summary>
+2. Sixteen TSX files with these exact names:
+- /poster-v1-4x5.tsx
+- /poster-v1-9x16.tsx
+- /poster-v1-16x9.tsx
+- /poster-v1-1x1.tsx
+- /poster-v2-4x5.tsx
+- /poster-v2-9x16.tsx
+- /poster-v2-16x9.tsx
+- /poster-v2-1x1.tsx
+- /poster-v3-4x5.tsx
+- /poster-v3-9x16.tsx
+- /poster-v3-16x9.tsx
+- /poster-v3-1x1.tsx
+- /poster-v4-4x5.tsx
+- /poster-v4-9x16.tsx
+- /poster-v4-16x9.tsx
+- /poster-v4-1x1.tsx
+
+SUMMARY FORMAT (SHORT)
+Inside <summary>, include:
+- Audience insight (2 to 4 bullets)
+- Single-minded promise (1 sentence)
+- CTA (exact text)
+- 3-second test (pass/fail with one fix if fail)
+- One line on V1, V2, V3, V4 differences
+
+TSX SPEC (CRITICAL)
+Each file must be a complete self-contained TSX component:
+- No imports.
+- Use export default function ComponentName() { ... }.
+- Inline styles only with style={{ ... }} objects.
+- No className usage.
+- No external CSS, no style tags, no external libraries.
+- Use a fixed poster artboard root div matching the file size.
+- Use accessible contrast and large type.
+- Include CTA and brand mark consistently.
+- Optional QR placeholder block is allowed.
+- If no logo image exists, use tasteful abstract shape or placeholder block.
+
+VARIATION REQUIREMENTS
+1. Variant 1: Brutal truth
+2. Variant 2: Clever twist
+3. Variant 3: Proof-led
+4. Variant 4: Editorial premium
+
+MODE 1 QUESTION TEMPLATE (USE EXACTLY, KEEP SHORT)
+Q1: "What is this poster trying to make people do? (Pick one: book a call, buy now, sign up, visit site, call, DM)"
+Q2: "Pick a visual style: Minimal bold type, Editorial premium, Playful meta, Photo-led, or Dark high-contrast."
+
+DO NOT
+- Do not output markdown.
+- Do not output explanations outside <summary> and <file> tags.
+- Do not add extra files beyond the 16 TSX files.
+- Do not ask more than 2 questions in Mode 1.
+
+When in Mode 2, output only <summary> and <file> tags.
 ${brandSection}`;
 }
 
@@ -314,34 +398,33 @@ function appendRetrievedContextToLatestUserMessage(
     const base = (message.content || "").trim();
     const context = contextText.trim();
     const merged = base
-      ? `${base}\n\nPack image library context:\n${context}`
-      : `Pack image library context:\n${context}`;
+      ? `${base}\n\nGlobal image library context:\n${context}`
+      : `Global image library context:\n${context}`;
     return { ...message, content: merged };
   });
 }
 
-async function fetchPosterImageContext(options: {
-  packId: string;
+async function fetchGlobalPosterImageContext(options: {
   query: string;
   authorizationHeader: string | null;
 }): Promise<RetrievedImageContext> {
-  if (!options.authorizationHeader) {
-    return { contextText: null, imageUrls: [] };
-  }
-
   const backendBase =
     process.env.BACKEND_URL ||
     process.env.NEXT_PUBLIC_API_URL ||
     "http://localhost:8000";
-  const url = `${backendBase}/api/v1/image-context/packs/${options.packId}/retrieve`;
+  const url = `${backendBase}/api/v1/image-context/global/retrieve`;
 
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (options.authorizationHeader) {
+      headers.Authorization = options.authorizationHeader;
+    }
+
     const res = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: options.authorizationHeader,
-      },
+      headers,
       body: JSON.stringify({
         query: options.query,
         top_k: MAX_MODEL_IMAGE_PARTS,
@@ -471,7 +554,7 @@ function streamWithAnthropic(
     async start(controller) {
       const stream = anthropic.messages.stream({
         model: "claude-sonnet-4-6",
-        max_tokens: 8192,
+        max_tokens: POSTER_MAX_OUTPUT_TOKENS,
         system: systemPrompt,
         messages: anthropicMessages as never,
       });
@@ -507,7 +590,7 @@ function streamWithOpenAI(
     async start(controller) {
       const stream = await openai.chat.completions.create({
         model: "gpt-4o",
-        max_tokens: 8192,
+        max_tokens: POSTER_MAX_OUTPUT_TOKENS,
         stream: true,
         messages: [
           { role: "system", content: systemPrompt },
@@ -557,7 +640,6 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const messages = normalizeMessages(body.messages);
-    const packId = normalizePackId(body.packId);
     const brandContext = body.brandContext as BrandContext | undefined;
     const {
       images: referenceImages,
@@ -578,6 +660,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const packId = normalizePackId(body.packId);
     if (body.packId != null && !packId) {
       return new Response(JSON.stringify({ error: "Invalid packId" }), {
         status: 400,
@@ -590,13 +673,12 @@ export async function POST(req: NextRequest) {
     const imageContextPosterEnabled =
       (process.env.IMAGE_CONTEXT_POSTER_ENABLED ?? "true").toLowerCase() !==
       "false";
-    if (packId && imageContextPosterEnabled) {
+    if (imageContextPosterEnabled) {
       const latestUserIndex = findLatestUserMessageIndex(messages);
       const latestUserContent =
         latestUserIndex >= 0 ? messages[latestUserIndex].content : "";
       if (latestUserContent.trim()) {
-        const retrieval = await fetchPosterImageContext({
-          packId,
+        const retrieval = await fetchGlobalPosterImageContext({
           query: latestUserContent,
           authorizationHeader: req.headers.get("authorization"),
         });

@@ -10,32 +10,32 @@ export type SizePreset = {
 
 export const POSTER_SIZE_PRESETS: SizePreset[] = [
   {
-    id: "a4_portrait",
-    label: "A4 Portrait",
-    width: 794,
-    height: 1123,
-    description: "Print, documents",
-  },
-  {
-    id: "a5_landscape",
-    label: "A5 Landscape",
-    width: 559,
-    height: 794,
-    description: "Flyers, handouts",
-  },
-  {
-    id: "instagram_square",
-    label: "Instagram Square",
+    id: "4x5",
+    label: "4x5 Feed",
     width: 1080,
-    height: 1080,
-    description: "Feed post",
+    height: 1350,
+    description: "Primary feed format",
   },
   {
-    id: "instagram_story",
-    label: "Instagram Story",
+    id: "9x16",
+    label: "9x16 Story",
     width: 1080,
     height: 1920,
-    description: "Stories, Reels",
+    description: "Stories and reels",
+  },
+  {
+    id: "16x9",
+    label: "16x9 Landscape",
+    width: 1920,
+    height: 1080,
+    description: "Wide placements",
+  },
+  {
+    id: "1x1",
+    label: "1x1 Square",
+    width: 1080,
+    height: 1080,
+    description: "Square placements",
   },
 ];
 

@@ -41,6 +41,8 @@ jobs:
   build:
     needs: checks
     runs-on: ubuntu-latest
+    env:
+      STAGING_NEXT_PUBLIC_API_URL: https://api.staging.klarnow.ai
     steps:
       - uses: actions/checkout@v4
 
@@ -52,6 +54,10 @@ jobs:
         with:
           context: .
           file: ./frontend/Dockerfile
+          # Configure STAGING_NEXT_PUBLIC_GOOGLE_CLIENT_ID as a GitHub Actions variable.
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ env.STAGING_NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ vars.STAGING_NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
           push: false
           load: true
           tags: klarnow-frontend:build

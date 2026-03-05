@@ -1,4 +1,9 @@
 import type { BrandContext } from "@/app/api/generate/route";
+import {
+  parsePosterFileTags,
+  parsePosterResponseEnvelope,
+  validatePosterTsxFiles,
+} from "@/lib/poster-output";
 
 export type PosterReferenceImage = {
   name: string;
@@ -7,14 +12,7 @@ export type PosterReferenceImage = {
 };
 
 export function parseFileTags(text: string): Record<string, string> {
-  const files: Record<string, string> = {};
-  const regex = /<file name="([^"]+)">([\s\S]*?)<\/file>/g;
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    const name = match[1].startsWith("/") ? match[1] : `/${match[1]}`;
-    files[name] = match[2].trim();
-  }
-  return files;
+  return parsePosterFileTags(text);
 }
 
 export async function generatePosters(
@@ -70,5 +68,15 @@ export async function generatePosters(
     accumulated += decoder.decode(value, { stream: true });
   }
 
-  return parseFileTags(accumulated);
+  const parsed = parsePosterResponseEnvelope(accumulated);
+  if (Object.keys(parsed.files).length === 0) {
+    throw new Error(parsed.assistantText || parsed.summary || "No poster files were generated.");
+  }
+
+  const validation = validatePosterTsxFiles(parsed.files);
+  if (!validation.ok) {
+    throw new Error(validation.errors.join(" "));
+  }
+
+  return validation.files;
 }
