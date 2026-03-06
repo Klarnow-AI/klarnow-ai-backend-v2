@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useParams, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
+import { toast } from "sonner";
 import {
   FolderKanban,
   PanelLeft,
@@ -473,14 +474,25 @@ export function SidebarContent({
     href: string,
     isActive: boolean,
     locked: boolean,
+    lockedReason?: string | null,
   ) => {
     const Icon = item.icon;
+    const gateReason =
+      lockedReason?.trim() || `${item.label} is locked right now.`;
     if (locked) {
       return (
-        <span
+        <button
+          type="button"
           key={item.key ?? item.href}
+          onClick={() =>
+            toast.error(`${item.label} is locked`, {
+              description: gateReason,
+            })
+          }
+          title={gateReason}
+          aria-label={`${item.label}: ${gateReason}`}
           className={cn(
-            "flex items-center rounded-xl text-sm font-medium cursor-not-allowed opacity-50",
+            "flex w-full items-center rounded-xl border-0 bg-transparent text-left text-sm font-medium cursor-not-allowed opacity-50 focus-visible:outline-none focus-visible:ring-0",
             isCollapsed
               ? "justify-center gap-0 px-2 py-2.5"
               : "gap-3 px-3 py-2.5",
@@ -489,7 +501,7 @@ export function SidebarContent({
         >
           <Lock className="h-5 w-5 shrink-0" />
           {!isCollapsed && item.label}
-        </span>
+        </button>
       );
     }
     return (
@@ -539,7 +551,13 @@ export function SidebarContent({
                   ? gates?.sections[sectionKey]
                   : undefined;
               const locked = section ? !section.unlocked : false;
-              return renderNavLink(item, href, isActive, locked);
+              return renderNavLink(
+                item,
+                href,
+                isActive,
+                locked,
+                section?.reason,
+              );
             })}
           </div>
         </div>
@@ -579,7 +597,13 @@ export function SidebarContent({
                   ? gates?.sections[sectionKey]
                   : undefined;
               const locked = section ? !section.unlocked : false;
-              return renderNavLink(item, href, isActive, locked);
+              return renderNavLink(
+                item,
+                href,
+                isActive,
+                locked,
+                section?.reason,
+              );
             })}
           </div>
         </div>
