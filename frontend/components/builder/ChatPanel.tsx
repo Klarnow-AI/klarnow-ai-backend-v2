@@ -44,9 +44,9 @@ type GenStage = "idle" | "thinking" | "planning" | "coding";
 
 const STAGE_CONFIG: Record<GenStage, { label: string; emoji: string }> = {
   idle: { label: "", emoji: "" },
-  thinking: { label: "Reasoning…", emoji: "🧠" },
-  planning: { label: "Planning layout…", emoji: "📐" },
-  coding: { label: "Writing code…", emoji: "⌨️" },
+  thinking: { label: "Reasoning…", emoji: "" },
+  planning: { label: "Planning layout…", emoji: "" },
+  coding: { label: "Writing code…", emoji: "⌨" },
 };
 
 const QUICK_ACTIONS = [
@@ -631,7 +631,9 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
     try {
       const result = await builder.publish(projectId);
       useProjectStore.getState().setLiveUrl(result.live_url ?? null);
-      useProjectStore.getState().setPublishedFiles(result.published_files ?? null);
+      useProjectStore
+        .getState()
+        .setPublishedFiles(result.published_files ?? null);
     } catch (err) {
       setPublishError(err instanceof Error ? err.message : "Publish failed");
     } finally {
@@ -660,9 +662,12 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
     useProjectStore.getState().restoreFiles(files);
   }, []);
 
-  const handleRevertToMessage = useCallback((snapshot: Record<string, string>) => {
-    useProjectStore.getState().restoreFiles(snapshot);
-  }, []);
+  const handleRevertToMessage = useCallback(
+    (snapshot: Record<string, string>) => {
+      useProjectStore.getState().restoreFiles(snapshot);
+    },
+    [],
+  );
 
   // ── Derived values ────────────────────────────────────────────────────────
 
@@ -823,11 +828,11 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
           <div className="flex justify-start">
             <div className="rounded-2xl rounded-tl-md px-4 py-3 bg-accent/40 text-sm text-foreground">
               <span className="flex items-center gap-2 text-muted-foreground">
-                {stage.emoji && (
+                {/* {stage.emoji && (
                   <span className="text-base leading-none select-none">
                     {stage.emoji}
                   </span>
-                )}
+                )} */}
                 <span className="flex gap-1 shrink-0">
                   <span className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:0ms]" />
                   <span className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:150ms]" />

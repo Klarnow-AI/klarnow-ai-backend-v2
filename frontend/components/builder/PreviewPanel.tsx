@@ -157,9 +157,9 @@ export function PreviewPanel({ onRegisterRefresh }: PreviewPanelProps = {}) {
   const files = useProjectStore((s) => s.files);
   const isGenerating = useProjectStore((s) => s.isGenerating);
   const [viewport, setViewport] = useState<Viewport>("desktop");
-  const [loadingAnimationData, setLoadingAnimationData] = useState<object | null>(
-    null,
-  );
+  const [loadingAnimationData, setLoadingAnimationData] = useState<
+    object | null
+  >(null);
   const [loadingAnimationFailed, setLoadingAnimationFailed] = useState(false);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -283,7 +283,7 @@ export function PreviewPanel({ onRegisterRefresh }: PreviewPanelProps = {}) {
                   animationData={loadingAnimationData}
                   loop
                   autoplay
-                  className="h-28 w-28"
+                  className="h-120 w-120"
                 />
               )}
               <p className="text-sm font-medium text-foreground animate-pulse">
