@@ -1,11 +1,21 @@
 """Stage gates: enforce MVP flow. Raise GateBlockedError when prerequisite not met."""
 
+from datetime import datetime, timezone
+
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
 from app.core.errors import GateBlockedError
 from app.modules.packs.models import Pack
+
+STEP_4_UPGRADE_GATE_BYPASS_UNTIL = datetime(2026, 3, 6, 23, 59, 59, tzinfo=timezone.utc)
+
+
+def is_step_4_upgrade_gate_bypassed(now: datetime | None = None) -> bool:
+    """Temporary grace window for the Step 4 upgrade gate."""
+    current_time = now or datetime.now(timezone.utc)
+    return current_time <= STEP_4_UPGRADE_GATE_BYPASS_UNTIL
 
 
 def can_generate_website(db: Session, pack: Pack) -> None:
@@ -65,12 +75,16 @@ def can_create_invoice(db: Session, pack: Pack) -> None:
 
 
 def can_pass_paywall_gate(db: Session, user_id: UUID, current_day: int) -> tuple[bool, str]:
-    """Paywall gate: Free users blocked after Day 4."""
+    """Paywall gate: Free users blocked after Day 4 unless grace window is active."""
     from app.modules.subscription.services import get_user_subscription
     from app.modules.subscription.models import PLAN_FREE
     
     subscription = get_user_subscription(db, user_id)
-    if subscription.plan == PLAN_FREE and current_day > 4:
+    if (
+        subscription.plan == PLAN_FREE
+        and current_day > 4
+        and not is_step_4_upgrade_gate_bypassed()
+    ):
         return False, "Upgrade to Standard to continue past Day 4"
     return True, ""
 
@@ -120,7 +134,7 @@ def can_pass_day8_gate(db: Session, pack: Pack) -> tuple[bool, str]:
 def can_complete_day(db: Session, day_card, day_number: int, pack: Pack) -> tuple[bool, str]:
     """
     Daily completion gates:
-    - Day 4 completion requires a paid plan to unlock Day 5.
+    - Day 4 completion requires a paid plan to unlock Day 5 unless grace window is active.
     - Day 7 requires a published website and proof.
     - Day 8 requires locked response rules.
     """
@@ -129,7 +143,7 @@ def can_complete_day(db: Session, day_card, day_number: int, pack: Pack) -> tupl
 
     if day_number == 4:
         subscription = get_user_subscription(db, pack.created_by_user_id)
-        if subscription.plan == PLAN_FREE:
+        if subscription.plan == PLAN_FREE and not is_step_4_upgrade_gate_bypassed():
             return False, "Upgrade to Standard to complete Step 4 and unlock Step 5."
 
     if day_number == 7:

@@ -457,6 +457,22 @@ def complete_onboarding_route(
             "Please complete the brand step and indicate whether you have an existing brand (yes/no).",
             status_code=400,
         )
+    job_status = get_onboarding_job_status(pack)
+    if job_status["status"] in {"queued", "running"}:
+        start_onboarding_job_worker(pack_id)
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={
+                "status": "processing",
+                "pack_id": str(pack_id),
+                "job_id": job_status.get("job_id"),
+            },
+        )
+    if job_status["status"] == "completed":
+        return OnboardingCompleteResponse(
+            pack=PackRead.model_validate(pack),
+            is_existing_brand=answers.get("has_existing_brand") == "yes",
+        )
     pack = complete_onboarding(db, pack, answers=answers)
     job = enqueue_onboarding_job(db, pack_id)
     db.commit()

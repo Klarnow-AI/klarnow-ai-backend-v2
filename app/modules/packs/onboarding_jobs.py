@@ -17,9 +17,13 @@ from app.modules.packs.services import append_suggested_logo, merge_onboarding_a
 
 ONBOARDING_JOB_KEY = "_onboarding_job"
 ONBOARDING_JOB_MAX_ATTEMPTS = 3
+# Keep background onboarding deliberately serialized to avoid startup recovery
+# fan-out overwhelming the local database.
+ONBOARDING_JOB_MAX_CONCURRENT_WORKERS = 1
 
 _active_pack_workers: set[UUID] = set()
 _worker_lock = threading.Lock()
+_pipeline_slots = threading.BoundedSemaphore(ONBOARDING_JOB_MAX_CONCURRENT_WORKERS)
 
 
 def _iso_now() -> str:
@@ -195,55 +199,56 @@ def _run_onboarding_pipeline(db: Session, pack_id: UUID) -> None:
 def _run_worker(pack_id: UUID) -> None:
     try:
         while True:
-            db = SessionLocal()
             should_retry = False
             retry_attempt = 0
-            try:
-                pack = db.get(Pack, pack_id)
-                if not pack:
-                    return
-                job = _get_job_data(pack)
-                if not job:
-                    return
-                if job.get("status") == "completed":
-                    return
-                attempt = int(job.get("attempt") or 0) + 1
-                max_attempts = int(job.get("max_attempts") or ONBOARDING_JOB_MAX_ATTEMPTS)
-                job["attempt"] = attempt
-                job["status"] = "running"
-                job["started_at"] = _iso_now()
-                job["last_error"] = None
-                _set_job_data(pack, job)
-                db.commit()
-
+            with _pipeline_slots:
+                db = SessionLocal()
                 try:
-                    _run_onboarding_pipeline(db, pack_id)
-                except Exception as exc:
-                    try:
-                        db.rollback()
-                    except Exception:
-                        pass
                     pack = db.get(Pack, pack_id)
                     if not pack:
                         return
-                    job = _get_job_data(pack) or job
-                    job["last_error"] = str(exc)[:2000]
-                    retry_attempt = attempt
-                    should_retry = attempt < max_attempts
-                    job["status"] = "queued" if should_retry else "failed"
-                    _set_job_data(pack, job)
-                    db.commit()
-                    if not should_retry:
+                    job = _get_job_data(pack)
+                    if not job:
                         return
-                else:
-                    job = _get_job_data(pack) or job
-                    job["status"] = "completed"
-                    job["completed_at"] = _iso_now()
+                    if job.get("status") == "completed":
+                        return
+                    attempt = int(job.get("attempt") or 0) + 1
+                    max_attempts = int(job.get("max_attempts") or ONBOARDING_JOB_MAX_ATTEMPTS)
+                    job["attempt"] = attempt
+                    job["status"] = "running"
+                    job["started_at"] = _iso_now()
+                    job["last_error"] = None
                     _set_job_data(pack, job)
                     db.commit()
-                    return
-            finally:
-                db.close()
+
+                    try:
+                        _run_onboarding_pipeline(db, pack_id)
+                    except Exception as exc:
+                        try:
+                            db.rollback()
+                        except Exception:
+                            pass
+                        pack = db.get(Pack, pack_id)
+                        if not pack:
+                            return
+                        job = _get_job_data(pack) or job
+                        job["last_error"] = str(exc)[:2000]
+                        retry_attempt = attempt
+                        should_retry = attempt < max_attempts
+                        job["status"] = "queued" if should_retry else "failed"
+                        _set_job_data(pack, job)
+                        db.commit()
+                        if not should_retry:
+                            return
+                    else:
+                        job = _get_job_data(pack) or job
+                        job["status"] = "completed"
+                        job["completed_at"] = _iso_now()
+                        _set_job_data(pack, job)
+                        db.commit()
+                        return
+                finally:
+                    db.close()
             if should_retry:
                 # Basic in-process backoff; queued state remains durable in DB.
                 time.sleep(min(8, 2 ** retry_attempt))

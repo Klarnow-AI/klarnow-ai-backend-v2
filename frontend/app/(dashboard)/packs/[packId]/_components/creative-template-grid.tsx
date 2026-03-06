@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Lottie from "lottie-react";
-import { sprintApi } from "@/api_requests/sprint";
 import {
   CreativeTemplateCard,
   type CreativeTemplateCardAsset,
@@ -43,7 +41,7 @@ export type PromptWithResults = {
 };
 
 type CreativeTemplateGridProps = {
-  packId: string;
+  sprintDay: number | null;
   promptGroups: PromptWithResults[];
   generationDisplay: CreativeGenerationDisplay | null;
   isGenerating?: boolean;
@@ -124,38 +122,15 @@ function GeneratingTile() {
 }
 
 export function CreativeTemplateGrid({
-  packId,
+  sprintDay,
   promptGroups,
   generationDisplay,
   isGenerating = false,
   generationProgress = null,
-  variant,
   onAssetClick,
 }: CreativeTemplateGridProps) {
-  const [sprint, setSprint] = useState<{
-    current_day: number;
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const hasCompletedDay0To3 = (sprint?.current_day ?? 0) >= 4;
+  const hasCompletedDay0To3 = (sprintDay ?? 0) >= 4;
   const hasContent = promptGroups.length > 0 || isGenerating;
-
-  useEffect(() => {
-    if (!packId) return;
-    sprintApi
-      .getSprint(packId)
-      .then((s) => setSprint(s ? { current_day: s.current_day } : null))
-      .catch(() => setSprint(null))
-      .finally(() => setLoading(false));
-  }, [packId]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-foreground" />
-      </div>
-    );
-  }
 
   if (!hasCompletedDay0To3) {
     return (

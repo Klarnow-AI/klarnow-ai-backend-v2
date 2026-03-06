@@ -1,4 +1,8 @@
 import { api } from "@/lib/http";
+import {
+  dispatchPackRefresh,
+  type PackRefreshScope,
+} from "@/lib/pack-refresh-events";
 import type {
   SprintRead,
   SprintDayDetail,
@@ -7,6 +11,13 @@ import type {
 } from "@/types/api-types";
 
 const PACKS_PREFIX = "/api/v1/packs";
+const SPRINT_REFRESH_SCOPES: PackRefreshScope[] = [
+  "summary",
+  "today-tasks",
+  "next-action",
+  "gates",
+  "sprint",
+];
 
 export type SuggestDayResponse = {
   offer_one_liner?: string | null;
@@ -14,6 +25,17 @@ export type SuggestDayResponse = {
   primary_outcome?: string | null;
   pitch_script?: string | null;
 };
+
+type CompleteDayOptions = {
+  suppressPackRefresh?: boolean;
+};
+
+function dispatchSprintRefresh(packId: string) {
+  dispatchPackRefresh({
+    packId,
+    scopes: SPRINT_REFRESH_SCOPES,
+  });
+}
 
 export const sprintApi = {
   getSprint: (packId: string) =>
@@ -34,29 +56,43 @@ export const sprintApi = {
     }),
 
   completeDay: (
-    packId: string, 
-    sprintId: string, 
+    packId: string,
+    sprintId: string,
     dayNumber: number,
-    userSelections?: Record<string, string>
+    userSelections?: Record<string, string>,
+    options?: CompleteDayOptions,
   ) =>
     api<SprintRead>(
       `${PACKS_PREFIX}/${packId}/sprint/${sprintId}/day/${dayNumber}/complete`,
-      { 
+      {
         method: "POST",
-        body: userSelections ? JSON.stringify({ user_selections: userSelections }) : undefined,
+        body: userSelections
+          ? JSON.stringify({ user_selections: userSelections })
+          : undefined,
+      },
+    ).then((result) => {
+      if (!options?.suppressPackRefresh) {
+        dispatchSprintRefresh(packId);
       }
-    ),
+      return result;
+    }),
 
   checkIn: (packId: string, sprintId: string) =>
     api<SprintRead>(
       `${PACKS_PREFIX}/${packId}/sprint/${sprintId}/check-in`,
-      { method: "POST" }
-    ),
+      { method: "POST" },
+    ).then((result) => {
+      dispatchSprintRefresh(packId);
+      return result;
+    }),
 
   createSprint: (packId: string) =>
     api<SprintRead>(`${PACKS_PREFIX}/${packId}/sprint`, {
       method: "POST",
       body: JSON.stringify({}),
+    }).then((result) => {
+      dispatchSprintRefresh(packId);
+      return result;
     }),
 
   /** Suggested values for Day 1, 2, or 3 fields (pre-fill modals). */

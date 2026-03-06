@@ -16,6 +16,7 @@ import type { PosterConversationMessage } from "@/lib/poster-output";
 export type CreativeFactoryLayoutProps = {
   variant: "posters";
   packId: string;
+  sprintDay: number | null;
   brandContext?: BrandContext | null;
   promptGroups: PromptWithResults[];
   generationDisplay: CreativeGenerationDisplay | null;
@@ -41,6 +42,7 @@ export type CreativeFactoryLayoutProps = {
 export function CreativeFactoryLayout({
   variant,
   packId,
+  sprintDay,
   brandContext,
   promptGroups,
   generationDisplay,
@@ -67,7 +69,7 @@ export function CreativeFactoryLayout({
       {/* Main timeline */}
       <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
         <CreativeTemplateGrid
-          packId={packId}
+          sprintDay={sprintDay}
           promptGroups={promptGroups}
           generationDisplay={generationDisplay}
           isGenerating={isGenerating}

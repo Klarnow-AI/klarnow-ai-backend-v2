@@ -10,6 +10,7 @@ import { BrandPreviewModal } from "@/components/brand-preview-modal";
 import { OnboardingChoiceButtons } from "@/components/onboarding-chat";
 import { packs, pollPackUntilOnboardingReady } from "@/api_requests/packs";
 import { sprintApi } from "@/api_requests/sprint";
+import { dispatchPackRefresh } from "@/lib/pack-refresh-events";
 import type { Pack, ExtractBrandResponse } from "@/types/api-types";
 
 const USP_CATEGORIES = [
@@ -104,17 +105,20 @@ export function Day0Modal({
   onClose,
   packId,
   onComplete,
+  onGoToNextStep,
 }: {
   open: boolean;
   onClose: () => void;
   packId: string;
   onComplete?: () => void;
+  onGoToNextStep?: () => void;
 }) {
   const [pack, setPack] = useState<Pack | null>(null);
   const [sprintId, setSprintId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [onboardingProgress, setOnboardingProgress] = useState("");
   const [step, setStep] = useState(0);
   const [values, setValues] = useState<Record<string, string>>({
     has_existing_brand: "",
@@ -131,11 +135,12 @@ export function Day0Modal({
   const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const hasExistingBrand = values.has_existing_brand === "yes";
-  const day0AlreadyComplete = !!pack?.day_0_completed_at;
+  const onboardingAlreadyComplete = !!pack?.onboarding_completed_at;
+  const onboardingBackgroundReady = !!pack?.onboarding_background_completed_at;
   const steps = useMemo<Day0StepConfig[]>(() => {
-    if (day0AlreadyComplete) return DAY0_STEPS_AFTER_CHOICE;
+    if (onboardingAlreadyComplete) return DAY0_STEPS_AFTER_CHOICE;
     return [STEP_CHOICE, ...(hasExistingBrand ? [STEP_WEBSITE_URL] : []), ...DAY0_STEPS_AFTER_CHOICE];
-  }, [day0AlreadyComplete, hasExistingBrand]);
+  }, [onboardingAlreadyComplete, hasExistingBrand]);
   const totalSteps = steps.length;
   const currentStep = steps[step];
   const isLastStep = step === totalSteps - 1;
@@ -145,6 +150,7 @@ export function Day0Modal({
     if (!open || !packId) return;
     setLoading(true);
     setError("");
+    setOnboardingProgress("");
     setStep(0);
     Promise.all([packs.get(packId), sprintApi.getSprint(packId)])
       .then(([p, s]) => {
@@ -174,10 +180,21 @@ export function Day0Modal({
     if (current) setInput(getStepValue(current, values));
   }, [step, values, steps]);
 
-  const handleChoice = (value: string) => {
+  const handleChoice = async (value: string) => {
     setError("");
-    setValues((prev) => ({ ...prev, has_existing_brand: value }));
-    setStep(1);
+    setSaving(true);
+    try {
+      const updated = await packs.patch(packId, {
+        onboarding_answers: { has_existing_brand: value },
+      });
+      setPack(updated);
+      setValues((prev) => ({ ...prev, has_existing_brand: value }));
+      setStep(1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save brand type");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handlePreviewConfirm = async (editedData: ExtractBrandResponse) => {
@@ -295,14 +312,44 @@ export function Day0Modal({
       if (updated.day_0_completed_at) {
         try {
           if (sprintId) {
-            await sprintApi.completeDay(packId, sprintId, 0);
+            await sprintApi.completeDay(
+              packId,
+              sprintId,
+              0,
+              undefined,
+              { suppressPackRefresh: true },
+            );
           }
+          setOnboardingProgress("Finalizing your brand setup and generating Brand OS...");
           const res = await packs.completeOnboarding(packId);
+          let completedPack: Pack | null = null;
           if ("status" in res && res.status === "processing" && res.pack_id) {
-            await pollPackUntilOnboardingReady(res.pack_id);
+            completedPack = await pollPackUntilOnboardingReady(res.pack_id, {
+              onProgress: ({ elapsedMs }) => {
+                const seconds = Math.max(1, Math.floor(elapsedMs / 1000));
+                setOnboardingProgress(
+                  `Finalizing your brand setup and generating Brand OS... about ${seconds}s elapsed`,
+                );
+              },
+            });
+          } else if ("pack" in res && res.pack) {
+            completedPack = res.pack;
           }
-          onComplete?.();
+          if (completedPack) setPack(completedPack);
+          setOnboardingProgress("");
+          dispatchPackRefresh({
+            packId,
+            scopes: [
+              "summary",
+              "today-tasks",
+              "next-action",
+              "gates",
+              "sprint",
+            ],
+          });
+          if (!onGoToNextStep) onComplete?.();
         } catch (completeErr) {
+          setOnboardingProgress("");
           setError(
             completeErr instanceof Error
               ? completeErr.message
@@ -379,18 +426,39 @@ export function Day0Modal({
                   {error}
                 </p>
               </div>
-            ) : pack?.day_0_completed_at ? (
+            ) : onboardingAlreadyComplete ? (
               <div className="mt-6 space-y-4">
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                  <Check className="h-5 w-5 shrink-0" />
-                  <span className="text-sm font-medium">Step 0 complete</span>
+                <div
+                  className={`flex items-center gap-2 ${
+                    onboardingBackgroundReady
+                      ? "text-green-600 dark:text-green-400"
+                      : "text-foreground"
+                  }`}
+                >
+                  {onboardingBackgroundReady ? (
+                    <Check className="h-5 w-5 shrink-0" />
+                  ) : (
+                    <Spinner className="h-5 w-5 shrink-0" />
+                  )}
+                  <span className="text-sm font-medium">
+                    {onboardingBackgroundReady ? "Step 0 complete" : "Generating Brand OS"}
+                  </span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  You&apos;re all set. No need to go through the process again.
+                  {onboardingBackgroundReady
+                    ? "Brand OS is ready. You can move straight into Step 1."
+                    : onboardingProgress || "Finalizing your brand setup..."}
                 </p>
-                <Button disabled size="md" className="w-full sm:w-auto">
-                  Step 0 complete
-                </Button>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button type="button" variant="outline" onClick={onClose} size="md">
+                    Close
+                  </Button>
+                  {onboardingBackgroundReady && onGoToNextStep && (
+                    <Button type="button" onClick={onGoToNextStep} size="md">
+                      Go to next step
+                    </Button>
+                  )}
+                </div>
                 {error && (
                   <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">
                     {error}
@@ -453,52 +521,60 @@ export function Day0Modal({
                             />
                           )}
                           {currentStep.type === "url" && currentStep.key === "brand_url" && (
-                            <SearchInput
-                              type="text"
-                              placeholder="e.g. example.com"
-                              value={input}
-                              onChange={(e) => setInput(e.target.value)}
-                              disabled={saving}
-                              aria-label="Website URL"
-                              rightAdornment={
-                                <Button
-                                  type="submit"
-                                  disabled={saving || !input.trim()}
-                                  size="md"
-                                >
-                                  {saving ? (
-                                    <Spinner className="h-5 w-5" />
-                                  ) : (
+                            <div className="flex flex-col gap-3">
+                              <SearchInput
+                                type="text"
+                                placeholder="e.g. example.com"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                disabled={saving}
+                                aria-label="Website URL"
+                              />
+                              <Button
+                                type="submit"
+                                disabled={saving || !input.trim()}
+                                size="md"
+                                className="w-full sm:w-auto"
+                              >
+                                {saving ? (
+                                  <Spinner className="h-5 w-5" />
+                                ) : (
+                                  <>
+                                    Next
                                     <ChevronRight className="h-5 w-5" />
-                                  )}
-                                </Button>
-                              }
-                            />
+                                  </>
+                                )}
+                              </Button>
+                            </div>
                           )}
                           {currentStep.type === "input" && (
-                            <SearchInput
-                              placeholder={currentStep.placeholder}
-                              value={input}
-                              onChange={(e) => setInput(e.target.value)}
-                              disabled={saving}
-                              aria-label={currentStep.label}
-                              rightAdornment={
-                                <Button
-                                  type="submit"
-                                  disabled={
-                                    saving ||
-                                    (currentStep.required && !input.trim())
-                                  }
-                                  size="md"
-                                >
-                                  {saving ? (
-                                    <Spinner className="h-5 w-5" />
-                                  ) : (
+                            <div className="flex flex-col gap-3">
+                              <SearchInput
+                                placeholder={currentStep.placeholder}
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                disabled={saving}
+                                aria-label={currentStep.label}
+                              />
+                              <Button
+                                type="submit"
+                                disabled={
+                                  saving ||
+                                  (currentStep.required && !input.trim())
+                                }
+                                size="md"
+                                className="w-full sm:w-auto"
+                              >
+                                {saving ? (
+                                  <Spinner className="h-5 w-5" />
+                                ) : (
+                                  <>
+                                    Next
                                     <ChevronRight className="h-5 w-5" />
-                                  )}
-                                </Button>
-                              }
-                            />
+                                  </>
+                                )}
+                              </Button>
+                            </div>
                           )}
                           {currentStep.type === "select" && (
                             <div className="flex flex-col gap-3">
@@ -569,6 +645,11 @@ export function Day0Modal({
                     role="alert"
                   >
                     {error}
+                  </p>
+                )}
+                {onboardingProgress && (
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    {onboardingProgress}
                   </p>
                 )}
               </>

@@ -11,7 +11,6 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Target,
-  Megaphone,
   FileCode,
   Users,
   FileCheck,
@@ -43,6 +42,7 @@ import { Day3Modal } from "@/components/day-3-modal";
 import { DayDetailModal } from "@/components/day-detail-modal";
 import { DAY_TITLES } from "@/lib/sprint-phases";
 import { useDelayedNextActionToast } from "@/hooks/use-delayed-next-action-toast";
+import { usePackRefreshListener } from "@/lib/pack-refresh-events";
 
 /** Fixed pack summary cards — no add/remove. */
 const PACK_SUMMARY_CARDS: string[] = ["brand_os"];
@@ -83,32 +83,6 @@ const PACK_OVERVIEW_MODULES: Record<
           )}
           {s.brand_os.has_positioning && (
             <p className="text-muted-foreground">Positioning defined.</p>
-          )}
-        </>
-      ) : null,
-  },
-  campaign: {
-    title: "Campaign",
-    hrefSuffix: "/campaign",
-    icon: Megaphone,
-    emptyMessage:
-      "Set your primary call-to-action and goal so Klaro can tailor your content and next steps.",
-    getContent: (s) =>
-      s.campaign ? (
-        <>
-          {s.campaign.primary_cta && (
-            <p>
-              <span className="font-medium text-muted-foreground">
-                Primary CTA:
-              </span>{" "}
-              {s.campaign.primary_cta}
-            </p>
-          )}
-          {s.campaign.goal_summary && (
-            <p>
-              <span className="font-medium text-muted-foreground">Goal:</span>{" "}
-              {s.campaign.goal_summary}
-            </p>
           )}
         </>
       ) : null,
@@ -411,19 +385,17 @@ export default function PackOverviewPage() {
     loadNextAction();
   }, [fetchSummary, fetchTodayTasks, loadNextAction]);
 
-  const handleDaySaved = useCallback(() => {
-    refreshOverviewState();
-    router.refresh();
-    window.setTimeout(() => {
-      refreshOverviewState();
-      router.refresh();
-    }, 250);
-  }, [refreshOverviewState, router]);
+  usePackRefreshListener(
+    packId,
+    ["summary", "today-tasks", "next-action"],
+    refreshOverviewState,
+  );
+
+  const handleDaySaved = useCallback(() => undefined, []);
 
   const handleDayComplete = useCallback(() => {
     closeDayModal();
-    handleDaySaved();
-  }, [closeDayModal, handleDaySaved]);
+  }, [closeDayModal]);
 
   const handleTaskToggle = useCallback(
     async (taskId: string, checked: boolean) => {
@@ -461,15 +433,13 @@ export default function PackOverviewPage() {
     setStartingSprint(true);
     try {
       const sprint = await sprintApi.createSprint(packId);
-      refreshOverviewState();
       openDayModal(sprint.current_day);
-      router.refresh();
     } catch {
       fetchTodayTasks();
     } finally {
       setStartingSprint(false);
     }
-  }, [fetchTodayTasks, openDayModal, packId, refreshOverviewState, router]);
+  }, [fetchTodayTasks, openDayModal, packId]);
 
   const handleExecuteToday = useCallback(() => {
     if (todayTasks?.day_number == null) return;
@@ -921,6 +891,7 @@ export default function PackOverviewPage() {
               onClose={closeDayModal}
               packId={packId}
               onComplete={handleDayComplete}
+              onGoToNextStep={() => openDayModal(1)}
             />
           )}
           {dayModalOpen === 1 && (
