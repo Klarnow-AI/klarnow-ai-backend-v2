@@ -13,7 +13,6 @@ import {
 import { CreativeFactoryLayout } from "../_components/creative-factory-layout";
 import type { CreativeTemplateCardAsset } from "../_components/creative-template-card";
 import type { PromptWithResults } from "../_components/creative-template-grid";
-import { DevImageContextPanel } from "./_components/dev-image-context-panel";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
@@ -386,7 +385,6 @@ poster-v4-4x5.tsx, poster-v4-9x16.tsx, poster-v4-16x9.tsx, poster-v4-1x1.tsx.
 
   return (
     <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden flex-col">
-      <DevImageContextPanel />
       <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
         <CreativeFactoryLayout
           variant="posters"

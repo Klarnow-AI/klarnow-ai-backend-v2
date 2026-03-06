@@ -71,17 +71,6 @@ class Settings(BaseSettings):
     reference_doc_min_score: float = 0.2
     reference_doc_max_chars: int = 250000
     reference_doc_cache_ttl_seconds: int = 300
-    # Optional: Pack image context retrieval (pgvector-backed)
-    image_context_enabled: bool = False
-    image_context_top_k: int = 3
-    image_context_min_score: float = 0.2
-    image_context_embedding_model: str = "text-embedding-3-small"
-    image_context_caption_model: str = "gpt-4o-mini"
-    image_context_job_poll_seconds: int = 2
-    image_context_job_max_attempts: int = 3
-    image_context_preview_url_ttl_seconds: int = 900
-    image_context_chat_enabled: bool = True
-    image_context_poster_enabled: bool = True
 
     # Optional: Kling API (official - api-singapore.klingai.com, JWT auth)
     kling_access_key: str = ""

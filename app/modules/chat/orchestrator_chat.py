@@ -341,89 +341,6 @@ def _get_reference_context(query: str) -> tuple[str | None, list[dict]]:
     return context_text, references
 
 
-def _augment_user_content_with_image_context(
-    user_content: str,
-    image_context_text: str | None,
-) -> str:
-    if not image_context_text:
-        return user_content
-    cleaned_user_content = user_content.strip()
-    cleaned_context = image_context_text.strip()
-    if not cleaned_context:
-        return user_content
-    if cleaned_user_content:
-        return f"{cleaned_user_content}\n\nPack image library context:\n{cleaned_context}"
-    return f"Pack image library context:\n{cleaned_context}"
-
-
-def _merge_references(
-    base_references: list[dict] | None,
-    extra_references: list[dict] | None,
-) -> list[dict]:
-    merged: list[dict] = []
-    seen_chunk_ids: set[str] = set()
-    for collection in (base_references or [], extra_references or []):
-        for ref in collection:
-            if not isinstance(ref, dict):
-                continue
-            chunk_id = str(ref.get("chunk_id") or "").strip()
-            if chunk_id and chunk_id in seen_chunk_ids:
-                continue
-            if chunk_id:
-                seen_chunk_ids.add(chunk_id)
-            merged.append(ref)
-    return merged
-
-
-def _get_image_context_for_chat(
-    db: Session,
-    user_id: UUID,
-    pack_id: UUID | None,
-    user_content: str,
-) -> dict:
-    settings = get_settings()
-    if (
-        not settings.image_context_enabled
-        or not settings.image_context_chat_enabled
-        or not pack_id
-        or not user_content.strip()
-    ):
-        return {"context_text": None, "references": [], "image_urls": []}
-
-    try:
-        from app.modules.image_context.services import retrieve_pack_image_context
-
-        payload = retrieve_pack_image_context(
-            db,
-            user_id=user_id,
-            pack_id=pack_id,
-            query=user_content,
-            top_k=settings.image_context_top_k,
-            min_score=settings.image_context_min_score,
-            max_image_urls=IMAGE_ATTACHMENT_MAX_FOR_MODEL,
-        )
-    except Exception as e:
-        logger.warning("chat_image_context_retrieval_failed | error=%s", e)
-        return {"context_text": None, "references": [], "image_urls": []}
-
-    context_text = payload.get("context_text") if isinstance(payload, dict) else None
-    references = payload.get("references") if isinstance(payload, dict) else None
-    image_urls = payload.get("image_urls") if isinstance(payload, dict) else None
-
-    if not isinstance(context_text, str):
-        context_text = None
-    if not isinstance(references, list):
-        references = []
-    if not isinstance(image_urls, list):
-        image_urls = []
-
-    return {
-        "context_text": context_text,
-        "references": references,
-        "image_urls": image_urls,
-    }
-
-
 def _parse_tool_args(arguments: str) -> dict:
     try:
         return json.loads(arguments) if isinstance(arguments, str) else arguments
@@ -675,31 +592,9 @@ def run_chat_turn(
         }
 
     reference_context, base_references = _get_reference_context(user_content)
-    image_context_payload = _get_image_context_for_chat(
-        db=db,
-        user_id=user_id,
-        pack_id=pack_id,
-        user_content=user_content,
-    )
-    merged_references = _merge_references(
-        base_references,
-        image_context_payload.get("references")
-        if isinstance(image_context_payload, dict)
-        else [],
-    )
-    effective_user_content = _augment_user_content_with_image_context(
-        user_content,
-        image_context_payload.get("context_text")
-        if isinstance(image_context_payload, dict)
-        else None,
-    )
-    retrieved_image_urls = (
-        image_context_payload.get("image_urls")
-        if isinstance(image_context_payload, dict)
-        else []
-    )
-    if not isinstance(retrieved_image_urls, list):
-        retrieved_image_urls = []
+    merged_references = base_references
+    effective_user_content = user_content
+    retrieved_image_urls: list[str] = []
     system_content = build_system_message(
         pack_context,
         reference_context=reference_context,
@@ -1000,31 +895,9 @@ def run_chat_turn_stream(
             else None
         )
         reference_context, base_references = _get_reference_context(user_content)
-        image_context_payload = _get_image_context_for_chat(
-            db=db,
-            user_id=user_id,
-            pack_id=pack_id,
-            user_content=user_content,
-        )
-        merged_references = _merge_references(
-            base_references,
-            image_context_payload.get("references")
-            if isinstance(image_context_payload, dict)
-            else [],
-        )
-        effective_user_content = _augment_user_content_with_image_context(
-            user_content,
-            image_context_payload.get("context_text")
-            if isinstance(image_context_payload, dict)
-            else None,
-        )
-        retrieved_image_urls = (
-            image_context_payload.get("image_urls")
-            if isinstance(image_context_payload, dict)
-            else []
-        )
-        if not isinstance(retrieved_image_urls, list):
-            retrieved_image_urls = []
+        merged_references = base_references
+        effective_user_content = user_content
+        retrieved_image_urls: list[str] = []
         system_content = build_system_message(
             pack_context,
             reference_context=reference_context,

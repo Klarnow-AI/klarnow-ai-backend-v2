@@ -18,7 +18,6 @@ from app.modules.proof_vault import models as proof_vault_models  # noqa: F401
 from app.modules.chat import models as chat_models  # noqa: F401
 from app.modules.builder import models as builder_models  # noqa: F401
 from app.modules.ad_factory import models as ad_factory_models  # noqa: F401
-from app.modules.image_context import models as image_context_models  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -49,12 +48,6 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
-
-
 def run_migrations_offline() -> None:
     url = get_settings().database_url
     context.configure(
@@ -73,6 +66,10 @@ def run_migrations_online() -> None:
     connectable = create_engine(
         get_settings().database_url,
         poolclass=pool.NullPool,
+        connect_args={
+            # Let DDL wait for locks in maintenance runs.
+            "options": "-c statement_timeout=0 -c lock_timeout=0 -c idle_in_transaction_session_timeout=5min"
+        },
     )
 
     with connectable.connect() as connection:

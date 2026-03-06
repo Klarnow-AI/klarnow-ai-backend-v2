@@ -512,22 +512,6 @@ export type CreativeAssetCreateBody = {
   chat_messages?: CreativeAssetChatMessage[] | null;
 };
 
-export type GlobalImageContextItem = {
-  id: string;
-  source_name: string | null;
-  caption: string | null;
-  metadata_json: Record<string, unknown> | null;
-  score?: number | null;
-  preview_url: string | null;
-};
-
-export type GlobalImageContextRetrieveResponse = {
-  query: string;
-  items: GlobalImageContextItem[];
-  references: { chunk_id: string; score: number; excerpt: string }[];
-  context_text: string;
-};
-
 /** Onboarding: extract brand (Path A – existing brand). */
 export type ExtractBrandBody = {
   input_type: "url" | "paste" | "logo";

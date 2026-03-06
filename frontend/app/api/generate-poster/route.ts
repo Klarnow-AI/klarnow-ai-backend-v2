@@ -243,20 +243,6 @@ type ValidReferenceImage = {
   base64Data: string;
 };
 
-type RetrievedImageContextItem = {
-  preview_url?: string | null;
-};
-
-type RetrievedImageContextResponse = {
-  context_text?: string | null;
-  items?: RetrievedImageContextItem[] | null;
-};
-
-type RetrievedImageContext = {
-  contextText: string | null;
-  imageUrls: string[];
-};
-
 const DATA_URL_PATTERN = /^data:([a-zA-Z0-9./+\-]+);base64,([A-Za-z0-9+/=]+)$/;
 
 function estimateBase64Bytes(base64Data: string): number {
@@ -367,89 +353,14 @@ function normalizePackId(raw: unknown): string | null {
   return UUID_PATTERN.test(trimmed) ? trimmed : null;
 }
 
-function mergeImageUrls(
-  dataUrlImages: ValidReferenceImage[],
-  retrievedImageUrls: string[],
-): string[] {
+function mergeImageUrls(dataUrlImages: ValidReferenceImage[]): string[] {
   const merged: string[] = [];
   for (const image of dataUrlImages) {
     if (!image.dataUrl || merged.includes(image.dataUrl)) continue;
     merged.push(image.dataUrl);
     if (merged.length >= MAX_MODEL_IMAGE_PARTS) return merged;
   }
-  for (const url of retrievedImageUrls) {
-    if (!url || merged.includes(url)) continue;
-    merged.push(url);
-    if (merged.length >= MAX_MODEL_IMAGE_PARTS) return merged;
-  }
   return merged;
-}
-
-function appendRetrievedContextToLatestUserMessage(
-  messages: ChatMessage[],
-  contextText: string | null,
-): ChatMessage[] {
-  if (!contextText || !contextText.trim()) return messages;
-  const latestUserIndex = findLatestUserMessageIndex(messages);
-  if (latestUserIndex < 0) return messages;
-
-  return messages.map((message, index) => {
-    if (index !== latestUserIndex) return message;
-    const base = (message.content || "").trim();
-    const context = contextText.trim();
-    const merged = base
-      ? `${base}\n\nGlobal image library context:\n${context}`
-      : `Global image library context:\n${context}`;
-    return { ...message, content: merged };
-  });
-}
-
-async function fetchGlobalPosterImageContext(options: {
-  query: string;
-  authorizationHeader: string | null;
-}): Promise<RetrievedImageContext> {
-  const backendBase =
-    process.env.BACKEND_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    "http://localhost:8000";
-  const url = `${backendBase}/api/v1/image-context/global/retrieve`;
-
-  try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (options.authorizationHeader) {
-      headers.Authorization = options.authorizationHeader;
-    }
-
-    const res = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        query: options.query,
-        top_k: MAX_MODEL_IMAGE_PARTS,
-      }),
-    });
-    if (!res.ok) {
-      return { contextText: null, imageUrls: [] };
-    }
-
-    const payload = (await res.json()) as RetrievedImageContextResponse;
-    const contextText =
-      typeof payload.context_text === "string" ? payload.context_text : null;
-    const imageUrls = Array.isArray(payload.items)
-      ? payload.items
-          .map((item) =>
-            typeof item?.preview_url === "string" ? item.preview_url : null,
-          )
-          .filter((url): url is string => Boolean(url))
-          .slice(0, MAX_MODEL_IMAGE_PARTS)
-      : [];
-
-    return { contextText, imageUrls };
-  } catch {
-    return { contextText: null, imageUrls: [] };
-  }
 }
 
 function findLatestUserMessageIndex(messages: ChatMessage[]): number {
@@ -502,9 +413,8 @@ function buildAnthropicMessages(
 function buildOpenAiMessages(
   messages: ChatMessage[],
   referenceImages: ValidReferenceImage[],
-  retrievedImageUrls: string[],
 ): Array<Record<string, unknown>> {
-  const mergedImageUrls = mergeImageUrls(referenceImages, retrievedImageUrls);
+  const mergedImageUrls = mergeImageUrls(referenceImages);
   if (mergedImageUrls.length === 0) {
     return messages.map((message) => ({
       role: message.role,
@@ -577,14 +487,9 @@ function streamWithOpenAI(
   systemPrompt: string,
   messages: ChatMessage[],
   referenceImages: ValidReferenceImage[],
-  retrievedImageUrls: string[],
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
-  const openAiMessages = buildOpenAiMessages(
-    messages,
-    referenceImages,
-    retrievedImageUrls,
-  );
+  const openAiMessages = buildOpenAiMessages(messages, referenceImages);
 
   return new ReadableStream({
     async start(controller) {
@@ -668,28 +573,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    let messagesForGeneration = messages;
-    let retrievedImageUrls: string[] = [];
-    const imageContextPosterEnabled =
-      (process.env.IMAGE_CONTEXT_POSTER_ENABLED ?? "true").toLowerCase() !==
-      "false";
-    if (imageContextPosterEnabled) {
-      const latestUserIndex = findLatestUserMessageIndex(messages);
-      const latestUserContent =
-        latestUserIndex >= 0 ? messages[latestUserIndex].content : "";
-      if (latestUserContent.trim()) {
-        const retrieval = await fetchGlobalPosterImageContext({
-          query: latestUserContent,
-          authorizationHeader: req.headers.get("authorization"),
-        });
-        messagesForGeneration = appendRetrievedContextToLatestUserMessage(
-          messagesForGeneration,
-          retrieval.contextText,
-        );
-        retrievedImageUrls = retrieval.imageUrls;
-      }
-    }
-
     const hasAnthropic = !!process.env.ANTHROPIC_API_KEY?.trim();
     const hasOpenAI = !!process.env.OPENAI_API_KEY?.trim();
     if (!hasAnthropic && !hasOpenAI) {
@@ -719,7 +602,7 @@ export async function POST(req: NextRequest) {
           streamWithAnthropic(
             anthropic,
             systemPrompt,
-            messagesForGeneration,
+            messages,
             referenceImages,
           ),
         );
@@ -745,9 +628,8 @@ export async function POST(req: NextRequest) {
             streamWithOpenAI(
               openai,
               systemPrompt,
-              messagesForGeneration,
+              messages,
               referenceImages,
-              retrievedImageUrls,
             ),
           );
         } catch (openaiError) {
@@ -773,9 +655,8 @@ export async function POST(req: NextRequest) {
           streamWithOpenAI(
             openai!,
             systemPrompt,
-            messagesForGeneration,
+            messages,
             referenceImages,
-            retrievedImageUrls,
           ),
         );
       } catch (openaiError) {

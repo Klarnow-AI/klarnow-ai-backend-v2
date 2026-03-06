@@ -5,18 +5,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, UploadFile, status
 
 from app.core.auth.deps import get_current_user
-from app.core.config import get_settings
 from app.core.db.session import get_db
 from app.core.errors import NotFoundError
-from app.core.logging import get_logger
 from app.core.storage import upload_file
-from app.modules.image_context.jobs import start_image_context_worker
-from app.modules.image_context.services import (
-    JOB_OPERATION_DELETE,
-    JOB_OPERATION_UPSERT,
-    SOURCE_TYPE_PROOF,
-    enqueue_image_context_job,
-)
 from app.modules.packs.models import User
 from app.modules.packs.services import get_pack_for_user
 from app.modules.proof_vault.schemas import ProofList, ProofRead, ProofTagUpdate
@@ -29,8 +20,6 @@ from app.modules.proof_vault.services import (
 )
 
 router = APIRouter()
-logger = get_logger("klarnow.image_context.hooks")
-settings = get_settings()
 
 
 def _ensure_pack(db, pack_id: UUID, user_id: UUID):
@@ -73,23 +62,6 @@ async def upload_proof(
         from app.core.errors import AppError
         raise AppError("Storage not configured; cannot upload proof", status_code=503)
     proof = create_proof(db, pack_id=pack_id, file_key=uploaded_key, tags=None)
-    if settings.image_context_enabled:
-        try:
-            enqueue_image_context_job(
-                db,
-                user_id=current_user.id,
-                pack_id=pack_id,
-                source_type=SOURCE_TYPE_PROOF,
-                source_id=proof.id,
-                operation=JOB_OPERATION_UPSERT,
-            )
-            start_image_context_worker()
-        except Exception as e:
-            logger.warning(
-                "image_context_enqueue_failed | source=proof_upload | proof_id=%s | error=%s",
-                proof.id,
-                e,
-            )
     return ProofRead.model_validate(proof)
 
 
@@ -116,23 +88,6 @@ def update_proof_tags(
     if not proof:
         raise NotFoundError("Proof not found")
     proof = update_tags(db, proof, body.tags)
-    if settings.image_context_enabled:
-        try:
-            enqueue_image_context_job(
-                db,
-                user_id=current_user.id,
-                pack_id=proof.pack_id,
-                source_type=SOURCE_TYPE_PROOF,
-                source_id=proof.id,
-                operation=JOB_OPERATION_UPSERT,
-            )
-            start_image_context_worker()
-        except Exception as e:
-            logger.warning(
-                "image_context_enqueue_failed | source=proof_tag_update | proof_id=%s | error=%s",
-                proof.id,
-                e,
-            )
     return ProofRead.model_validate(proof)
 
 
@@ -145,22 +100,4 @@ def delete_proof_route(
     proof = get_for_user(db, proof_id, current_user.id)
     if not proof:
         raise NotFoundError("Proof not found")
-    pack_id = proof.pack_id
     delete_proof(db, proof)
-    if settings.image_context_enabled:
-        try:
-            enqueue_image_context_job(
-                db,
-                user_id=current_user.id,
-                pack_id=pack_id,
-                source_type=SOURCE_TYPE_PROOF,
-                source_id=proof_id,
-                operation=JOB_OPERATION_DELETE,
-            )
-            start_image_context_worker()
-        except Exception as e:
-            logger.warning(
-                "image_context_enqueue_failed | source=proof_delete | proof_id=%s | error=%s",
-                proof_id,
-                e,
-            )
