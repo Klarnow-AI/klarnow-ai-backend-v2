@@ -14,7 +14,6 @@ import type {
   GenerateLogoBody,
   GenerateLogoResponse,
   UploadLogoResponse,
-  GenerateMockupsResponse,
 } from "@/types/api-types";
 
 const PACKS_PREFIX = "/api/v1/packs";
@@ -147,11 +146,6 @@ export const packs = {
     api<GenerateLogoResponse>(
       `${PACKS_PREFIX}/${packId}/onboarding/generate-logo`,
       { method: "POST", body: JSON.stringify(body) }
-    ),
-  generateMockups: (packId: string) =>
-    api<GenerateMockupsResponse>(
-      `${PACKS_PREFIX}/${packId}/brand-showcase/generate-mockups`,
-      { method: "POST" }
     ),
 
   suggestTypography: (

@@ -119,7 +119,23 @@ def can_pass_day8_gate(db: Session, pack: Pack) -> tuple[bool, str]:
 
 def can_complete_day(db: Session, day_card, day_number: int, pack: Pack) -> tuple[bool, str]:
     """
-    Daily completion gate (Days 4-13) currently has no extra requirements.
-    Day unlock logic and Day 7/8 specific gates remain enforced elsewhere.
+    Daily completion gates:
+    - Day 4 completion requires a paid plan to unlock Day 5.
+    - Day 7 requires a published website and proof.
+    - Day 8 requires locked response rules.
     """
+    from app.modules.subscription.models import PLAN_FREE
+    from app.modules.subscription.services import get_user_subscription
+
+    if day_number == 4:
+        subscription = get_user_subscription(db, pack.created_by_user_id)
+        if subscription.plan == PLAN_FREE:
+            return False, "Upgrade to Standard to complete Step 4 and unlock Step 5."
+
+    if day_number == 7:
+        return can_pass_day7_gate(db, pack)
+
+    if day_number == 8:
+        return can_pass_day8_gate(db, pack)
+
     return True, ""

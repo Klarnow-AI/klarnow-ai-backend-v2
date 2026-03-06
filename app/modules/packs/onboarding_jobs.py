@@ -86,7 +86,7 @@ def get_onboarding_job_status(pack: Pack) -> dict[str, Any]:
 def _run_onboarding_pipeline(db: Session, pack_id: UUID) -> None:
     from app.modules.agents.orchestrator import handle_onboarding_complete
     from app.modules.brand_os.services import get_active_for_pack, get_summary_fields
-    from app.modules.packs.logo_generation import generate_logo_with_gemini
+    from app.modules.packs.logo_generation import generate_logo
     from app.modules.packs.onboarding_services import generate_starter_brand
 
     pack = db.get(Pack, pack_id)
@@ -170,13 +170,14 @@ def _run_onboarding_pipeline(db: Session, pack_id: UUID) -> None:
         audience = (foundation.get("main_audience") or "").strip()
         summary_parts = [p for p in [mission, vision, one_line, industry, audience] if p]
         brand_os_summary = " ".join(summary_parts)[:1500] if summary_parts else None
-        logo_result = generate_logo_with_gemini(
+        logo_result = generate_logo(
             brand_name=(pack.brand_name or pack.name or "My Brand"),
             prompt="distinctive, creative logo—professional and memorable, not generic",
             pack_id=str(pack_id),
             color_scheme="use the provided palette",
             brand_os_summary=brand_os_summary,
             color_palette=new_brand_palette,
+            strict=False,
         )
         logo_url = logo_result.get("logo_url") or logo_result.get("wordmark_svg_or_url")
         if logo_url:

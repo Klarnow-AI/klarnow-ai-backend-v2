@@ -144,7 +144,7 @@ class GenerateStarterBrandResponse(BaseModel):
 
 
 class GenerateLogoBody(BaseModel):
-    """Body for generate-logo (Gemini image generation). Prompt template: Create a [image type] for [brand]. The design should be [style], with a [color scheme]."""
+    """Body for generate-logo (OpenAI image generation). Prompt template: Create a [image type] for [brand]. The design should be [style], with a [color scheme]."""
 
     brand_name: str
     prompt: str | None = None  # style description
@@ -164,22 +164,6 @@ class UploadLogoResponse(BaseModel):
     """Response from upload-logo."""
 
     logo_url: str
-
-
-class MockupItemResponse(BaseModel):
-    """Single mockup image in generate-mockups response."""
-
-    id: str
-    url: str
-    width: int | None = None
-    height: int | None = None
-    size: str | None = None
-
-
-class GenerateMockupsResponse(BaseModel):
-    """Response from brand-showcase generate-mockups."""
-
-    items: list[MockupItemResponse]
 
 
 class SuggestTypographyBody(BaseModel):

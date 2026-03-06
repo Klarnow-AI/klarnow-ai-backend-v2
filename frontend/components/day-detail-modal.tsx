@@ -158,7 +158,10 @@ export function DayDetailModal({
   };
 
   const canComplete =
-    sprint && !detail?.completed_at && detail?.unlocked !== false;
+    sprint &&
+    !detail?.completed_at &&
+    detail?.unlocked !== false &&
+    !detail?.completion_blocked_message;
   const isDay14 = dayNumber === 14;
 
   if (!isOpen) return null;
@@ -217,6 +220,30 @@ export function DayDetailModal({
                           {detail.blocker_message ??
                             `Complete the previous step to unlock Step ${dayNumber}.`}
                         </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                {detail?.completion_blocked_message && (
+                  <Card className="mb-4 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                    <CardContent className="flex items-start gap-3 py-4">
+                      <Lock className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                            Upgrade required before this step can be completed
+                          </p>
+                          <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+                            {detail.completion_blocked_message}
+                          </p>
+                        </div>
+                        {detail.completion_blocked_message
+                          .toLowerCase()
+                          .includes("upgrade") && (
+                          <Link href="/settings" className="inline-flex">
+                            <Button size="sm">Upgrade plan</Button>
+                          </Link>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

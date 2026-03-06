@@ -25,13 +25,13 @@ import {
 } from "@floating-ui/react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import type { BrandContext } from "@/app/api/generate/route";
-import type { PosterReferenceImage } from "@/lib/generate-poster";
-import { getToken } from "@/lib/http";
 import {
-  parsePosterResponseEnvelope,
-  validatePosterTsxFiles,
-  type PosterConversationMessage,
-} from "@/lib/poster-output";
+  streamPosterGeneration,
+  type PosterReferenceImage,
+} from "@/lib/generate-poster";
+import { getToken } from "@/lib/http";
+import type { PosterConversationMessage } from "@/lib/poster-output";
+import type { CreativeGenerationDisplay } from "./creative-template-grid";
 
 const POSTER_IMAGE_MAX_FILES = 3;
 const POSTER_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
@@ -56,16 +56,30 @@ function formatFileSize(bytes: number): string {
   return `${mb.toFixed(1)}MB`;
 }
 
+function buildPromptGenerationDisplay(
+  prompt: string,
+): CreativeGenerationDisplay {
+  return {
+    kind: "prompt",
+    label: prompt,
+    displayKey: `prompt:${prompt}`,
+  };
+}
+
 type CreativeInputBarProps = {
   apiRoute: string;
   packId?: string;
   brandContext?: BrandContext | null;
   placeholder?: string;
-  onGenerate: (
-    files: Record<string, string>,
-    messages: { role: "user" | "assistant"; content: string }[],
+  onFileGenerated: (
+    name: string,
+    code: string,
+    messages: PosterConversationMessage[],
+  ) => void | Promise<void>;
+  onGeneratingChange?: (
+    generating: boolean,
+    display?: CreativeGenerationDisplay | null,
   ) => void;
-  onGeneratingChange?: (generating: boolean, prompt?: string | null) => void;
   disabled?: boolean;
 };
 
@@ -74,7 +88,7 @@ export function CreativeInputBar({
   packId,
   brandContext,
   placeholder = "Type to Generate",
-  onGenerate,
+  onFileGenerated,
   onGeneratingChange,
   disabled = false,
 }: CreativeInputBarProps) {
@@ -154,80 +168,28 @@ export function CreativeInputBar({
       images: PosterReferenceImage[],
     ) => {
       setIsStreaming(true);
-      onGeneratingChange?.(true, userContent);
-      const controller = new AbortController();
+      onGeneratingChange?.(true, buildPromptGenerationDisplay(userContent));
 
       try {
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-        };
         const token = getToken();
-        if (token) {
-          headers.Authorization = `Bearer ${token}`;
-        }
-
-        const res = await fetch(apiRoute, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
+        const parsed = await streamPosterGeneration(
+          {
+            apiRoute,
             messages: messagesForRequest,
-            brandContext: brandContext ?? undefined,
-            packId: packId ?? undefined,
+            brandContext,
+            packId,
+            generationMode: "manual",
             referenceImages: images.length > 0 ? images : undefined,
-          }),
-          signal: controller.signal,
-        });
+            authToken: token,
+          },
+          {
+            onFile: async (name, code) => {
+              await onFileGenerated(name, code, messagesForRequest);
+            },
+          },
+        );
 
-        if (!res.ok) {
-          const errText = await res.text();
-          let message: string;
-          try {
-            const parsed = JSON.parse(errText) as { error?: string };
-            message = parsed.error ?? errText;
-          } catch {
-            message = errText;
-          }
-          onGeneratingChange?.(false, null);
-          toast.error("Generation failed", { description: message });
-          return;
-        }
-
-        const reader = res.body?.getReader();
-        if (!reader) {
-          onGeneratingChange?.(false);
-          return;
-        }
-
-        const decoder = new TextDecoder();
-        let accumulated = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          accumulated += decoder.decode(value, { stream: true });
-        }
-
-        const parsed = parsePosterResponseEnvelope(accumulated);
-        const hasFiles = Object.keys(parsed.files).length > 0;
-
-        if (hasFiles) {
-          const validation = validatePosterTsxFiles(parsed.files);
-          if (!validation.ok) {
-            const detail = validation.errors.join(" ");
-            const assistantText =
-              parsed.assistantText ||
-              parsed.summary ||
-              "Generation did not return a valid 16-file TSX set.";
-            const nextConversation: PosterConversationMessage[] = [
-              ...messagesForRequest,
-              { role: "assistant", content: assistantText },
-            ];
-            setConversation(nextConversation);
-            setLatestAssistantMessage(assistantText);
-            toast.error("Generation failed", { description: detail });
-            return;
-          }
-
+        if (Object.keys(parsed.files).length > 0) {
           const assistantText =
             parsed.summary || "Done! Your designs have been generated.";
           const nextConversation: PosterConversationMessage[] = [
@@ -236,7 +198,6 @@ export function CreativeInputBar({
           ];
           setConversation(nextConversation);
           setLatestAssistantMessage("");
-          onGenerate(validation.files, nextConversation);
           return;
         }
 
@@ -250,6 +211,10 @@ export function CreativeInputBar({
         ];
         setConversation(nextConversation);
         setLatestAssistantMessage(assistantText);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Generation failed";
+        toast.error("Generation failed", { description: message });
       } finally {
         setReferenceImages([]);
         setIsStreaming(false);
@@ -257,7 +222,13 @@ export function CreativeInputBar({
         inputRef.current?.focus();
       }
     },
-    [apiRoute, brandContext, onGenerate, onGeneratingChange, packId],
+    [
+      apiRoute,
+      brandContext,
+      onFileGenerated,
+      onGeneratingChange,
+      packId,
+    ],
   );
 
   const handleSubmit = async (trimmed: string) => {

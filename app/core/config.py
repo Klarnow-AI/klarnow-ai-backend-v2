@@ -77,9 +77,6 @@ class Settings(BaseSettings):
     kling_secret_key: str = ""
     kling_api_base_url: str = "https://api-singapore.klingai.com"
 
-    # Optional: Black Forest Labs (FLUX.2 Pro)
-    bfl_api_key: str = ""
-
     # Optional: Stripe (Connect + Invoicing)
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""

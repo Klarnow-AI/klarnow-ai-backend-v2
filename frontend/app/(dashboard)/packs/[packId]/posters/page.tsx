@@ -5,19 +5,25 @@ import { useParams } from "next/navigation";
 import { packs as packsApi, creative as creativeApi } from "@/lib/api";
 import { brandOs as brandOsApi } from "@/api_requests/brand-os";
 import { sprintApi } from "@/api_requests/sprint";
-import { generatePosters } from "@/lib/generate-poster";
+import { streamPosterGeneration } from "@/lib/generate-poster";
 import {
   extractPosterTemplateIdFromFilename,
-  sortPosterFiles,
+  type PosterConversationMessage,
 } from "@/lib/poster-output";
 import { CreativeFactoryLayout } from "../_components/creative-factory-layout";
 import type { CreativeTemplateCardAsset } from "../_components/creative-template-card";
-import type { PromptWithResults } from "../_components/creative-template-grid";
+import type {
+  CreativeGenerationDisplay,
+  PromptWithResults,
+} from "../_components/creative-template-grid";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
 import type { Pack, BrandOS } from "@/types/api-types";
 import type { BrandContext } from "@/app/api/generate/route";
+
+const AUTO_GENERATION_LABEL = "Starter poster pack";
+const GENERATION_FILE_TOTAL = 16;
 
 function buildBrandContext(pack: Pack, brand: BrandOS | null): BrandContext {
   const onboarding = pack.onboarding_answers as
@@ -91,14 +97,81 @@ function buildBrandContext(pack: Pack, brand: BrandOS | null): BrandContext {
 
 type AssetWithMeta = CreativeTemplateCardAsset & {
   created_at: string;
-  chat_messages?: { role: string; content: string }[] | null;
+  chat_messages?: PosterConversationMessage[] | null;
 };
 
-function getPromptFromAsset(asset: AssetWithMeta): string {
+function buildPromptDisplay(prompt: string): CreativeGenerationDisplay {
+  return {
+    kind: "prompt",
+    label: prompt,
+    displayKey: `prompt:${prompt}`,
+  };
+}
+
+function formatModeLabel(mode?: string | null): string | null {
+  if (!mode) return null;
+  const normalized = mode.trim().toLowerCase();
+  if (!normalized) return null;
+  return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)} mode`;
+}
+
+function buildBackgroundTaskDisplay(
+  label: string,
+  mode?: string | null,
+  taskLabel = "Background task",
+): CreativeGenerationDisplay {
+  const modeLabel = formatModeLabel(mode);
+  return {
+    kind: "background_task",
+    label,
+    taskLabel,
+    modeLabel,
+    displayKey: `background:${taskLabel}:${modeLabel ?? ""}:${label}`,
+  };
+}
+
+function buildAutoGenerationDisplay(mode?: string | null): CreativeGenerationDisplay {
+  return buildBackgroundTaskDisplay(AUTO_GENERATION_LABEL, mode);
+}
+
+function buildAutoGenerationMessages(
+  mode?: string | null,
+): PosterConversationMessage[] {
+  const display = buildAutoGenerationDisplay(mode);
+  return [
+    {
+      role: "assistant",
+      content: "Starter poster pack generated automatically.",
+      meta: {
+        kind: "background_generation",
+        label: display.label,
+        taskLabel: display.taskLabel ?? undefined,
+        mode: mode ?? undefined,
+        modeLabel: display.modeLabel ?? undefined,
+      },
+    },
+  ];
+}
+
+function getAssetDisplay(asset: AssetWithMeta): CreativeGenerationDisplay {
   const msgs = asset.chat_messages;
-  if (!msgs || !Array.isArray(msgs)) return "Your creation";
-  const userMsg = msgs.find((m) => m.role === "user");
-  return userMsg?.content?.trim() || "Your creation";
+  if (!msgs || !Array.isArray(msgs)) return buildPromptDisplay("Your creation");
+
+  const backgroundMessage = msgs.find(
+    (message) => message.meta?.kind === "background_generation",
+  );
+  if (backgroundMessage) {
+    return buildBackgroundTaskDisplay(
+      backgroundMessage.meta?.label || backgroundMessage.content || AUTO_GENERATION_LABEL,
+      backgroundMessage.meta?.mode,
+      backgroundMessage.meta?.taskLabel || "Background task",
+    );
+  }
+
+  const userMsg = msgs.find(
+    (message) => message.role === "user" && message.content.trim().length > 0,
+  );
+  return buildPromptDisplay(userMsg?.content.trim() || "Your creation");
 }
 
 function groupAssetsByPrompt(assets: AssetWithMeta[]): PromptWithResults[] {
@@ -108,22 +181,22 @@ function groupAssetsByPrompt(assets: AssetWithMeta[]): PromptWithResults[] {
   );
   const groups: PromptWithResults[] = [];
   let current: {
-    prompt: string;
+    display: CreativeGenerationDisplay;
     results: CreativeTemplateCardAsset[];
     createdAt: string;
   } | null = null;
 
   for (const asset of sorted) {
-    const prompt = getPromptFromAsset(asset);
+    const display = getAssetDisplay(asset);
     const card: CreativeTemplateCardAsset = {
       id: asset.id,
       name: asset.name,
       code: asset.code,
     };
-    if (current && current.prompt === prompt) {
+    if (current && current.display.displayKey === display.displayKey) {
       current.results.push(card);
     } else {
-      current = { prompt, results: [card], createdAt: asset.created_at };
+      current = { display, results: [card], createdAt: asset.created_at };
       groups.push(current);
     }
   }
@@ -137,7 +210,7 @@ function toAssetsWithMeta(
     name: string | null;
     source_code: string | null;
     created_at: string;
-    chat_messages?: { role: string; content: string }[] | null;
+    chat_messages?: PosterConversationMessage[] | null;
   }[],
 ): AssetWithMeta[] {
   return items
@@ -159,10 +232,16 @@ export default function PostersPage() {
   const [error, setError] = useState<string | null>(null);
   const [assets, setAssets] = useState<AssetWithMeta[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatingPrompt, setGeneratingPrompt] = useState<string | null>(null);
+  const [generationDisplay, setGenerationDisplay] =
+    useState<CreativeGenerationDisplay | null>(null);
+  const [generationProgress, setGenerationProgress] = useState<{
+    completedCount: number;
+    totalCount: number;
+  } | null>(null);
   const [selectedAsset, setSelectedAsset] =
     useState<CreativeTemplateCardAsset | null>(null);
   const [sprintDay, setSprintDay] = useState<number | null>(null);
+  const [sprintMode, setSprintMode] = useState<string | null>(null);
   const autoGeneratedRef = useRef(false);
 
   const promptGroups = groupAssetsByPrompt(assets);
@@ -185,6 +264,7 @@ export default function PostersPage() {
           setBrandContext(buildBrandContext(pack, brand ?? null));
           setAssets(toAssetsWithMeta(assetsRes.items));
           setSprintDay(sprint?.current_day ?? null);
+          setSprintMode(sprint?.mode ?? null);
         }
       } catch (err) {
         if (!cancelled) {
@@ -225,57 +305,53 @@ export default function PostersPage() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
   }, [packId]);
 
-  const handleFilesGenerated = useCallback(
+  const handleFileGenerated = useCallback(
     async (
-      files: Record<string, string>,
-      messages: { role: "user" | "assistant"; content: string }[],
+      name: string,
+      code: string,
+      messages: PosterConversationMessage[],
     ) => {
-      let newAssets: AssetWithMeta[] = [];
-      let saveFailCount = 0;
-      let lastSaveErrorMessage: string | undefined;
-      const now = new Date().toISOString();
+      if (!packId) return;
+      try {
+        const created = await creativeApi.createAsset({
+          pack_id: packId,
+          type: "poster",
+          name,
+          source_code: code,
+          template_id: extractPosterTemplateIdFromFilename(name),
+          chat_messages: messages.length > 0 ? messages : null,
+        });
 
-      const orderedFiles = sortPosterFiles(files);
-      newAssets = orderedFiles.map(([name, code]) => ({
-        name,
-        code,
-        created_at: now,
-        chat_messages: messages,
-      }));
+        const nextAsset: AssetWithMeta = {
+          id: created.id,
+          name: created.name ?? name,
+          code: created.source_code ?? code,
+          created_at: created.created_at,
+          chat_messages: (created.chat_messages as PosterConversationMessage[] | null) ?? messages,
+        };
 
-      if (packId) {
-        await Promise.all(
-          newAssets.map(async (asset) => {
-            try {
-              const created = await creativeApi.createAsset({
-                pack_id: packId,
-                type: "poster",
-                name: asset.name,
-                source_code: asset.code,
-                template_id: extractPosterTemplateIdFromFilename(asset.name),
-                chat_messages: messages.length > 0 ? messages : null,
-              });
-              asset.id = created.id;
-              asset.created_at = created.created_at;
-            } catch (e) {
-              saveFailCount += 1;
-              lastSaveErrorMessage =
-                e instanceof Error ? e.message : String(e);
-            }
-          }),
+        setAssets((prev) => {
+          if (prev.some((asset) => asset.id === nextAsset.id)) {
+            return prev;
+          }
+          return [...prev, nextAsset];
+        });
+        setGenerationProgress((prev) =>
+          prev
+            ? {
+                ...prev,
+                completedCount: Math.min(
+                  prev.totalCount,
+                  prev.completedCount + 1,
+                ),
+              }
+            : prev,
         );
-      }
-      if (saveFailCount > 0) {
-        const message =
-          saveFailCount === 1
-            ? "Poster couldn't be saved. Try again."
-            : `${saveFailCount} posters couldn't be saved. Try again.`;
-        toast.error(message, {
-          description: lastSaveErrorMessage,
+      } catch (e) {
+        toast.error("Poster couldn't be saved. Try again.", {
+          description: e instanceof Error ? e.message : String(e),
         });
       }
-      setAssets((prev) => [...prev, ...newAssets]);
-      setGeneratingPrompt(null);
     },
     [packId],
   );
@@ -306,21 +382,25 @@ poster-v3-4x5.tsx, poster-v3-9x16.tsx, poster-v3-16x9.tsx, poster-v3-1x1.tsx,
 poster-v4-4x5.tsx, poster-v4-9x16.tsx, poster-v4-16x9.tsx, poster-v4-1x1.tsx.
 - Each file must be self-contained TSX with inline styles only.`;
     setIsGenerating(true);
-    setGeneratingPrompt(prompt);
+    setGenerationDisplay(buildAutoGenerationDisplay(sprintMode));
+    setGenerationProgress({
+      completedCount: 0,
+      totalCount: GENERATION_FILE_TOTAL,
+    });
 
-    generatePosters("/api/generate-poster", prompt, brandContext)
-      .then((files) => {
-        if (Object.keys(files).length > 0) {
-          const messages = [
-            { role: "user" as const, content: prompt },
-            {
-              role: "assistant" as const,
-              content: "Done! Your designs have been generated.",
-            },
-          ];
-          handleFilesGenerated(files, messages);
-        }
-      })
+    streamPosterGeneration(
+      {
+        apiRoute: "/api/generate-poster",
+        messages: [{ role: "user", content: prompt }],
+        brandContext,
+        generationMode: "auto",
+      },
+      {
+        onFile: async (name, code) => {
+          await handleFileGenerated(name, code, buildAutoGenerationMessages(sprintMode));
+        },
+      },
+    )
       .catch((err) => {
         autoGeneratedRef.current = false;
         toast.error("Auto-generation failed", {
@@ -329,21 +409,24 @@ poster-v4-4x5.tsx, poster-v4-9x16.tsx, poster-v4-16x9.tsx, poster-v4-1x1.tsx.
       })
       .finally(() => {
         setIsGenerating(false);
-        setGeneratingPrompt(null);
+        setGenerationDisplay(null);
+        setGenerationProgress(null);
       });
   }, [
     packId,
     loading,
     assets.length,
     sprintDay,
+    sprintMode,
     brandContext,
-    handleFilesGenerated,
+    handleFileGenerated,
   ]);
 
   const handleGeneratingChange = useCallback(
-    (generating: boolean, prompt?: string | null) => {
+    (generating: boolean, display?: CreativeGenerationDisplay | null) => {
       setIsGenerating(generating);
-      setGeneratingPrompt(generating && prompt ? prompt : null);
+      setGenerationDisplay(generating ? display ?? null : null);
+      setGenerationProgress(null);
     },
     [],
   );
@@ -391,11 +474,12 @@ poster-v4-4x5.tsx, poster-v4-9x16.tsx, poster-v4-16x9.tsx, poster-v4-1x1.tsx.
           packId={packId}
           brandContext={brandContext}
           promptGroups={promptGroups}
-          generatingPrompt={generatingPrompt}
+          generationDisplay={generationDisplay}
+          generationProgress={generationProgress}
           isGenerating={isGenerating}
           selectedAsset={selectedAsset}
           onAssetSelect={setSelectedAsset}
-          onFilesGenerated={handleFilesGenerated}
+          onFileGenerated={handleFileGenerated}
           onGeneratingChange={handleGeneratingChange}
           onDeleteAsset={handleDeleteAsset}
         />

@@ -41,8 +41,6 @@ from app.modules.packs.schemas import (
     GenerateLogoBody,
     GenerateLogoResponse,
     UploadLogoResponse,
-    GenerateMockupsResponse,
-    MockupItemResponse,
     SuggestTypographyBody,
     SuggestTypographyResponse,
     SuggestPaletteBody,
@@ -61,44 +59,15 @@ from app.modules.packs.services import (
     submit_onboarding,
 )
 from app.modules.packs.onboarding_services import extract_brand, generate_starter_brand
-from app.modules.packs.logo_generation import generate_logo_with_gemini
-from app.modules.packs.mockup_generation import generate_mockups
+from app.modules.packs.logo_generation import generate_logo
 from app.modules.packs.brand_identity_suggestions import suggest_typography, suggest_palette
 from app.modules.packs.onboarding_jobs import (
     enqueue_onboarding_job,
     get_onboarding_job_status,
     start_onboarding_job_worker,
 )
-from app.modules.brand_os.services import get_active_for_pack, get_context_strings
 
 router = APIRouter()
-
-
-def _brand_os_summary_for_mockups(db: Session, pack_id: UUID) -> str | None:
-    """Build a short summary string from the pack's active Brand OS for mockup prompts."""
-    brand_os = get_active_for_pack(db, pack_id)
-    if not brand_os or not brand_os.brand_strategy or not isinstance(brand_os.brand_strategy, dict):
-        return None
-    bs = brand_os.brand_strategy
-    mission, vision, values_str, voice_str = get_context_strings(brand_os)
-    pos = bs.get("positioning_differentiation") or {}
-    positioning = (pos.get("statement") or "") or (pos.get("unique_advantage") or "")
-    msg = bs.get("core_messaging_hierarchy") or {}
-    elevator = msg.get("elevator_pitch") or ""
-    parts = []
-    if mission:
-        parts.append(f"Mission: {mission[:200]}")
-    if vision:
-        parts.append(f"Vision: {vision[:200]}")
-    if positioning:
-        parts.append(f"Positioning: {positioning[:200]}")
-    if values_str:
-        parts.append(f"Values: {values_str[:150]}")
-    if voice_str:
-        parts.append(voice_str[:150])
-    if elevator:
-        parts.append(f"Elevator pitch: {elevator[:200]}")
-    return " ".join(parts).strip() or None
 
 
 @router.get("", response_model=PackList)
@@ -627,11 +596,11 @@ def generate_logo_route(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Generate a logo image with Gemini; append to suggested_logos and optionally set as wordmark."""
+    """Generate a logo image with OpenAI DALL-E 3 and append it to suggested_logos."""
     pack = get_pack_for_user(db, pack_id, current_user.id)
     if not pack:
         raise NotFoundError("Pack not found")
-    result = generate_logo_with_gemini(
+    result = generate_logo(
         brand_name=body.brand_name,
         prompt=body.prompt,
         pack_id=str(pack_id),
@@ -645,58 +614,6 @@ def generate_logo_route(
         logo_url=logo_url,
         wordmark_svg_or_url=result.get("wordmark_svg_or_url"),
     )
-
-
-def _is_raster_logo_url(url: str) -> bool:
-    """Return True if the URL looks like it points to a raster image (PNG/JPEG/WebP)."""
-    lower = url.lower()
-    if lower.startswith("<") or lower.startswith("data:image/svg"):
-        return False
-    if lower.endswith(".svg"):
-        return False
-    path_part = lower.split("?")[0]
-    if path_part.endswith(".svg"):
-        return False
-    return True
-
-
-@router.post("/{pack_id}/brand-showcase/generate-mockups", response_model=GenerateMockupsResponse)
-def generate_mockups_route(
-    pack_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Generate brand mockup images using the pack's actual logo as reference."""
-    pack = get_pack_for_user(db, pack_id, current_user.id)
-    if not pack:
-        raise NotFoundError("Pack not found")
-
-    answers = pack.onboarding_answers or {}
-    logo_url = answers.get("wordmark_svg_or_url") or answers.get("wordmark_result")
-    if not logo_url or not str(logo_url).strip():
-        raise BadRequestError(
-            "Add a logo first. We need your logo to generate brand mockups with AI."
-        )
-    logo_str = str(logo_url).strip()
-    if not _is_raster_logo_url(logo_str):
-        raise BadRequestError(
-            "Mockup generation requires a PNG, JPEG, or WebP logo image. "
-            "Please upload or generate a raster logo first."
-        )
-
-    brand_name = answers.get("brand_name") or getattr(pack, "brand_name", None) or "Brand"
-    brand_os_summary = _brand_os_summary_for_mockups(db, pack_id)
-    items = generate_mockups(
-        pack_id=str(pack_id),
-        brand_name=brand_name,
-        logo_url=logo_str,
-        brand_os_summary=brand_os_summary,
-    )
-    return GenerateMockupsResponse(
-        items=[MockupItemResponse(**item) for item in items]
-    )
-
-
 @router.post(
     "/{pack_id}/brand-identity/suggest-typography",
     response_model=SuggestTypographyResponse,

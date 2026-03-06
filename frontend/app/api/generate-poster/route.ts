@@ -19,6 +19,7 @@ const POSTER_MAX_OUTPUT_TOKENS = Number.isFinite(
   : 16384;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+type PosterGenerationMode = "auto" | "manual";
 
 function buildBrandSection(brand: BrandContext): string {
   const sections: string[] = [];
@@ -78,13 +79,77 @@ function buildBrandSection(brand: BrandContext): string {
     : "";
 }
 
-function buildSystemPrompt(brandContext?: BrandContext): string {
+function buildSystemPrompt(
+  brandContext?: BrandContext,
+  generationMode: PosterGenerationMode = "manual",
+): string {
   const brandSection = brandContext ? buildBrandSection(brandContext) : "";
   const brandName = brandContext?.brandName;
+  const isAuto = generationMode === "auto";
+  const outputRequirement = isAuto
+    ? `OUTPUT REQUIREMENTS (Mode 2)
+Return exactly:
+1. <summary>...</summary>
+2. Sixteen TSX files with these exact names:
+- /poster-v1-4x5.tsx
+- /poster-v1-9x16.tsx
+- /poster-v1-16x9.tsx
+- /poster-v1-1x1.tsx
+- /poster-v2-4x5.tsx
+- /poster-v2-9x16.tsx
+- /poster-v2-16x9.tsx
+- /poster-v2-1x1.tsx
+- /poster-v3-4x5.tsx
+- /poster-v3-9x16.tsx
+- /poster-v3-16x9.tsx
+- /poster-v3-1x1.tsx
+- /poster-v4-4x5.tsx
+- /poster-v4-9x16.tsx
+- /poster-v4-16x9.tsx
+- /poster-v4-1x1.tsx`
+    : `OUTPUT REQUIREMENTS (Mode 2)
+Return exactly:
+1. <summary>...</summary>
+2. Four TSX files for one single concept with these exact names:
+- /poster-v1-4x5.tsx
+- /poster-v1-9x16.tsx
+- /poster-v1-16x9.tsx
+- /poster-v1-1x1.tsx`;
+  const summaryFormat = isAuto
+    ? `SUMMARY FORMAT (SHORT)
+Inside <summary>, include:
+- Audience insight (2 to 4 bullets)
+- Single-minded promise (1 sentence)
+- CTA (exact text)
+- 3-second test (pass/fail with one fix if fail)
+- One line on V1, V2, V3, V4 differences`
+    : `SUMMARY FORMAT (SHORT)
+Inside <summary>, include:
+- Audience insight (2 to 4 bullets)
+- Single-minded promise (1 sentence)
+- CTA (exact text)
+- 3-second test (pass/fail with one fix if fail)
+- One line describing the chosen concept direction`;
+  const variationRequirements = isAuto
+    ? `VARIATION REQUIREMENTS
+1. Variant 1: Brutal truth
+2. Variant 2: Clever twist
+3. Variant 3: Proof-led
+4. Variant 4: Editorial premium`
+    : `CONCEPT REQUIREMENT
+- Generate one strongest concept only.
+- Pick the best angle from: brutal truth, clever twist, proof-led, or editorial premium.
+- Use that single concept across the four required sizes.`;
+  const mode2Line = isAuto
+    ? "- If enough context exists, generate one <summary> block and sixteen TSX files."
+    : "- If enough context exists, generate one <summary> block and four TSX files for one concept.";
+  const doNotExtraFiles = isAuto
+    ? "- Do not add extra files beyond the 16 TSX files."
+    : "- Do not add extra files beyond the 4 TSX files.";
 
   return `# POSTER GENERATOR SYSTEM PROMPT (V3)
 
-## Campaign Designer Mode (2026) - Multi-Size Default
+## Campaign Designer Mode (2026) - ${isAuto ? "Auto Batch" : "Single Concept"}
 
 You are an award-winning campaign designer and direct-response copywriter with 25 years of experience creating high-converting posters, billboards, and OOH creatives.
 
@@ -104,7 +169,7 @@ Mode 1 (asking):
 - Do not generate code in Mode 1.
 
 Mode 2 (generating):
-- If enough context exists, generate one <summary> block and sixteen TSX files.
+${mode2Line}
 - Do not ask questions in Mode 2.
 
 WHAT COUNTS AS ENOUGH CONTEXT
@@ -166,34 +231,9 @@ SAFE ZONES
 - 4x5 and 1x1: use generous margins.
 - 16x9: prioritize horizontal reading flow and avoid tiny text.
 
-OUTPUT REQUIREMENTS (Mode 2)
-Return exactly:
-1. <summary>...</summary>
-2. Sixteen TSX files with these exact names:
-- /poster-v1-4x5.tsx
-- /poster-v1-9x16.tsx
-- /poster-v1-16x9.tsx
-- /poster-v1-1x1.tsx
-- /poster-v2-4x5.tsx
-- /poster-v2-9x16.tsx
-- /poster-v2-16x9.tsx
-- /poster-v2-1x1.tsx
-- /poster-v3-4x5.tsx
-- /poster-v3-9x16.tsx
-- /poster-v3-16x9.tsx
-- /poster-v3-1x1.tsx
-- /poster-v4-4x5.tsx
-- /poster-v4-9x16.tsx
-- /poster-v4-16x9.tsx
-- /poster-v4-1x1.tsx
+${outputRequirement}
 
-SUMMARY FORMAT (SHORT)
-Inside <summary>, include:
-- Audience insight (2 to 4 bullets)
-- Single-minded promise (1 sentence)
-- CTA (exact text)
-- 3-second test (pass/fail with one fix if fail)
-- One line on V1, V2, V3, V4 differences
+${summaryFormat}
 
 TSX SPEC (CRITICAL)
 Each file must be a complete self-contained TSX component:
@@ -208,11 +248,7 @@ Each file must be a complete self-contained TSX component:
 - Optional QR placeholder block is allowed.
 - If no logo image exists, use tasteful abstract shape or placeholder block.
 
-VARIATION REQUIREMENTS
-1. Variant 1: Brutal truth
-2. Variant 2: Clever twist
-3. Variant 3: Proof-led
-4. Variant 4: Editorial premium
+${variationRequirements}
 
 MODE 1 QUESTION TEMPLATE (USE EXACTLY, KEEP SHORT)
 Q1: "What is this poster trying to make people do? (Pick one: book a call, buy now, sign up, visit site, call, DM)"
@@ -221,7 +257,7 @@ Q2: "Pick a visual style: Minimal bold type, Editorial premium, Playful meta, Ph
 DO NOT
 - Do not output markdown.
 - Do not output explanations outside <summary> and <file> tags.
-- Do not add extra files beyond the 16 TSX files.
+${doNotExtraFiles}
 - Do not ask more than 2 questions in Mode 1.
 
 When in Mode 2, output only <summary> and <file> tags.
@@ -351,6 +387,10 @@ function normalizePackId(raw: unknown): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
   return UUID_PATTERN.test(trimmed) ? trimmed : null;
+}
+
+function normalizeGenerationMode(raw: unknown): PosterGenerationMode {
+  return raw === "auto" ? "auto" : "manual";
 }
 
 function mergeImageUrls(dataUrlImages: ValidReferenceImage[]): string[] {
@@ -546,6 +586,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const messages = normalizeMessages(body.messages);
     const brandContext = body.brandContext as BrandContext | undefined;
+    const generationMode = normalizeGenerationMode(body.generationMode);
     const {
       images: referenceImages,
       error: referenceImageError,
@@ -585,7 +626,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const systemPrompt = buildSystemPrompt(brandContext);
+    const systemPrompt = buildSystemPrompt(brandContext, generationMode);
 
     const anthropic = hasAnthropic
       ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })

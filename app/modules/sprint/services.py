@@ -471,7 +471,7 @@ def complete_sprint_and_reload(db: Session, pack_id: UUID, sprint_id: UUID) -> S
 def get_sprint_day_detail(db: Session, pack_id: UUID, day_number: int) -> dict | None:
     """
     Return detail for one day (0-14) of the pack's active sprint.
-    Days beyond current_day are locked. Day 7/8 check specific gates.
+    Days beyond current_day are locked. Some days also have completion gates.
     """
     if day_number < 0 or day_number > 14:
         return None
@@ -486,9 +486,14 @@ def get_sprint_day_detail(db: Session, pack_id: UUID, day_number: int) -> dict |
 
     unlocked = day_number <= sprint.current_day
     blocker_message: str | None = None
+    completion_blocked_message: str | None = None
 
     if unlocked and pack:
-        from app.core.gates import can_pass_day7_gate, can_pass_day8_gate
+        from app.core.gates import (
+            can_complete_day,
+            can_pass_day7_gate,
+            can_pass_day8_gate,
+        )
         if day_number == 7:
             ok, msg = can_pass_day7_gate(db, pack)
             if not ok:
@@ -499,6 +504,11 @@ def get_sprint_day_detail(db: Session, pack_id: UUID, day_number: int) -> dict |
             if not ok:
                 unlocked = False
                 blocker_message = msg
+
+        if unlocked and card.completed_at is None:
+            can_complete, msg = can_complete_day(db, card, day_number, pack)
+            if not can_complete:
+                completion_blocked_message = msg
 
     if not unlocked and not blocker_message:
         blocker_message = f"Complete Day {day_number - 1} first to unlock this day."
@@ -512,6 +522,7 @@ def get_sprint_day_detail(db: Session, pack_id: UUID, day_number: int) -> dict |
         "completed_at": card.completed_at,
         "unlocked": unlocked,
         "blocker_message": blocker_message if not unlocked else None,
+        "completion_blocked_message": completion_blocked_message,
     }
 
 

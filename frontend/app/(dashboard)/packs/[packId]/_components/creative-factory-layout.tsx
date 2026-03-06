@@ -6,23 +6,35 @@ import { CreativeInputBar } from "./creative-input-bar";
 import { CreativePreviewModal } from "./creative-preview-modal";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import type { CreativeTemplateCardAsset } from "./creative-template-card";
-import type { PromptWithResults } from "./creative-template-grid";
+import type {
+  CreativeGenerationDisplay,
+  PromptWithResults,
+} from "./creative-template-grid";
 import type { BrandContext } from "@/app/api/generate/route";
+import type { PosterConversationMessage } from "@/lib/poster-output";
 
 export type CreativeFactoryLayoutProps = {
   variant: "posters";
   packId: string;
   brandContext?: BrandContext | null;
   promptGroups: PromptWithResults[];
-  generatingPrompt: string | null;
+  generationDisplay: CreativeGenerationDisplay | null;
+  generationProgress?: {
+    completedCount: number;
+    totalCount: number;
+  } | null;
   isGenerating: boolean;
   selectedAsset: CreativeTemplateCardAsset | null;
   onAssetSelect: (asset: CreativeTemplateCardAsset | null) => void;
-  onFilesGenerated: (
-    files: Record<string, string>,
-    messages: { role: "user" | "assistant"; content: string }[],
+  onFileGenerated: (
+    name: string,
+    code: string,
+    messages: PosterConversationMessage[],
+  ) => void | Promise<void>;
+  onGeneratingChange: (
+    generating: boolean,
+    display?: CreativeGenerationDisplay | null,
   ) => void;
-  onGeneratingChange: (generating: boolean, prompt?: string | null) => void;
   onDeleteAsset?: (assetId: string) => void | Promise<void>;
 };
 
@@ -31,11 +43,12 @@ export function CreativeFactoryLayout({
   packId,
   brandContext,
   promptGroups,
-  generatingPrompt,
+  generationDisplay,
+  generationProgress = null,
   isGenerating,
   selectedAsset,
   onAssetSelect,
-  onFilesGenerated,
+  onFileGenerated,
   onGeneratingChange,
   onDeleteAsset,
 }: CreativeFactoryLayoutProps) {
@@ -43,13 +56,10 @@ export function CreativeFactoryLayout({
   const isMobile = !useMediaQuery("(min-width: 1024px)");
 
   const handleGenerate = useCallback(
-    (
-      files: Record<string, string>,
-      _messages: { role: "user" | "assistant"; content: string }[],
-    ) => {
-      onFilesGenerated(files, _messages);
+    (name: string, code: string, messages: PosterConversationMessage[]) => {
+      onFileGenerated(name, code, messages);
     },
-    [onFilesGenerated],
+    [onFileGenerated],
   );
 
   return (
@@ -59,8 +69,9 @@ export function CreativeFactoryLayout({
         <CreativeTemplateGrid
           packId={packId}
           promptGroups={promptGroups}
-          generatingPrompt={generatingPrompt}
+          generationDisplay={generationDisplay}
           isGenerating={isGenerating}
+          generationProgress={generationProgress}
           variant={variant}
           onAssetClick={(asset) => onAssetSelect(asset)}
         />
@@ -77,7 +88,7 @@ export function CreativeFactoryLayout({
                   packId={packId}
                   brandContext={brandContext}
                   placeholder={bottomPlaceholder}
-                  onGenerate={handleGenerate}
+                  onFileGenerated={handleGenerate}
                   onGeneratingChange={onGeneratingChange}
                   disabled={isGenerating}
                 />
@@ -89,7 +100,7 @@ export function CreativeFactoryLayout({
               packId={packId}
               brandContext={brandContext}
               placeholder={bottomPlaceholder}
-              onGenerate={handleGenerate}
+              onFileGenerated={handleGenerate}
               onGeneratingChange={onGeneratingChange}
               disabled={isGenerating}
             />

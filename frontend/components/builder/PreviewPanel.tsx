@@ -1,11 +1,29 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import Lottie from "lottie-react";
 import { useProjectStore } from "@/store/useProjectStore";
 import { IconButton } from "@/components/ui/icon-button";
 import { RotateCcw } from "@/components/icons";
 
 const IMPORT_RE = /import\s+[\s\S]*?from\s+['"].*?['"]\s*;?\n?/g;
+let cachedWebLoadingAnimationData: object | null = null;
+
+async function loadWebLoadingAnimationData(): Promise<object | null> {
+  if (cachedWebLoadingAnimationData) {
+    return cachedWebLoadingAnimationData;
+  }
+
+  try {
+    const res = await fetch("/assets/jsons/web-loading.json");
+    if (!res.ok) return null;
+    const data = await res.json();
+    cachedWebLoadingAnimationData = data;
+    return data;
+  } catch {
+    return null;
+  }
+}
 
 function stripExports(code: string, fallbackName?: string): string {
   return code
@@ -139,6 +157,10 @@ export function PreviewPanel({ onRegisterRefresh }: PreviewPanelProps = {}) {
   const files = useProjectStore((s) => s.files);
   const isGenerating = useProjectStore((s) => s.isGenerating);
   const [viewport, setViewport] = useState<Viewport>("desktop");
+  const [loadingAnimationData, setLoadingAnimationData] = useState<object | null>(
+    null,
+  );
+  const [loadingAnimationFailed, setLoadingAnimationFailed] = useState(false);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   // Tracks whether the iframe has finished its initial load (CDN scripts ready)
@@ -176,6 +198,24 @@ export function PreviewPanel({ onRegisterRefresh }: PreviewPanelProps = {}) {
     if (!onRegisterRefresh) return;
     onRegisterRefresh(() => sendBundle(buildBundle(files)));
   }, [onRegisterRefresh, sendBundle, files]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    loadWebLoadingAnimationData()
+      .then((data) => {
+        if (cancelled) return;
+        setLoadingAnimationData(data);
+        setLoadingAnimationFailed(!data);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadingAnimationFailed(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="flex flex-col w-full h-full overflow-hidden">
@@ -233,10 +273,19 @@ export function PreviewPanel({ onRegisterRefresh }: PreviewPanelProps = {}) {
         {isGenerating && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-4">
-              <div className="relative h-10 w-10">
-                <div className="absolute inset-0 rounded-full border-2 border-muted-foreground/20" />
-                <div className="absolute inset-0 rounded-full border-2 border-t-foreground animate-spin" />
-              </div>
+              {loadingAnimationFailed || !loadingAnimationData ? (
+                <div className="relative h-10 w-10">
+                  <div className="absolute inset-0 rounded-full border-2 border-muted-foreground/20" />
+                  <div className="absolute inset-0 rounded-full border-2 border-t-foreground animate-spin" />
+                </div>
+              ) : (
+                <Lottie
+                  animationData={loadingAnimationData}
+                  loop
+                  autoplay
+                  className="h-28 w-28"
+                />
+              )}
               <p className="text-sm font-medium text-foreground animate-pulse">
                 Building your page...
               </p>

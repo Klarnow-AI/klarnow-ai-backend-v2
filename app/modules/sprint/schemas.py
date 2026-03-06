@@ -70,6 +70,7 @@ class SprintDayDetail(BaseModel):
     completed_at: datetime | None
     unlocked: bool
     blocker_message: str | None = None
+    completion_blocked_message: str | None = None
 
 
 class TodayTaskItem(BaseModel):

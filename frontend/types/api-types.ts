@@ -84,6 +84,7 @@ export type SprintDayDetail = {
   completed_at: string | null;
   unlocked: boolean;
   blocker_message?: string | null;
+  completion_blocked_message?: string | null;
 };
 
 export type TodayTaskItem = {
@@ -480,6 +481,13 @@ export type SuggestedPromptsResponse = {
 export type CreativeAssetChatMessage = {
   role: "user" | "assistant";
   content: string;
+  meta?: {
+    kind?: "background_generation";
+    label?: string;
+    taskLabel?: string;
+    mode?: string;
+    modeLabel?: string;
+  };
 };
 
 export type CreativeAsset = {
@@ -573,30 +581,6 @@ export type GenerateLogoResponse = {
 
 export type UploadLogoResponse = {
   logo_url: string;
-};
-
-/** Brand showcase grid item for bento layout. */
-export type BrandShowcaseItem = {
-  id: string;
-  type: "image" | "logo" | "svg" | "text";
-  src?: string | null;
-  alt?: string;
-  size?: "small" | "medium" | "large" | "tall";
-  label?: string;
-  sublabel?: string;
-  colorSwatches?: { value: string; label?: string }[];
-  width?: number;
-  height?: number;
-};
-
-export type GenerateMockupsResponse = {
-  items: Array<{
-    id: string;
-    url: string;
-    width?: number;
-    height?: number;
-    size?: "small" | "medium" | "large" | "tall";
-  }>;
 };
 
 /** Pipeline stages for Kanban columns */

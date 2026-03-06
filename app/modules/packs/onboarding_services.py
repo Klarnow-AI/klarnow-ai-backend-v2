@@ -3,6 +3,7 @@
 import json
 
 from app.core.config import get_settings
+from app.core.errors import BadRequestError
 from app.core.logging import log_service_action
 from app.modules.packs.extraction.website_scraper import extract_brand_from_website
 from app.shared.services.llm import get_llm
@@ -186,17 +187,20 @@ def generate_starter_brand(
     if pack_id:
         chips_str = ", ".join(vibe_chips) if vibe_chips else "professional, modern"
         try:
-            from app.modules.packs.logo_generation import generate_logo_with_gemini
+            from app.modules.packs.logo_generation import generate_logo
 
-            result = generate_logo_with_gemini(
+            result = generate_logo(
                 brand_name=brand_name,
                 prompt=f"distinctive, memorable logo mark—{chips_str}, not generic or clipart",
                 pack_id=pack_id,
                 color_scheme="use the provided palette",
                 brand_os_summary=None,
                 color_palette=palette,
+                strict=False,
             )
             logo_url = result.get("logo_url") or result.get("wordmark_svg_or_url")
+        except BadRequestError as e:
+            logger.info("starter brand logo generation unavailable, using placeholder: %s", e)
         except Exception as e:
             logger.warning("starter brand logo generation failed: %s", e, exc_info=True)
 
