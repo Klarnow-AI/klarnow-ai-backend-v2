@@ -334,14 +334,7 @@ export function useOnboardingChat(options: {
         res.pack_id
       ) {
         setOnboardingProgress("Finalizing your brand setup...");
-        const pack = await pollPackUntilOnboardingReady(res.pack_id, {
-          onProgress: ({ elapsedMs }) => {
-            const seconds = Math.max(1, Math.floor(elapsedMs / 1000));
-            setOnboardingProgress(
-              `Finalizing your brand setup... about ${seconds}s elapsed`,
-            );
-          },
-        });
+        const pack = await pollPackUntilOnboardingReady(res.pack_id);
         setCompletedPack(pack);
       }
       setOnboardingProgress("");

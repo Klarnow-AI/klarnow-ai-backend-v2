@@ -324,14 +324,7 @@ export function Day0Modal({
           const res = await packs.completeOnboarding(packId);
           let completedPack: Pack | null = null;
           if ("status" in res && res.status === "processing" && res.pack_id) {
-            completedPack = await pollPackUntilOnboardingReady(res.pack_id, {
-              onProgress: ({ elapsedMs }) => {
-                const seconds = Math.max(1, Math.floor(elapsedMs / 1000));
-                setOnboardingProgress(
-                  `Finalizing your brand setup and generating Brand OS... about ${seconds}s elapsed`,
-                );
-              },
-            });
+            completedPack = await pollPackUntilOnboardingReady(res.pack_id);
           } else if ("pack" in res && res.pack) {
             completedPack = res.pack;
           }

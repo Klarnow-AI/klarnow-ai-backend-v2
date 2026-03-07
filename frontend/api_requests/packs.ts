@@ -27,20 +27,12 @@ export async function pollPackUntilOnboardingReady(
   options?: {
     intervalMs?: number;
     timeoutMs?: number;
-    onProgress?: (progress: { elapsedMs: number; attempt: number }) => void;
   }
 ): Promise<Pack> {
   const intervalMs = options?.intervalMs ?? ONBOARDING_POLL_INTERVAL_MS;
   const timeoutMs = options?.timeoutMs ?? ONBOARDING_POLL_TIMEOUT_MS;
   const deadline = Date.now() + timeoutMs;
-  const startedAt = Date.now();
-  let attempt = 0;
   while (Date.now() < deadline) {
-    attempt += 1;
-    options?.onProgress?.({
-      elapsedMs: Date.now() - startedAt,
-      attempt,
-    });
     const status = await packs.getOnboardingStatus(packId).catch(() => null);
     if (status?.status === "failed") {
       throw new Error(
