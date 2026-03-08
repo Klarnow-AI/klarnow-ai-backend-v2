@@ -18,8 +18,8 @@ import type {
 
 const PACKS_PREFIX = "/api/v1/packs";
 
-const ONBOARDING_POLL_INTERVAL_MS = 2000;
 const ONBOARDING_POLL_TIMEOUT_MS = 120000; // 2 min
+const ONBOARDING_POLL_INTERVALS_MS = [2000, 3000, 5000, 8000];
 
 /** Poll GET pack until onboarding_background_completed_at is set (after 202 from complete). */
 export async function pollPackUntilOnboardingReady(
@@ -29,11 +29,18 @@ export async function pollPackUntilOnboardingReady(
     timeoutMs?: number;
   }
 ): Promise<Pack> {
-  const intervalMs = options?.intervalMs ?? ONBOARDING_POLL_INTERVAL_MS;
   const timeoutMs = options?.timeoutMs ?? ONBOARDING_POLL_TIMEOUT_MS;
   const deadline = Date.now() + timeoutMs;
+  let attempt = 0;
+  let lastStatusErrorMessage: string | null = null;
   while (Date.now() < deadline) {
-    const status = await packs.getOnboardingStatus(packId).catch(() => null);
+    const status = await packs
+      .getOnboardingStatus(packId)
+      .catch((error) => {
+        lastStatusErrorMessage =
+          error instanceof Error ? error.message : String(error);
+        return null;
+      });
     if (status?.status === "failed") {
       throw new Error(
         status.last_error ||
@@ -43,9 +50,20 @@ export async function pollPackUntilOnboardingReady(
     if (status?.status === "completed") {
       return packs.get(packId);
     }
-    const pack = await packs.get(packId);
-    if (pack.onboarding_background_completed_at) return pack;
+    const intervalMs =
+      options?.intervalMs ??
+      ONBOARDING_POLL_INTERVALS_MS[
+        Math.min(attempt, ONBOARDING_POLL_INTERVALS_MS.length - 1)
+      ];
+    attempt += 1;
     await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  const pack = await packs.get(packId).catch(() => null);
+  if (pack?.onboarding_background_completed_at) return pack;
+  if (lastStatusErrorMessage) {
+    throw new Error(
+      `Unable to confirm onboarding status: ${lastStatusErrorMessage}`,
+    );
   }
   throw new Error("Onboarding is taking longer than expected. Refresh the page to check status.");
 }

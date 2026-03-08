@@ -1,4 +1,4 @@
-import type { BrandContext } from "@/app/api/generate/route";
+import type { BrandContext } from "@/types/generation";
 import {
   type PosterGenerationMode,
   extractCompletedPosterFiles,
@@ -7,6 +7,7 @@ import {
   validatePosterTsxFile,
   validatePosterTsxFiles,
 } from "@/lib/poster-output";
+import { getToken, resolveApiUrl } from "@/lib/http";
 
 export type PosterReferenceImage = {
   name: string;
@@ -52,11 +53,12 @@ export async function streamPosterGeneration(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (authToken) {
-    headers.Authorization = `Bearer ${authToken}`;
+  const token = authToken ?? getToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(apiRoute, {
+  const res = await fetch(resolveApiUrl(apiRoute), {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -75,8 +77,8 @@ export async function streamPosterGeneration(
     const errText = await res.text();
     let message: string;
     try {
-      const parsed = JSON.parse(errText) as { error?: string };
-      message = parsed.error ?? errText;
+      const parsed = JSON.parse(errText) as { error?: string; detail?: string };
+      message = parsed.error ?? parsed.detail ?? errText;
     } catch {
       message = errText;
     }

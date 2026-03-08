@@ -28,7 +28,8 @@ import {
   type ParsedQuestion,
 } from "@/components/builder/QuestionForm";
 import { cn } from "@/lib/utils";
-import type { BrandContext } from "@/app/api/generate/route";
+import { getHeaders, resolveApiUrl } from "@/lib/http";
+import type { BrandContext } from "@/types/generation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -383,25 +384,38 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
       abortRef.current = controller;
 
       try {
-        const res = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: currentMessages,
-            files: currentFiles,
-            brandContext: brandContext ?? undefined,
-            selectedStyle:
-              useProjectStore.getState().selectedStyle ?? undefined,
-          }),
-          signal: controller.signal,
-        });
+        if (!projectId) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: "Builder project is not ready yet." },
+          ]);
+          return;
+        }
+
+        const res = await fetch(
+          resolveApiUrl(`/api/v1/builder/projects/${encodeURIComponent(projectId)}/generate`),
+          {
+            method: "POST",
+            headers: getHeaders(),
+            body: JSON.stringify({
+              messages: currentMessages,
+              files: currentFiles,
+              selectedStyle:
+                useProjectStore.getState().selectedStyle ?? undefined,
+            }),
+            signal: controller.signal,
+          },
+        );
 
         if (!res.ok) {
           const errText = await res.text();
           let message: string;
           try {
-            const parsed = JSON.parse(errText) as { error?: string };
-            message = parsed.error ?? errText;
+            const parsed = JSON.parse(errText) as {
+              error?: string;
+              detail?: string;
+            };
+            message = parsed.error ?? parsed.detail ?? errText;
           } catch {
             message = errText;
           }
@@ -500,7 +514,7 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [brandContext],
+    [brandContext, projectId],
   );
 
   // ── Auto-generate on first load ───────────────────────────────────────────

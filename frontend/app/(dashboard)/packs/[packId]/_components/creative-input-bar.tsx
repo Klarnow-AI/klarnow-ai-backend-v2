@@ -24,7 +24,7 @@ import {
   autoUpdate,
 } from "@floating-ui/react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import type { BrandContext } from "@/app/api/generate/route";
+import type { BrandContext } from "@/types/generation";
 import {
   streamPosterGeneration,
   type PosterReferenceImage,
@@ -171,7 +171,6 @@ export function CreativeInputBar({
       onGeneratingChange?.(true, buildPromptGenerationDisplay(userContent));
 
       try {
-        const token = getToken();
         const parsed = await streamPosterGeneration(
           {
             apiRoute,
@@ -180,7 +179,7 @@ export function CreativeInputBar({
             packId,
             generationMode: "manual",
             referenceImages: images.length > 0 ? images : undefined,
-            authToken: token,
+            authToken: getToken(),
           },
           {
             onFile: async (name, code) => {

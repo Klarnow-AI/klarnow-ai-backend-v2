@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import type { Pack, BrandOS } from "@/types/api-types";
-import type { BrandContext } from "@/app/api/generate/route";
+import type { BrandContext } from "@/types/generation";
 
 function ResizableLayout({
   brandContext,

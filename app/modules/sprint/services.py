@@ -183,7 +183,7 @@ def _generate_today_task_labels_with_llm(
     pack_context: str,
 ) -> list[str] | None:
     settings = get_settings()
-    if not settings.openai_api_key:
+    if not settings.openai_api_key or not settings.ai_sprint_today_tasks_enabled:
         return None
 
     prompt = (
@@ -314,7 +314,13 @@ def _create_day_cards(db: Session, sprint_id: UUID) -> None:
 
 
 @log_service_action()
-def create_sprint_for_pack(db: Session, pack_id: UUID, started_at: datetime | None = None) -> Sprint:
+def create_sprint_for_pack(
+    db: Session,
+    pack_id: UUID,
+    started_at: datetime | None = None,
+    *,
+    commit: bool = True,
+) -> Sprint:
     """Create a new 14-day sprint for the pack with DayCards 0-14. Fails if pack already has an active sprint.
     If started_at is provided (e.g. pack.created_at), the sprint is anchored to that date; otherwise uses now."""
     existing = get_active_sprint_for_pack(db, pack_id)
@@ -339,8 +345,9 @@ def create_sprint_for_pack(db: Session, pack_id: UUID, started_at: datetime | No
     db.add(sprint)
     db.flush()
     _create_day_cards(db, sprint.id)
-    db.commit()
-    if sprint.current_day == 3:
+    if commit:
+        db.commit()
+    if commit and sprint.current_day == 3:
         try:
             _seed_ad_factory_videos_after_day_3(db, sprint)
         except Exception as exc:
@@ -351,7 +358,6 @@ def create_sprint_for_pack(db: Session, pack_id: UUID, started_at: datetime | No
                 sprint.pack_id,
                 str(exc),
             )
-    db.refresh(sprint)
     return sprint
 
 

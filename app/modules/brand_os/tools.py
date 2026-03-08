@@ -114,35 +114,36 @@ def _call_openai_for_brand_os(context: str) -> BrandOSDomain:
 
     # Step 1: Brief reasoning pass — identify key brand signals before generating
     reasoning = ""
-    try:
-        reasoning_response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a brand strategist. Identify the most important signals "
-                        "from the provided business context. Be specific and concise."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"Analyze this brand context and identify in 4-5 sentences:\n"
-                        f"1. The single most important problem this brand solves\n"
-                        f"2. The primary buyer persona (who exactly needs this)\n"
-                        f"3. The brand's key differentiator (what sets it apart)\n"
-                        f"4. The appropriate brand tone and archetype\n\n"
-                        f"Context:\n{context_trimmed}"
-                    ),
-                },
-            ],
-            temperature=0.4,
-            max_tokens=300,
-        )
-        reasoning = reasoning_response.choices[0].message.content or ""
-    except Exception:
-        pass  # CoT step failed — proceed with direct generation
+    if settings.ai_brand_os_reasoning_enabled:
+        try:
+            reasoning_response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a brand strategist. Identify the most important signals "
+                            "from the provided business context. Be specific and concise."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Analyze this brand context and identify in 4-5 sentences:\n"
+                            f"1. The single most important problem this brand solves\n"
+                            f"2. The primary buyer persona (who exactly needs this)\n"
+                            f"3. The brand's key differentiator (what sets it apart)\n"
+                            f"4. The appropriate brand tone and archetype\n\n"
+                            f"Context:\n{context_trimmed}"
+                        ),
+                    },
+                ],
+                temperature=0.4,
+                max_tokens=300,
+            )
+            reasoning = reasoning_response.choices[0].message.content or ""
+        except Exception:
+            pass  # Reasoning step failed — proceed with direct generation
 
     # Step 2: Structured generation using reasoning as additional context
     generation_prompt = (

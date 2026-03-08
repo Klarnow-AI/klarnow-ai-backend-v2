@@ -3,11 +3,22 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
-from app.core.errors import NotFoundError
-from app.modules.creative.schemas import AssetCreate, AssetList, AssetRead
+from app.core.errors import BadRequestError, NotFoundError
+from app.core.gates import can_generate_assets
+from app.modules.creative.generation import (
+    create_poster_generation_stream,
+    normalize_reference_images,
+)
+from app.modules.creative.schemas import (
+    AssetCreate,
+    AssetList,
+    AssetRead,
+    PosterGenerateRequest,
+)
 from app.modules.creative.services import (
     create_asset,
     delete_asset as delete_asset_service,
@@ -17,6 +28,7 @@ from app.modules.creative.services import (
 )
 from app.modules.packs.models import User
 from app.modules.packs.services import get_pack_for_user
+from app.shared.services.generation_context import load_generation_brand_context
 
 router = APIRouter()
 
@@ -40,7 +52,6 @@ def create_asset_route(
         body.type,
         body.name,
         body.source_code,
-        current_user.id,
         template_id=body.template_id,
         chat_messages=body.chat_messages,
     )
@@ -82,7 +93,7 @@ def regenerate_asset_route(
     asset = get_asset_for_pack_user(db, asset_id, current_user.id)
     if not asset:
         raise NotFoundError("Asset not found")
-    new_asset = regenerate_asset(db, asset, current_user.id)
+    new_asset = regenerate_asset(db, asset)
     return AssetRead.model_validate(new_asset)
 
 
@@ -96,4 +107,53 @@ def delete_asset_route(
     asset = get_asset_for_pack_user(db, asset_id, current_user.id)
     if not asset:
         raise NotFoundError("Asset not found")
-    delete_asset_service(db, asset_id, current_user.id)
+    delete_asset_service(db, asset)
+
+
+@router.post("/generate")
+async def generate_posters(
+    body: PosterGenerateRequest,
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate poster TSX output for the authenticated user's pack."""
+    if not body.messages:
+        raise BadRequestError("Missing messages")
+
+    pack = get_pack_for_user(db, body.pack_id, current_user.id)
+    if not pack:
+        raise NotFoundError("Pack not found")
+
+    can_generate_assets(db, pack)
+    brand_context = load_generation_brand_context(db, body.pack_id, pack=pack)
+
+    try:
+        reference_images = normalize_reference_images(
+            [image.model_dump() for image in body.reference_images]
+        )
+    except ValueError as exc:
+        raise BadRequestError(str(exc)) from exc
+
+    try:
+        stream = await create_poster_generation_stream(
+            messages=body.messages,
+            brand_context=brand_context,
+            reference_images=reference_images,
+            generation_mode=body.generation_mode,
+        )
+    except RuntimeError as exc:
+        message = str(exc)
+        if "not configured" in message.lower():
+            return JSONResponse(status_code=503, content={"detail": message})
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": "We're having trouble generating right now. Please try again in a few moments."
+            },
+        )
+
+    return StreamingResponse(
+        stream,
+        media_type="text/plain; charset=utf-8",
+        headers={"Cache-Control": "no-store"},
+    )

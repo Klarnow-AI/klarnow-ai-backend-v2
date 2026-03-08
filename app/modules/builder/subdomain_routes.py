@@ -1,5 +1,7 @@
 """Routes for subdomain-based site serving. Mount at prefix '' so GET / and POST /lead apply when Host is *.sites_domain."""
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 
@@ -9,6 +11,10 @@ from sqlalchemy.orm import Session
 from app.modules.builder.services import (
     build_deploy_html,
     get_published_by_subdomain,
+    load_published_html,
+    load_published_metadata,
+    load_published_snapshot,
+    publish_project_artifacts,
 )
 from app.modules.clients.services import create_lead
 from app.modules.public_site.schemas import PublicLeadCaptureBody, PublicLeadCaptureResponse
@@ -41,15 +47,29 @@ def serve_site_by_subdomain(
     subdomain = _get_subdomain_from_host(request)
     if subdomain is None:
         raise HTTPException(status_code=404, detail="Not found")
+    html = load_published_html(subdomain=subdomain)
+    if html is not None:
+        return HTMLResponse(
+            content=html,
+            headers={"Cache-Control": "public, max-age=60, stale-while-revalidate=600"},
+        )
     project = get_published_by_subdomain(db, subdomain)
     if not project:
         raise HTTPException(status_code=404, detail="Site not found or not yet published")
+    files = load_published_snapshot(project) or dict(project.published_files or project.files or {})
     html = build_deploy_html(
-        project.files,
+        files,
         project_id=str(project.id),
         lead_url="/lead",
     )
-    return HTMLResponse(content=html)
+    try:
+        publish_project_artifacts(project, lead_url="/lead")
+    except Exception:
+        pass
+    return HTMLResponse(
+        content=html,
+        headers={"Cache-Control": "public, max-age=60, stale-while-revalidate=600"},
+    )
 
 
 @router.post("/lead", response_model=PublicLeadCaptureResponse, status_code=status.HTTP_201_CREATED)
@@ -69,12 +89,21 @@ def capture_lead_by_subdomain(
     subdomain = _get_subdomain_from_host(request)
     if subdomain is None:
         raise HTTPException(status_code=404, detail="Not found")
-    project = get_published_by_subdomain(db, subdomain)
-    if not project:
-        raise HTTPException(status_code=404, detail="Site not found or not yet published")
+    pack_id = None
+    metadata = load_published_metadata(subdomain=subdomain)
+    if metadata and metadata.get("pack_id"):
+        try:
+            pack_id = UUID(str(metadata["pack_id"]))
+        except (TypeError, ValueError):
+            pack_id = None
+    if pack_id is None:
+        project = get_published_by_subdomain(db, subdomain)
+        if not project:
+            raise HTTPException(status_code=404, detail="Site not found or not yet published")
+        pack_id = project.pack_id
     lead = create_lead(
         db,
-        pack_id=project.pack_id,
+        pack_id=pack_id,
         name=body.name,
         email=body.email,
         phone=body.phone,

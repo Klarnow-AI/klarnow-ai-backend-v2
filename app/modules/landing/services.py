@@ -65,7 +65,7 @@ def landing_complete(
     """
     Create Pack + Sprint from landing 3 questions + pack name. Returns (pack_id, redirect path).
     """
-    pack = create_pack(db, user_id, name=pack_name.strip() or "My Pack")
+    pack = create_pack(db, user_id, name=pack_name.strip() or "My Pack", commit=False)
     answers = {
         "pack_name": pack_name.strip(),
         "what_do_you_sell": what_do_you_sell.strip(),
@@ -78,6 +78,5 @@ def landing_complete(
     pack.location_city = where_are_you_based.strip() or None
     pack.location_country = where_are_you_based.strip() or None
     db.commit()
-    db.refresh(pack)
     # Sprint was already created in create_pack with started_at=pack.created_at
     return pack.id, f"/packs/{pack.id}"

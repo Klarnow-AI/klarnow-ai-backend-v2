@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.logging import log_service_action
 from app.modules.creative.models import Asset
-from app.modules.packs.services import get_pack_for_user
+from app.modules.packs.models import Pack
 
 
 @log_service_action()
@@ -32,14 +32,10 @@ def create_asset(
     asset_type: str,
     name: str,
     source_code: str,
-    user_id: UUID,
     template_id: str | None = None,
     chat_messages: list[dict] | None = None,
 ) -> Asset:
-    """Create a poster or flyer asset with source code. Pack must belong to user."""
-    pack = get_pack_for_user(db, pack_id, user_id)
-    if not pack:
-        raise ValueError("Pack not found")
+    """Create a poster or flyer asset with source code."""
     if asset_type not in ("poster", "flyer"):
         raise ValueError("type must be 'poster' or 'flyer'")
     asset = Asset(
@@ -53,7 +49,6 @@ def create_asset(
     )
     db.add(asset)
     db.commit()
-    db.refresh(asset)
     return asset
 
 
@@ -61,19 +56,20 @@ def create_asset(
 def get_asset_for_pack_user(
     db: Session, asset_id: UUID, user_id: UUID
 ) -> Asset | None:
-    asset = get_asset_by_id(db, asset_id)
-    if not asset:
-        return None
-    pack = get_pack_for_user(db, asset.pack_id, user_id)
-    return asset if pack else None
+    return (
+        db.query(Asset)
+        .join(Pack, Pack.id == Asset.pack_id)
+        .filter(
+            Asset.id == asset_id,
+            Pack.created_by_user_id == user_id,
+        )
+        .first()
+    )
 
 
 @log_service_action()
-def delete_asset(db: Session, asset_id: UUID, user_id: UUID) -> None:
-    """Delete an asset. Asset's pack must belong to current user."""
-    asset = get_asset_for_pack_user(db, asset_id, user_id)
-    if not asset:
-        raise ValueError("Asset not found")
+def delete_asset(db: Session, asset: Asset) -> None:
+    """Delete an asset."""
     db.delete(asset)
     db.commit()
 
@@ -88,11 +84,8 @@ def _next_version(existing: list[str]) -> str:
 
 
 @log_service_action()
-def regenerate_asset(db: Session, asset: Asset, user_id: UUID) -> Asset:
+def regenerate_asset(db: Session, asset: Asset) -> Asset:
     """Create Version B (new asset), never overwrite. Returns the new asset."""
-    pack = get_pack_for_user(db, asset.pack_id, user_id)
-    if not pack:
-        raise ValueError("Pack not found")
     existing_versions = [
         a.version or "1"
         for a in list_assets_for_pack(db, asset.pack_id)
@@ -118,5 +111,4 @@ def regenerate_asset(db: Session, asset: Asset, user_id: UUID) -> Asset:
     )
     db.add(new_asset)
     db.commit()
-    db.refresh(new_asset)
     return new_asset

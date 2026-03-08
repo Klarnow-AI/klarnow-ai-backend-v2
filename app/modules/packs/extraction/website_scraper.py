@@ -451,7 +451,8 @@ def validate_profile(profile: Dict[str, Any]) -> WebsiteExtractedIngestion:
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(min=1, max=8),
-    retry=retry_if_exception_type(Exception),
+    # Retry transient fetch errors, but do not replay completed LLM work.
+    retry=retry_if_exception_type(httpx.RequestError),
     reraise=True,
 )
 async def extract_brand_from_website(

@@ -20,6 +20,7 @@ const DEFAULT_FILES: Record<string, string> = {
 type Message = { role: string; content: string };
 
 let syncTimer: ReturnType<typeof setTimeout> | null = null;
+const BUILDER_SYNC_DEBOUNCE_MS = 2500;
 
 function debouncedSync() {
   if (syncTimer) clearTimeout(syncTimer);
@@ -29,7 +30,7 @@ function debouncedSync() {
     builder.update(projectId, { files, messages }).catch((err) => {
       console.error("Failed to sync builder project:", err);
     });
-  }, 1000);
+  }, BUILDER_SYNC_DEBOUNCE_MS);
 }
 
 const initialProjectState = {

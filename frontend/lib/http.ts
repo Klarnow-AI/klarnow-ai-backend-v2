@@ -14,6 +14,10 @@ export function getHeaders(includeAuth = true): HeadersInit {
   return headers;
 }
 
+export function resolveApiUrl(path: string): string {
+  return path.startsWith("http") ? path : `${API_BASE}${path}`;
+}
+
 export function handleUnauthorized(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem("klarnow_token");

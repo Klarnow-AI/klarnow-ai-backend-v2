@@ -10,6 +10,12 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.db.observability import (
+    get_db_query_count,
+    get_db_query_duration_ms,
+    reset_db_query_stats,
+)
+from app.core.logging import get_logger
 from app.core.db.session import SessionLocal
 from app.modules.packs.models import Pack, utc_now
 from app.modules.packs.onboarding_queue import dispatch_onboarding_job, redis_queue_enabled
@@ -26,6 +32,8 @@ ONBOARDING_JOB_STAGES = (
     STAGE_BRAND_OS,
     STAGE_LOGO,
 )
+
+logger = get_logger("klarnow.onboarding_jobs")
 
 
 @dataclass(slots=True)
@@ -152,7 +160,6 @@ def _load_pack_and_job(
 def _persist_job(db: Session, pack: Pack, job: dict[str, Any]) -> Pack:
     _set_job_data(pack, job)
     db.commit()
-    db.refresh(pack)
     return pack
 
 
@@ -275,17 +282,12 @@ def _get_existing_onboarding_brand_os(db: Session, pack: Pack, job_id: str):
         return None
 
 
-def _sync_pack_core_concept(db: Session, pack_id: UUID, brand_os) -> None:
+def _sync_pack_core_concept(pack: Pack, brand_os) -> None:
     from app.modules.brand_os.services import get_summary_fields
 
-    pack = db.get(Pack, pack_id)
-    if not pack:
-        return
     mission, _, _ = get_summary_fields(brand_os)
     if mission:
         pack.core_concept = (mission.strip() or "")[:500]
-        db.commit()
-        db.refresh(pack)
 
 
 def _run_starter_brand_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
@@ -318,7 +320,7 @@ def _run_starter_brand_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
         pack_id=str(pack_id),
     )
     wordmark_to_use = result["wordmark_svg_or_url"]
-    pack = append_suggested_logo(db, pack, wordmark_to_use)
+    pack = append_suggested_logo(db, pack, wordmark_to_use, commit=False)
     pack = merge_onboarding_answers(
         db,
         pack,
@@ -328,6 +330,7 @@ def _run_starter_brand_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
             "starter_brand_job_id": job_id,
             "starter_brand_completed_at": _iso_now(),
         },
+        commit=False,
     )
     return _mark_stage(
         db,
@@ -358,8 +361,9 @@ def _run_brand_os_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
                     "onboarding_brand_os_job_id": job_id,
                     "onboarding_brand_os_completed_at": _iso_now(),
                 },
+                commit=False,
             )
-            _sync_pack_core_concept(db, pack_id, existing_brand_os)
+            _sync_pack_core_concept(pack, existing_brand_os)
         return _mark_stage(
             db,
             pack_id,
@@ -385,8 +389,9 @@ def _run_brand_os_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
             "onboarding_brand_os_job_id": job_id,
             "onboarding_brand_os_completed_at": _iso_now(),
         },
+        commit=False,
     )
-    _sync_pack_core_concept(db, pack_id, brand_os)
+    _sync_pack_core_concept(pack, brand_os)
     return _mark_stage(
         db,
         pack_id,
@@ -437,7 +442,7 @@ def _run_logo_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
     if not logo_url:
         return _mark_stage(db, pack_id, job_id, STAGE_LOGO, "skipped")
 
-    pack = append_suggested_logo(db, pack, logo_url)
+    pack = append_suggested_logo(db, pack, logo_url, commit=False)
     pack = merge_onboarding_answers(
         db,
         pack,
@@ -446,6 +451,7 @@ def _run_logo_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
             "final_logo_job_id": job_id,
             "final_logo_completed_at": _iso_now(),
         },
+        commit=False,
     )
     return _mark_stage(
         db,
@@ -481,7 +487,6 @@ def _run_onboarding_pipeline(db: Session, pack_id: UUID, job_id: str) -> None:
         return
     pack.onboarding_background_completed_at = utc_now()
     db.commit()
-    db.refresh(pack)
 
 
 def enqueue_onboarding_job(db: Session, pack_id: UUID) -> dict[str, Any]:
@@ -557,6 +562,7 @@ def dispatch_onboarding_job_from_api(
 
 def run_onboarding_job(pack_id: UUID, job_id: str) -> OnboardingRunResult:
     db = SessionLocal()
+    reset_db_query_stats()
     try:
         pack, job = _load_pack_and_job(db, pack_id, job_id)
         if not pack or not job:
@@ -575,7 +581,6 @@ def run_onboarding_job(pack_id: UUID, job_id: str) -> OnboardingRunResult:
         job["last_error"] = None
         _set_job_data(pack, job)
         db.commit()
-        db.refresh(pack)
 
         try:
             _run_onboarding_pipeline(db, pack_id, job_id)
@@ -593,7 +598,6 @@ def run_onboarding_job(pack_id: UUID, job_id: str) -> OnboardingRunResult:
             job["current_stage"] = None
             _set_job_data(pack, job)
             db.commit()
-            db.refresh(pack)
             return OnboardingRunResult(
                 retry=should_retry,
                 attempt=attempt,
@@ -609,7 +613,13 @@ def run_onboarding_job(pack_id: UUID, job_id: str) -> OnboardingRunResult:
         job["current_stage"] = None
         _set_job_data(pack, job)
         db.commit()
-        db.refresh(pack)
         return OnboardingRunResult(retry=False, attempt=attempt, clear_dispatch=True)
     finally:
+        logger.info(
+            "onboarding_job_db_usage | pack_id=%s | job_id=%s | queries=%s | query_time_ms=%.2f",
+            pack_id,
+            job_id,
+            get_db_query_count(),
+            get_db_query_duration_ms(),
+        )
         db.close()

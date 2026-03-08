@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { Spinner } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
 import type { Pack, BrandOS } from "@/types/api-types";
-import type { BrandContext } from "@/app/api/generate/route";
+import type { BrandContext } from "@/types/generation";
 
 const AUTO_GENERATION_LABEL = "Starter poster pack";
 const GENERATION_FILE_TOTAL = 16;
@@ -404,7 +404,7 @@ poster-v4-4x5.tsx, poster-v4-9x16.tsx, poster-v4-16x9.tsx, poster-v4-1x1.tsx.
 
     streamPosterGeneration(
       {
-        apiRoute: "/api/generate-poster",
+        apiRoute: "/api/v1/creative/generate",
         messages: [{ role: "user", content: prompt }],
         brandContext,
         generationMode: "auto",

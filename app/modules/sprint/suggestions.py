@@ -51,7 +51,7 @@ def suggest_day_fields(db: Session, pack_id: UUID, day_number: int) -> dict:
 
     context = _pack_context_for_suggestions(pack)
     settings = get_settings()
-    if not settings.openai_api_key:
+    if not settings.openai_api_key or not settings.ai_sprint_field_suggestions_enabled:
         return _fallback_day_response(day_number, pack)
 
     from openai import OpenAI
@@ -130,7 +130,7 @@ Respond with ONLY the suggested value. No explanation, no markdown, no quotes ar
 
     try:
         r = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.6,
             max_tokens=500,
@@ -204,7 +204,7 @@ def suggest_day_field_chips(
 
     context = _pack_context_for_suggestions(pack)
     settings = get_settings()
-    if not settings.openai_api_key:
+    if not settings.openai_api_key or not settings.ai_sprint_field_suggestions_enabled:
         return []
 
     from openai import OpenAI
@@ -240,7 +240,7 @@ Make each suggestion concrete and specific to their brand."""
 
     try:
         r = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.85,
             max_tokens=400,
@@ -273,7 +273,7 @@ def suggest_sprint_field(
 
     context = _pack_context_for_suggestions(pack)
     settings = get_settings()
-    if not settings.openai_api_key:
+    if not settings.openai_api_key or not settings.ai_sprint_field_suggestions_enabled:
         return (current_value or "").strip()
 
     from openai import OpenAI

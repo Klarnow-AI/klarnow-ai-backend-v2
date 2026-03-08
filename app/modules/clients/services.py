@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.logging import log_service_action
+from app.modules.packs.models import Pack
 from app.modules.clients.models import (
     Client,
     Lead,
@@ -34,7 +35,6 @@ def create(db: Session, user_id: UUID, name: str, email: str | None = None, comp
     client = Client(user_id=user_id, name=name, email=email, company=company)
     db.add(client)
     db.commit()
-    db.refresh(client)
     return client
 
 
@@ -53,7 +53,6 @@ def update(
     if company is not None:
         client.company = company
     db.commit()
-    db.refresh(client)
     return client
 
 
@@ -114,12 +113,15 @@ def get_lead_by_pack_and_client(db: Session, pack_id: UUID, client_id: UUID | No
 
 @log_service_action()
 def get_lead_for_pack_user(db: Session, lead_id: UUID, user_id: UUID) -> Lead | None:
-    lead = get_lead_by_id(db, lead_id)
-    if not lead:
-        return None
-    from app.modules.packs.services import get_pack_for_user
-    pack = get_pack_for_user(db, lead.pack_id, user_id)
-    return lead if pack else None
+    return (
+        db.query(Lead)
+        .join(Pack, Pack.id == Lead.pack_id)
+        .filter(
+            Lead.id == lead_id,
+            Pack.created_by_user_id == user_id,
+        )
+        .first()
+    )
 
 
 @log_service_action()
@@ -156,7 +158,6 @@ def create_lead(
     )
     db.add(lead)
     db.commit()
-    db.refresh(lead)
     return lead
 
 
@@ -205,7 +206,6 @@ def update_lead(
     if assigned_user_id is not None:
         lead.assigned_user_id = assigned_user_id
     db.commit()
-    db.refresh(lead)
     return lead
 
 
@@ -213,5 +213,4 @@ def update_lead(
 def qualify_lead(db: Session, lead: Lead) -> Lead:
     lead.status = LEAD_STATUS_QUALIFIED
     db.commit()
-    db.refresh(lead)
     return lead

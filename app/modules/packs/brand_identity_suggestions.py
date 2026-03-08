@@ -86,13 +86,13 @@ Each value must be a single font family name (e.g. "Playfair Display", "Inter", 
 Use only web-safe or Google Fonts that are free and widely available. No markdown, no explanation."""
 
     settings = get_settings()
-    if not settings.openai_api_key:
+    if not settings.openai_api_key or not settings.ai_brand_identity_suggestions_enabled:
         return {"headline_font": "Inter", "body_font": "Open Sans"}
 
     try:
         client = OpenAI(api_key=settings.openai_api_key)
         r = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=150,
@@ -147,13 +147,13 @@ Each value must be a hex color (e.g. "#2563eb"). Optionally add "background" and
 Ensure colors work well together and are accessible. No markdown, no explanation."""
 
     settings = get_settings()
-    if not settings.openai_api_key:
+    if not settings.openai_api_key or not settings.ai_brand_identity_suggestions_enabled:
         return {"primary": "#2563eb", "secondary": "#64748b", "accent": "#f59e0b"}
 
     try:
         client = OpenAI(api_key=settings.openai_api_key)
         r = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=200,

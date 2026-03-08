@@ -5,7 +5,8 @@ import { Paperclip, Send, Stop } from "@/components/icons";
 import { IconButton } from "@/components/ui/icon-button";
 import { AssistantAvatar } from "@/components/assistant-avatar";
 import { SearchInput } from "@/components/ui/search-input";
-import type { BrandContext } from "@/app/api/generate/route";
+import { getHeaders, resolveApiUrl } from "@/lib/http";
+import type { BrandContext } from "@/types/generation";
 
 type Message = {
   role: "user" | "assistant";
@@ -91,9 +92,9 @@ export function BuilderChatPanel({
       abortRef.current = controller;
 
       try {
-        const res = await fetch(apiRoute, {
+        const res = await fetch(resolveApiUrl(apiRoute), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getHeaders(),
           body: JSON.stringify({
             messages: currentMessages,
             brandContext: brandContext ?? undefined,
@@ -105,8 +106,11 @@ export function BuilderChatPanel({
           const errText = await res.text();
           let message: string;
           try {
-            const parsed = JSON.parse(errText) as { error?: string };
-            message = parsed.error ?? errText;
+            const parsed = JSON.parse(errText) as {
+              error?: string;
+              detail?: string;
+            };
+            message = parsed.error ?? parsed.detail ?? errText;
           } catch {
             message = errText;
           }

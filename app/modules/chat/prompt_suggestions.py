@@ -159,7 +159,7 @@ def suggest_pack_chat_prompts(
     fallback = _fallback_prompts(pack_context, next_action)
 
     settings = get_settings()
-    if not settings.openai_api_key:
+    if not settings.openai_api_key or not settings.ai_chat_prompt_suggestions_enabled:
         return fallback
 
     prompt_context = {
@@ -203,7 +203,7 @@ def suggest_pack_chat_prompts(
     try:
         client = OpenAI(api_key=settings.openai_api_key)
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=[
                 {
                     "role": "system",

@@ -97,9 +97,9 @@ def generate_logo_with_openai(
     Raises BadRequestError on failure.
     """
     settings = get_settings()
-    if not settings.openai_api_key:
+    if not settings.openai_api_key or not settings.ai_logo_generation_enabled:
         raise BadRequestError(
-            "Logo image generation is not configured. Set OPENAI_API_KEY in your environment to generate logos."
+            "Logo image generation is disabled. Set OPENAI_API_KEY and AI_LOGO_GENERATION_ENABLED=true to generate logos."
         )
     cooldown_reason = _get_openai_cooldown_reason()
     if cooldown_reason:
@@ -191,7 +191,7 @@ def generate_logo(
     )
     no_logo_result: dict[str, str | None] = {"logo_url": None, "wordmark_svg_or_url": None}
 
-    if settings.openai_api_key:
+    if settings.openai_api_key and settings.ai_logo_generation_enabled:
         logger.info("logo_generation: using DALL-E 3")
         try:
             return generate_logo_with_openai(prompt_text, pack_id)
@@ -203,7 +203,7 @@ def generate_logo(
 
     if strict:
         raise BadRequestError(
-            "Logo image generation is not configured. Set OPENAI_API_KEY in your environment to generate logos."
+            "Logo image generation is disabled. Set OPENAI_API_KEY and AI_LOGO_GENERATION_ENABLED=true to generate logos."
         )
     logger.info("logo_generation: non-strict mode returning no logo; providers not configured")
     return no_logo_result

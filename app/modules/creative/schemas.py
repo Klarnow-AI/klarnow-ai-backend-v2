@@ -1,9 +1,12 @@
 """Creative asset Pydantic schemas."""
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.shared.generation_schemas import GenerationMessage
 
 
 class AssetRead(BaseModel):
@@ -36,3 +39,26 @@ class AssetCreate(BaseModel):
 class AssetList(BaseModel):
     items: list[AssetRead]
     total: int
+
+
+class PosterReferenceImageInput(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    name: str
+    mime_type: str = Field(alias="mimeType")
+    data_url: str = Field(alias="dataUrl")
+
+
+class PosterGenerateRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    pack_id: UUID = Field(alias="packId")
+    messages: list[GenerationMessage]
+    generation_mode: Literal["auto", "manual"] = Field(
+        default="manual",
+        alias="generationMode",
+    )
+    reference_images: list[PosterReferenceImageInput] = Field(
+        default_factory=list,
+        alias="referenceImages",
+    )

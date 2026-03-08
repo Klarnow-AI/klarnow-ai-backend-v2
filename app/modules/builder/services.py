@@ -1,5 +1,6 @@
 """Builder project services. CRUD scoped to user via pack ownership."""
 
+import json
 import re
 from datetime import datetime, timezone
 from uuid import UUID
@@ -7,11 +8,15 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.logging import log_service_action
+from app.core.storage import delete_file, download_file, storage_enabled, upload_file
 from app.modules.builder.models import BuilderProject
 
 # Subdomains that must not be used (reserved or ambiguous)
 _RESERVED_SUBDOMAINS = frozenset({"www", "api", "app", "admin", "mail", "ftp", "staging"})
 _SUBDOMAIN_MAX_LEN = 63
+_PUBLIC_HTML_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=600"
+_PUBLIC_META_CACHE_CONTROL = "public, max-age=60"
+_PRIVATE_SNAPSHOT_CACHE_CONTROL = "private, max-age=0, no-cache"
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +121,166 @@ def build_deploy_html(
     return header + escaped + _DEPLOY_FOOTER
 
 
+def published_html_key(project_id: UUID | str) -> str:
+    return f"builder/published/by-project/{project_id}/index.html"
+
+
+def published_metadata_key(project_id: UUID | str) -> str:
+    return f"builder/published/by-project/{project_id}/meta.json"
+
+
+def published_snapshot_key(project_id: UUID | str) -> str:
+    return f"builder/published/by-project/{project_id}/snapshot.json"
+
+
+def published_subdomain_html_key(subdomain: str) -> str:
+    return f"builder/published/by-subdomain/{subdomain}/index.html"
+
+
+def published_subdomain_metadata_key(subdomain: str) -> str:
+    return f"builder/published/by-subdomain/{subdomain}/meta.json"
+
+
+def _decode_json_bytes(raw: bytes | None) -> dict | None:
+    if not raw:
+        return None
+    try:
+        decoded = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return decoded if isinstance(decoded, dict) else None
+
+
+def load_published_html(*, project_id: UUID | str | None = None, subdomain: str | None = None) -> str | None:
+    if not storage_enabled():
+        return None
+    key: str | None = None
+    if project_id is not None:
+        key = published_html_key(project_id)
+    elif subdomain:
+        key = published_subdomain_html_key(subdomain)
+    if not key:
+        return None
+    raw = download_file(key)
+    if not raw:
+        return None
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def load_published_metadata(
+    *,
+    project_id: UUID | str | None = None,
+    subdomain: str | None = None,
+) -> dict | None:
+    if not storage_enabled():
+        return None
+    key: str | None = None
+    if project_id is not None:
+        key = published_metadata_key(project_id)
+    elif subdomain:
+        key = published_subdomain_metadata_key(subdomain)
+    if not key:
+        return None
+    return _decode_json_bytes(download_file(key))
+
+
+def load_published_snapshot(project: BuilderProject) -> dict | None:
+    if storage_enabled():
+        snapshot = _decode_json_bytes(download_file(published_snapshot_key(project.id)))
+        if snapshot is not None:
+            return snapshot
+    if isinstance(project.published_files, dict):
+        return dict(project.published_files)
+    return None
+
+
+def publish_project_artifacts(
+    project: BuilderProject,
+    *,
+    lead_url: str,
+    previous_subdomain_slug: str | None = None,
+) -> bool:
+    """Persist public HTML + metadata to object storage. Returns False when storage is unavailable."""
+    if not storage_enabled():
+        return False
+
+    files = dict(project.files or {})
+    html = build_deploy_html(files, project_id=str(project.id), lead_url=lead_url)
+    metadata = json.dumps(
+        {
+            "project_id": str(project.id),
+            "pack_id": str(project.pack_id),
+            "subdomain_slug": project.subdomain_slug,
+            "published_at": (
+                project.published_at.isoformat() if project.published_at else datetime.now(timezone.utc).isoformat()
+            ),
+        },
+        sort_keys=True,
+    ).encode("utf-8")
+    snapshot = json.dumps(files, sort_keys=True).encode("utf-8")
+
+    upload_file(
+        published_html_key(project.id),
+        html.encode("utf-8"),
+        content_type="text/html; charset=utf-8",
+        cache_control=_PUBLIC_HTML_CACHE_CONTROL,
+    )
+    upload_file(
+        published_metadata_key(project.id),
+        metadata,
+        content_type="application/json",
+        cache_control=_PUBLIC_META_CACHE_CONTROL,
+    )
+    upload_file(
+        published_snapshot_key(project.id),
+        snapshot,
+        content_type="application/json",
+        cache_control=_PRIVATE_SNAPSHOT_CACHE_CONTROL,
+    )
+
+    current_subdomain = (project.subdomain_slug or "").strip().lower() or None
+    previous_subdomain = (previous_subdomain_slug or "").strip().lower() or None
+    if previous_subdomain and previous_subdomain != current_subdomain:
+        delete_file(published_subdomain_html_key(previous_subdomain))
+        delete_file(published_subdomain_metadata_key(previous_subdomain))
+    if current_subdomain:
+        upload_file(
+            published_subdomain_html_key(current_subdomain),
+            html.encode("utf-8"),
+            content_type="text/html; charset=utf-8",
+            cache_control=_PUBLIC_HTML_CACHE_CONTROL,
+        )
+        upload_file(
+            published_subdomain_metadata_key(current_subdomain),
+            metadata,
+            content_type="application/json",
+            cache_control=_PUBLIC_META_CACHE_CONTROL,
+        )
+    return True
+
+
+def remove_published_artifacts(
+    project_id: UUID | str,
+    *,
+    subdomain_slug: str | None = None,
+) -> bool:
+    """Delete storage-backed public artifacts. Returns False when storage is unavailable."""
+    if not storage_enabled():
+        return False
+
+    delete_file(published_html_key(project_id))
+    delete_file(published_metadata_key(project_id))
+    delete_file(published_snapshot_key(project_id))
+    subdomain = (subdomain_slug or "").strip().lower()
+    if subdomain:
+        delete_file(published_subdomain_html_key(subdomain))
+        delete_file(published_subdomain_metadata_key(subdomain))
+    return True
+
+
 @log_service_action()
 def get_for_pack(db: Session, pack_id: UUID, user_id: UUID) -> BuilderProject | None:
     return (
@@ -209,24 +374,38 @@ def delete(db: Session, project: BuilderProject) -> None:
 
 
 @log_service_action()
-def publish(db: Session, project: BuilderProject, live_url: str) -> BuilderProject:
+def publish(
+    db: Session,
+    project: BuilderProject,
+    live_url: str,
+    *,
+    persist_published_files: bool = True,
+    commit: bool = True,
+) -> BuilderProject:
     project.live_url = live_url
     project.published_at = datetime.now(timezone.utc)
-    project.published_files = dict(project.files) if project.files else {}
-    db.commit()
-    db.refresh(project)
+    project.published_files = dict(project.files) if persist_published_files and project.files else None
+    if commit:
+        db.commit()
+        db.refresh(project)
     return project
 
 
 @log_service_action()
-def unpublish(db: Session, project: BuilderProject) -> BuilderProject:
+def unpublish(
+    db: Session,
+    project: BuilderProject,
+    *,
+    commit: bool = True,
+) -> BuilderProject:
     """Clear live_url, published_at, subdomain_slug, and published_files."""
     project.live_url = None
     project.published_at = None
     project.published_files = None
     project.subdomain_slug = None
-    db.commit()
-    db.refresh(project)
+    if commit:
+        db.commit()
+        db.refresh(project)
     return project
 
 

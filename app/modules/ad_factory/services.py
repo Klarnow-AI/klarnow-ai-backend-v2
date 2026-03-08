@@ -202,7 +202,6 @@ def generate_variants(db: Session, pack_id: UUID, user_id: UUID) -> dict:
     )
     db.add(render)
     db.commit()
-    db.refresh(render)
 
     return {
         "render_id": str(render.id),
@@ -213,8 +212,12 @@ def generate_variants(db: Session, pack_id: UUID, user_id: UUID) -> dict:
 
 
 def get_render(db: Session, render_id: UUID, user_id: UUID) -> AdFactoryRender | None:
-    render = db.query(AdFactoryRender).filter(AdFactoryRender.id == render_id).first()
-    if not render:
-        return None
-    pack = get_pack_for_user(db, render.pack_id, user_id)
-    return render if pack else None
+    return (
+        db.query(AdFactoryRender)
+        .join(Pack, Pack.id == AdFactoryRender.pack_id)
+        .filter(
+            AdFactoryRender.id == render_id,
+            Pack.created_by_user_id == user_id,
+        )
+        .first()
+    )

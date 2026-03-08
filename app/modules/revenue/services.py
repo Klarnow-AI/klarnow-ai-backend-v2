@@ -10,11 +10,6 @@ from app.modules.packs.models import Pack
 from app.modules.revenue.models import Invoice, Proposal
 
 
-def _get_pack_for_user(db: Session, pack_id: UUID, user_id: UUID) -> Pack | None:
-    from app.modules.packs.services import get_pack_for_user
-    return get_pack_for_user(db, pack_id, user_id)
-
-
 @log_service_action()
 def list_proposals_for_pack(db: Session, pack_id: UUID) -> list[Proposal]:
     return db.query(Proposal).filter(Proposal.pack_id == pack_id).order_by(Proposal.created_at.desc()).all()
@@ -27,20 +22,28 @@ def list_invoices_for_pack(db: Session, pack_id: UUID) -> list[Invoice]:
 
 @log_service_action()
 def get_proposal(db: Session, proposal_id: UUID, user_id: UUID) -> Proposal | None:
-    p = db.query(Proposal).filter(Proposal.id == proposal_id).first()
-    if not p:
-        return None
-    pack = _get_pack_for_user(db, p.pack_id, user_id)
-    return p if pack else None
+    return (
+        db.query(Proposal)
+        .join(Pack, Pack.id == Proposal.pack_id)
+        .filter(
+            Proposal.id == proposal_id,
+            Pack.created_by_user_id == user_id,
+        )
+        .first()
+    )
 
 
 @log_service_action()
 def get_invoice(db: Session, invoice_id: UUID, user_id: UUID) -> Invoice | None:
-    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-    if not inv:
-        return None
-    pack = _get_pack_for_user(db, inv.pack_id, user_id)
-    return inv if pack else None
+    return (
+        db.query(Invoice)
+        .join(Pack, Pack.id == Invoice.pack_id)
+        .filter(
+            Invoice.id == invoice_id,
+            Pack.created_by_user_id == user_id,
+        )
+        .first()
+    )
 
 
 @log_service_action()
@@ -64,7 +67,6 @@ def create_proposal(
     )
     db.add(proposal)
     db.commit()
-    db.refresh(proposal)
     return proposal
 
 
@@ -89,7 +91,6 @@ def create_invoice(
     )
     db.add(invoice)
     db.commit()
-    db.refresh(invoice)
     return invoice
 
 
@@ -114,7 +115,6 @@ def update_proposal(
     if content is not None:
         proposal.content = content
     db.commit()
-    db.refresh(proposal)
     return proposal
 
 
@@ -145,5 +145,4 @@ def update_invoice(
     if stripe_hosted_url is not None:
         invoice.stripe_hosted_url = stripe_hosted_url
     db.commit()
-    db.refresh(invoice)
     return invoice

@@ -8,7 +8,7 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.core.auth.deps import get_current_user
+from app.core.auth.deps import get_current_user, get_current_user_record
 from app.core.auth.google import verify_google_identity_token
 from app.core.auth.jwt import create_access_token
 from app.core.auth.password import hash_password, verify_password
@@ -306,7 +306,7 @@ def reset_password(
 def change_password(
     body: ChangePasswordBody,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_record),
 ):
     """Change password for the authenticated user."""
     if not verify_password(body.current_password, current_user.hashed_password):
@@ -320,7 +320,7 @@ def change_password(
 @router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
 def delete_account(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_record),
 ):
     """
     Permanently delete the authenticated user's account and all related data.

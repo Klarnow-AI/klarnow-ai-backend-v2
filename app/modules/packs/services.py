@@ -38,6 +38,8 @@ def create_pack(
     user_id: UUID,
     name: str = "New Pack",
     pack_type: str = PACK_TYPE_ENQUIRIES,
+    *,
+    commit: bool = True,
 ) -> Pack:
     pack = Pack(
         name=name,
@@ -46,11 +48,12 @@ def create_pack(
         created_by_user_id=user_id,
     )
     db.add(pack)
-    db.commit()
-    db.refresh(pack)
+    db.flush()
     # Start sprint on pack creation day so "Day 0" = when the pack was created
     from app.modules.sprint.services import create_sprint_for_pack
-    create_sprint_for_pack(db, pack.id, started_at=pack.created_at)
+    create_sprint_for_pack(db, pack.id, started_at=pack.created_at, commit=False)
+    if commit:
+        db.commit()
     return pack
 
 
@@ -58,7 +61,6 @@ def create_pack(
 def archive_pack(db: Session, pack: Pack) -> Pack:
     pack.status = "archived"
     db.commit()
-    db.refresh(pack)
     return pack
 
 
@@ -67,7 +69,6 @@ def restore_pack(db: Session, pack: Pack) -> Pack:
     """Restore an archived pack back to draft status."""
     pack.status = "draft"
     db.commit()
-    db.refresh(pack)
     return pack
 
 
@@ -83,29 +84,24 @@ def submit_onboarding(db: Session, pack: Pack, answers: dict) -> Pack:
     pack.onboarding_answers = answers
     pack.status = "onboarding"
     db.commit()
-    db.refresh(pack)
     return pack
 
 
 SUGGESTED_LOGOS_MAX = 20
 
 
-@log_service_action()
-def merge_onboarding_answers(db: Session, pack: Pack, partial: dict) -> Pack:
-    """Merge partial keys into pack.onboarding_answers and save. Preserves existing keys."""
+def _merge_onboarding_answers(pack: Pack, partial: dict) -> Pack:
     current = dict(pack.onboarding_answers or {})
     for k, v in partial.items():
         if v is not None:
             current[k] = v
     pack.onboarding_answers = current
-    db.commit()
-    db.refresh(pack)
     return pack
 
 
-def append_suggested_logo(db: Session, pack: Pack, logo_url_or_svg: str) -> Pack:
-    """Append a logo URL (or SVG/data URL) to suggested_logos in onboarding_answers, cap at SUGGESTED_LOGOS_MAX."""
+def _append_suggested_logo(pack: Pack, logo_url_or_svg: str) -> Pack:
     import json
+
     current = dict(pack.onboarding_answers or {})
     raw = current.get("suggested_logos")
     if isinstance(raw, str):
@@ -122,17 +118,50 @@ def append_suggested_logo(db: Session, pack: Pack, logo_url_or_svg: str) -> Pack
     suggested.append(logo_url_or_svg)
     current["suggested_logos"] = json.dumps(suggested[-SUGGESTED_LOGOS_MAX:])
     pack.onboarding_answers = current
-    db.commit()
-    db.refresh(pack)
     return pack
 
 
 @log_service_action()
-def complete_onboarding(db: Session, pack: Pack, answers: dict | None = None) -> Pack:
+def merge_onboarding_answers(
+    db: Session,
+    pack: Pack,
+    partial: dict,
+    *,
+    commit: bool = True,
+) -> Pack:
+    """Merge partial keys into pack.onboarding_answers and save. Preserves existing keys."""
+    _merge_onboarding_answers(pack, partial)
+    if commit:
+        db.commit()
+    return pack
+
+
+def append_suggested_logo(
+    db: Session,
+    pack: Pack,
+    logo_url_or_svg: str,
+    *,
+    commit: bool = True,
+) -> Pack:
+    """Append a logo URL (or SVG/data URL) to suggested_logos in onboarding_answers, cap at SUGGESTED_LOGOS_MAX."""
+    _append_suggested_logo(pack, logo_url_or_svg)
+    if commit:
+        db.commit()
+    return pack
+
+
+@log_service_action()
+def complete_onboarding(
+    db: Session,
+    pack: Pack,
+    answers: dict | None = None,
+    *,
+    commit: bool = True,
+) -> Pack:
     pack.onboarding_completed_at = utc_now()
     pack.status = "draft"
     if answers and answers.get("pack_type") in ("enquiries", "quotes", "sales"):
         pack.pack_type = answers["pack_type"]
-    db.commit()
-    db.refresh(pack)
+    if commit:
+        db.commit()
     return pack

@@ -32,9 +32,17 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = ""
-    db_pool_size: int = 10
-    db_max_overflow: int = 20
+    # Keep conservative defaults for hosted Postgres providers like Supabase.
+    db_pool_size: int = 5
+    db_max_overflow: int = 0
     db_pool_timeout_seconds: int = 30
+    # Leave unset to auto-enable in staging/production and disable in development.
+    db_pool_pre_ping: bool | None = None
+    # Recycle long-lived connections periodically to avoid stale remote sockets.
+    db_pool_recycle_seconds: int = 1800
+    # Reuse the hottest pooled connection first to reduce reconnect churn.
+    db_pool_use_lifo: bool = True
+    db_connect_timeout_seconds: int = 5
 
     # Optional: onboarding∑
     onboarding_session_expiry_days: int = 1
@@ -54,6 +62,15 @@ class Settings(BaseSettings):
 
     # Optional: OpenAI
     openai_api_key: str = ""
+    anthropic_api_key: str = ""
+    poster_max_output_tokens: int = 16384
+    # Cost guards: keep non-essential AI features opt-in.
+    ai_chat_prompt_suggestions_enabled: bool = False
+    ai_sprint_today_tasks_enabled: bool = False
+    ai_sprint_field_suggestions_enabled: bool = False
+    ai_brand_identity_suggestions_enabled: bool = False
+    ai_logo_generation_enabled: bool = False
+    ai_brand_os_reasoning_enabled: bool = False
 
     # Optional: Redis-backed onboarding queue
     redis_url: str = ""
@@ -154,6 +171,9 @@ class Settings(BaseSettings):
     def validate_required_settings(self):
         if not self.database_url:
             raise ValueError("DATABASE_URL is required")
+
+        if self.db_pool_pre_ping is None:
+            self.db_pool_pre_ping = self.app_env in {"production", "staging"}
 
         if self.app_env in {"production", "staging"}:
             missing: list[str] = []

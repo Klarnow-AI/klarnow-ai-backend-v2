@@ -5,6 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import JSONResponse
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.auth.deps import get_current_user
@@ -139,10 +140,9 @@ def get_pack_summary(
     from app.modules.campaign.services import get_active_for_pack as get_campaign
     from app.modules.builder.services import get_published_for_pack as get_published_site
     from app.modules.sprint.services import get_active_sprint_for_pack
-    from app.modules.clients.services import list_leads_for_pack, count_qualified_leads_for_pack
-    from app.modules.revenue.services import list_proposals_for_pack, list_invoices_for_pack
-    from app.modules.proof_vault.services import count_for_pack as count_proofs
-    from sqlalchemy import func
+    from app.modules.clients.models import LEAD_STATUS_QUALIFIED, Lead
+    from app.modules.revenue.models import Invoice, Proposal
+    from app.modules.proof_vault.models import Proof
     from app.modules.creative.models import Asset
 
     brand_os = get_brand_os(db, pack_id)
@@ -152,12 +152,65 @@ def get_pack_summary(
     campaign = get_campaign(db, pack_id)
     published_site = get_published_site(db, pack_id)
     active_sprint = get_active_sprint_for_pack(db, pack_id)
-    leads_list = list_leads_for_pack(db, pack_id)
-    qualified_count = count_qualified_leads_for_pack(db, pack_id)
-    proposals = list_proposals_for_pack(db, pack_id)
-    invoices = list_invoices_for_pack(db, pack_id)
-    proofs_count = count_proofs(db, pack_id)
-    assets_count = db.query(func.count(Asset.id)).filter(Asset.pack_id == pack_id).scalar() or 0
+    counts = (
+        db.execute(
+            select(
+                select(func.count(Lead.id))
+                .where(Lead.pack_id == pack_id)
+                .scalar_subquery()
+                .label("leads_total"),
+                select(func.count(Lead.id))
+                .where(
+                    Lead.pack_id == pack_id,
+                    Lead.status == LEAD_STATUS_QUALIFIED,
+                )
+                .scalar_subquery()
+                .label("leads_qualified"),
+                select(func.count(Proposal.id))
+                .where(Proposal.pack_id == pack_id)
+                .scalar_subquery()
+                .label("proposals_total"),
+                select(func.count(Proposal.id))
+                .where(Proposal.pack_id == pack_id, Proposal.status == "sent")
+                .scalar_subquery()
+                .label("proposals_sent"),
+                select(func.count(Proposal.id))
+                .where(Proposal.pack_id == pack_id, Proposal.status == "accepted")
+                .scalar_subquery()
+                .label("proposals_accepted"),
+                select(func.count(Proposal.id))
+                .where(Proposal.pack_id == pack_id, Proposal.status == "declined")
+                .scalar_subquery()
+                .label("proposals_declined"),
+                select(func.count(Invoice.id))
+                .where(Invoice.pack_id == pack_id)
+                .scalar_subquery()
+                .label("invoices_total"),
+                select(func.count(Invoice.id))
+                .where(Invoice.pack_id == pack_id, Invoice.status == "sent")
+                .scalar_subquery()
+                .label("invoices_sent"),
+                select(func.count(Invoice.id))
+                .where(Invoice.pack_id == pack_id, Invoice.status == "paid")
+                .scalar_subquery()
+                .label("invoices_paid"),
+                select(func.count(Invoice.id))
+                .where(Invoice.pack_id == pack_id, Invoice.status == "overdue")
+                .scalar_subquery()
+                .label("invoices_overdue"),
+                select(func.count(Proof.id))
+                .where(Proof.pack_id == pack_id)
+                .scalar_subquery()
+                .label("proofs_count"),
+                select(func.count(Asset.id))
+                .where(Asset.pack_id == pack_id)
+                .scalar_subquery()
+                .label("assets_count"),
+            )
+        )
+        .one()
+        ._mapping
+    )
 
     goal_summary = None
     if campaign and campaign.goal:
@@ -188,21 +241,24 @@ def get_pack_summary(
             sprint_day=sprint_day,
             has_sprint=has_sprint,
         ) if has_sprint else None,
-        leads=LeadsSummary(total=len(leads_list), qualified=qualified_count),
+        leads=LeadsSummary(
+            total=int(counts["leads_total"] or 0),
+            qualified=int(counts["leads_qualified"] or 0),
+        ),
         proposals=ProposalsSummary(
-            total=len(proposals),
-            sent=sum(1 for p in proposals if p.status == "sent"),
-            accepted=sum(1 for p in proposals if p.status == "accepted"),
-            declined=sum(1 for p in proposals if p.status == "declined"),
+            total=int(counts["proposals_total"] or 0),
+            sent=int(counts["proposals_sent"] or 0),
+            accepted=int(counts["proposals_accepted"] or 0),
+            declined=int(counts["proposals_declined"] or 0),
         ),
         invoices=InvoicesSummary(
-            total=len(invoices),
-            sent=sum(1 for i in invoices if i.status == "sent"),
-            paid=sum(1 for i in invoices if i.status == "paid"),
-            overdue=sum(1 for i in invoices if i.status == "overdue"),
+            total=int(counts["invoices_total"] or 0),
+            sent=int(counts["invoices_sent"] or 0),
+            paid=int(counts["invoices_paid"] or 0),
+            overdue=int(counts["invoices_overdue"] or 0),
         ),
-        proofs_count=proofs_count,
-        assets_count=assets_count,
+        proofs_count=int(counts["proofs_count"] or 0),
+        assets_count=int(counts["assets_count"] or 0),
     )
 
 
@@ -357,7 +413,12 @@ def patch_pack(
                     db.flush()
                     pack.active_campaign_id = campaign.id
     if "onboarding_answers" in data and data["onboarding_answers"]:
-        pack = merge_onboarding_answers(db, pack, data["onboarding_answers"])
+        pack = merge_onboarding_answers(
+            db,
+            pack,
+            data["onboarding_answers"],
+            commit=False,
+        )
     
     # Day 0 completion check
     was_day_0_incomplete = pack.day_0_completed_at is None
@@ -369,7 +430,6 @@ def patch_pack(
             pack.day_0_completed_at = datetime.now(timezone.utc)
     
     db.commit()
-    db.refresh(pack)
     return PackRead.model_validate(pack)
 
 
@@ -482,7 +542,7 @@ def complete_onboarding_route(
             pack=PackRead.model_validate(pack),
             is_existing_brand=answers.get("has_existing_brand") == "yes",
         )
-    pack = complete_onboarding(db, pack, answers=answers)
+    pack = complete_onboarding(db, pack, answers=answers, commit=False)
     job = enqueue_onboarding_job(db, pack_id)
     db.commit()
     try:
@@ -566,7 +626,7 @@ def generate_starter_brand_route(
         pack_id=str(pack_id),
     )
     wordmark = result["wordmark_svg_or_url"]
-    pack = append_suggested_logo(db, pack, wordmark)
+    pack = append_suggested_logo(db, pack, wordmark, commit=False)
     pack = merge_onboarding_answers(
         db,
         pack,
@@ -574,7 +634,9 @@ def generate_starter_brand_route(
             "wordmark_svg_or_url": wordmark,
             "palette": result["palette"],
         },
+        commit=False,
     )
+    db.commit()
     return GenerateStarterBrandResponse(
         wordmark_svg_or_url=wordmark,
         palette=result["palette"],
@@ -613,10 +675,14 @@ async def upload_logo_route(
     logo_url = get_presigned_url(key, expires_in=86400 * 7)
     if not logo_url:
         logo_url = f"key:{key}"
-    current = dict(pack.onboarding_answers or {})
-    current["wordmark_svg_or_url"] = logo_url
-    pack = merge_onboarding_answers(db, pack, current)
-    pack = append_suggested_logo(db, pack, logo_url)
+    pack = merge_onboarding_answers(
+        db,
+        pack,
+        {"wordmark_svg_or_url": logo_url},
+        commit=False,
+    )
+    pack = append_suggested_logo(db, pack, logo_url, commit=False)
+    db.commit()
     return UploadLogoResponse(logo_url=logo_url)
 
 
@@ -640,7 +706,8 @@ def generate_logo_route(
         color_palette=body.color_palette,
     )
     logo_url = result.get("logo_url") or result.get("wordmark_svg_or_url") or ""
-    pack = append_suggested_logo(db, pack, logo_url)
+    pack = append_suggested_logo(db, pack, logo_url, commit=False)
+    db.commit()
     return GenerateLogoResponse(
         logo_url=logo_url,
         wordmark_svg_or_url=result.get("wordmark_svg_or_url"),

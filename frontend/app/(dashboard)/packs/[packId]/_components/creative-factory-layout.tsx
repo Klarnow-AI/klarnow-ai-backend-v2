@@ -10,7 +10,7 @@ import type {
   CreativeGenerationDisplay,
   PromptWithResults,
 } from "./creative-template-grid";
-import type { BrandContext } from "@/app/api/generate/route";
+import type { BrandContext } from "@/types/generation";
 import type { PosterConversationMessage } from "@/lib/poster-output";
 
 export type CreativeFactoryLayoutProps = {
@@ -86,7 +86,7 @@ export function CreativeFactoryLayout({
             <>
               <div className="flex-1 min-w-0 min-h-[4.5rem] flex items-center">
                 <CreativeInputBar
-                  apiRoute="/api/generate-poster"
+                  apiRoute="/api/v1/creative/generate"
                   packId={packId}
                   brandContext={brandContext}
                   placeholder={bottomPlaceholder}
@@ -98,7 +98,7 @@ export function CreativeFactoryLayout({
             </>
           ) : (
             <CreativeInputBar
-              apiRoute="/api/generate-poster"
+              apiRoute="/api/v1/creative/generate"
               packId={packId}
               brandContext={brandContext}
               placeholder={bottomPlaceholder}

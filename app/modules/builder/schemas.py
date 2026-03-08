@@ -3,7 +3,9 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.shared.generation_schemas import GenerationMessage
 
 
 class BuilderProjectCreate(BaseModel):
@@ -39,3 +41,11 @@ class BuilderProjectRead(BaseModel):
 class BuilderProjectList(BaseModel):
     items: list[BuilderProjectRead]
     total: int
+
+
+class BuilderGenerateRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    messages: list[GenerationMessage]
+    files: dict[str, str]
+    selected_style: str | None = Field(default=None, alias="selectedStyle")

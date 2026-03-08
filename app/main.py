@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
+from app.core.db.observability import get_db_query_count, get_db_query_duration_ms, reset_db_query_stats
 from app.core.errors import AppError, app_error_handler
 from app.core.metrics import record_request, snapshot
 from app.core.request_context import set_correlation_id
@@ -88,6 +89,7 @@ async def request_observability_middleware(request: Request, call_next):
     request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
     request.state.request_id = request_id
     set_correlation_id(request_id)
+    reset_db_query_stats()
     start = time.perf_counter()
     response: Response | None = None
     try:
@@ -95,10 +97,20 @@ async def request_observability_middleware(request: Request, call_next):
         return response
     finally:
         duration_ms = (time.perf_counter() - start) * 1000
+        db_queries = get_db_query_count()
+        db_query_time_ms = get_db_query_duration_ms()
         status_code = response.status_code if response else 500
-        record_request(request.url.path, status_code, duration_ms)
+        record_request(
+            request.url.path,
+            status_code,
+            duration_ms,
+            db_queries=db_queries,
+            db_query_time_ms=db_query_time_ms,
+        )
         if response is not None:
             response.headers["X-Request-ID"] = request_id
+            response.headers["X-DB-Queries"] = str(db_queries)
+            response.headers["X-DB-Query-Time-MS"] = f"{db_query_time_ms:.2f}"
         set_correlation_id("-")
 
 
@@ -116,6 +128,9 @@ def metrics():
         "total_requests": snap.total_requests,
         "error_requests": snap.error_requests,
         "avg_duration_ms": snap.avg_duration_ms,
+        "total_db_queries": snap.total_db_queries,
+        "avg_db_queries_per_request": snap.avg_db_queries_per_request,
+        "avg_db_query_time_ms": snap.avg_db_query_time_ms,
         "routes": snap.routes,
     }
 
