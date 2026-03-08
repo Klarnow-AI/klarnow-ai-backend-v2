@@ -8,7 +8,7 @@ ALEMBIC := $(VENV)/bin/alembic
 # Migration message (can be overridden: make migrate MESSAGE="your message")
 message ?= "auto migration"
 
-.PHONY: init create install update sync run activate clean import start build-frontend build serve
+.PHONY: init create install update sync run activate clean import start worker build-frontend build serve
 
 init:
 	$(UV) init
@@ -51,6 +51,9 @@ run: create
 
 start:
 	set -a && [ -f .env ] && . .env; set +a && $(UVICORN) app.main:app --reload
+
+worker:
+	set -a && [ -f .env ] && . .env; set +a && $(PYTHON) -m app.workers.onboarding_worker
 
 build-frontend:
 	cd frontend && npm install && npm run build

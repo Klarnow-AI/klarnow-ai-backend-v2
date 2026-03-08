@@ -62,9 +62,9 @@ from app.modules.packs.onboarding_services import extract_brand, generate_starte
 from app.modules.packs.logo_generation import generate_logo
 from app.modules.packs.brand_identity_suggestions import suggest_typography, suggest_palette
 from app.modules.packs.onboarding_jobs import (
+    dispatch_onboarding_job_from_api,
     enqueue_onboarding_job,
     get_onboarding_job_status,
-    start_onboarding_job_worker,
 )
 
 router = APIRouter()
@@ -432,7 +432,9 @@ def submit_onboarding_route(
 
 def _run_onboarding_background(pack_id: UUID) -> None:
     """Compatibility wrapper for callers still referencing old function name."""
-    start_onboarding_job_worker(pack_id)
+    raise RuntimeError(
+        "In-process onboarding workers were removed. Enqueue via dispatch_onboarding_job_from_api()."
+    )
 
 
 @router.post(
@@ -459,7 +461,14 @@ def complete_onboarding_route(
         )
     job_status = get_onboarding_job_status(pack)
     if job_status["status"] in {"queued", "running"}:
-        start_onboarding_job_worker(pack_id)
+        if job_status["status"] == "queued" and job_status.get("job_id"):
+            try:
+                dispatch_onboarding_job_from_api(pack_id, str(job_status["job_id"]))
+            except Exception as exc:
+                raise AppError(
+                    f"Onboarding worker queue is unavailable: {exc}",
+                    status_code=503,
+                ) from exc
         return JSONResponse(
             status_code=status.HTTP_202_ACCEPTED,
             content={
@@ -476,7 +485,13 @@ def complete_onboarding_route(
     pack = complete_onboarding(db, pack, answers=answers)
     job = enqueue_onboarding_job(db, pack_id)
     db.commit()
-    start_onboarding_job_worker(pack_id)
+    try:
+        dispatch_onboarding_job_from_api(pack_id, str(job.get("job_id")))
+    except Exception as exc:
+        raise AppError(
+            f"Onboarding worker queue is unavailable: {exc}",
+            status_code=503,
+        ) from exc
     return JSONResponse(
         status_code=status.HTTP_202_ACCEPTED,
         content={"status": "processing", "pack_id": str(pack_id), "job_id": job.get("job_id")},

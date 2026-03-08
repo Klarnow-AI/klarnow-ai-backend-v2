@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.modules.brand_os.domain_schema import BrandOS as BrandOSDomain
 from app.modules.brand_os.models import BrandOS
-from app.modules.brand_os.services import get_active_for_pack, list_versions_for_pack
+from app.modules.brand_os.services import get_active_for_pack, get_by_source_job_id, list_versions_for_pack
 from app.modules.packs.models import Pack
 
 
@@ -19,6 +19,10 @@ GENERATE_BRAND_OS_SCHEMA = {
         "onboarding_answers": {
             "type": "object",
             "description": "Optional override; otherwise uses pack.onboarding_answers",
+        },
+        "source_job_id": {
+            "type": "string",
+            "description": "Optional idempotency key for background onboarding jobs.",
         },
     },
     "required": ["pack_id"],
@@ -187,12 +191,21 @@ def generate_brand_os(
     db: Session,
     pack_id: UUID | str,
     onboarding_answers: dict | None = None,
+    source_job_id: str | None = None,
 ) -> dict:
     """Create a new Brand OS version (A or B) for the pack. Strategy Agent only."""
     pack_id = UUID(str(pack_id)) if isinstance(pack_id, str) else pack_id
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
         raise ValueError("Pack not found")
+
+    if source_job_id:
+        existing_for_job = get_by_source_job_id(db, pack_id, source_job_id)
+        if existing_for_job:
+            return {
+                "version": existing_for_job.version,
+                "brand_os_id": str(existing_for_job.id),
+            }
 
     # Do not generate Brand OS for new brands until Day 0 (onboarding) is complete.
     answers = onboarding_answers if onboarding_answers is not None else (pack.onboarding_answers or {})
@@ -236,6 +249,7 @@ def generate_brand_os(
     brand_os = BrandOS(
         pack_id=pack_id,
         version=version,
+        source_job_id=source_job_id,
         foundation=content.foundation.model_dump(),
         brand_strategy=content.brand_strategy.model_dump(),
         is_active=True,

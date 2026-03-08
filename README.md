@@ -13,6 +13,7 @@ Enable small businesses to launch and execute professional marketing campaigns w
 - Python 3.10+
 - [uv](https://github.com/astral-sh/uv) (recommended) or pip
 - PostgreSQL
+- Redis
 
 ### Setup
 
@@ -36,6 +37,11 @@ Enable small businesses to launch and execute professional marketing campaigns w
    make start
    # or: source .env && uvicorn app.main:app --reload
    ```
+6. Start the onboarding worker in a separate terminal:
+   ```bash
+   make worker
+   # or: source .env && python -m app.workers.onboarding_worker
+   ```
 
 API: `http://localhost:8000`. Docs: `http://localhost:8000/docs`. Health: `http://localhost:8000/health`.
 
@@ -45,12 +51,13 @@ API: `http://localhost:8000`. Docs: `http://localhost:8000/docs`. Health: `http:
 | --------------- | -------------------------------- |
 | `make install`  | Create venv and sync deps        |
 | `make start`    | Run API with reload (loads .env) |
+| `make worker`   | Run Redis onboarding worker      |
 | `make serve`    | Run API production-style         |
 | `make activate` | Print command to activate venv   |
 
 ## Environment variables
 
-See [.env.example](.env.example). Required: `DATABASE_URL`, `SECRET_KEY`. Optional: Resend, S3, OpenAI, and Google sign-in.
+See [.env.example](.env.example). Required: `DATABASE_URL`, `SECRET_KEY`, and `REDIS_URL` for background onboarding. Optional: Resend, S3, OpenAI, and Google sign-in.
 `CORS_ALLOW_ORIGINS` accepts a JSON list (recommended), comma-separated values, and bracketed forms that are normalized.
 
 ### Staging/production API + CORS checklist

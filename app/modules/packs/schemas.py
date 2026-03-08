@@ -213,6 +213,13 @@ class OnboardingCompleteAccepted(BaseModel):
     job_id: str | None = None
 
 
+class OnboardingStageStatus(BaseModel):
+    status: str
+    started_at: str | None = None
+    completed_at: str | None = None
+    last_error: str | None = None
+
+
 class OnboardingJobStatusResponse(BaseModel):
     """Current state of the durable onboarding background job."""
 
@@ -224,6 +231,8 @@ class OnboardingJobStatusResponse(BaseModel):
     started_at: str | None = None
     completed_at: str | None = None
     last_error: str | None = None
+    current_stage: str | None = None
+    stages: dict[str, OnboardingStageStatus] | None = None
 
 
 # --- Pack summary (overview from Brand OS → Proof Vault) ---

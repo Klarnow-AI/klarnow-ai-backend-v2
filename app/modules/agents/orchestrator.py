@@ -113,11 +113,25 @@ def run_tool_chain(
     return results
 
 
-def handle_onboarding_complete(pack_id: UUID, db: Session) -> list[dict]:
+def handle_onboarding_complete(
+    pack_id: UUID,
+    db: Session,
+    *,
+    source_job_id: str | None = None,
+) -> list[dict]:
     """After onboarding complete: generate Brand OS."""
+    tool_inputs_override = None
+    if source_job_id:
+        tool_inputs_override = {
+            "generate_brand_os": {
+                "pack_id": str(pack_id),
+                "source_job_id": source_job_id,
+            }
+        }
     return run_tool_chain(
         pack_id,
         ["generate_brand_os"],
         db,
         agent="orchestrator",
+        tool_inputs_override=tool_inputs_override,
     )

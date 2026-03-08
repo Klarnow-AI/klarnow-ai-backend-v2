@@ -1,6 +1,7 @@
 openai
 pgvector
 requests
+redis>=6.4.0
 pydantic-settings
 fastapi[standard]
 uvicorn[standard]

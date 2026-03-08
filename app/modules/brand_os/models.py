@@ -24,6 +24,7 @@ class BrandOS(Base):
         UUID(as_uuid=True), ForeignKey("pack.id", ondelete="CASCADE"), nullable=False
     )
     version: Mapped[str] = mapped_column(String(16), nullable=False)  # e.g. "A", "B"
+    source_job_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     foundation: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     brand_strategy: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     is_active: Mapped[bool] = mapped_column(default=False, nullable=False)

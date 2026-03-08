@@ -78,6 +78,15 @@ def get_by_version_and_pack(db: Session, pack_id: UUID, version: str) -> BrandOS
 
 
 @log_service_action()
+def get_by_source_job_id(db: Session, pack_id: UUID, source_job_id: str) -> BrandOS | None:
+    return (
+        db.query(BrandOS)
+        .filter(BrandOS.pack_id == pack_id, BrandOS.source_job_id == source_job_id)
+        .first()
+    )
+
+
+@log_service_action()
 def update_active_brand_os(
     db: Session,
     pack_id: UUID,

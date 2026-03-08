@@ -55,6 +55,19 @@ class Settings(BaseSettings):
     # Optional: OpenAI
     openai_api_key: str = ""
 
+    # Optional: Redis-backed onboarding queue
+    redis_url: str = ""
+    onboarding_queue_stream_key: str = "klarnow:onboarding:stream"
+    onboarding_queue_consumer_group: str = "onboarding-workers"
+    onboarding_queue_delayed_key: str = "klarnow:onboarding:delayed"
+    onboarding_queue_block_ms: int = 5000
+    onboarding_queue_claim_idle_ms: int = 60000
+    onboarding_queue_batch_size: int = 1
+    onboarding_queue_stream_maxlen: int = 1000
+    onboarding_queue_dispatch_ttl_seconds: int = 86400
+    onboarding_queue_retry_base_delay_seconds: int = 5
+    onboarding_queue_retry_max_delay_seconds: int = 300
+
     # Optional: Chat attachments
     chat_attachment_max_size_mb: int = 20
     chat_attachment_max_text_chars: int = 20000
