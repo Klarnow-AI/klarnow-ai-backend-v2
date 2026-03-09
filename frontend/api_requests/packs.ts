@@ -21,12 +21,68 @@ const PACKS_PREFIX = "/api/v1/packs";
 const ONBOARDING_POLL_TIMEOUT_MS = 120000; // 2 min
 const ONBOARDING_POLL_INTERVALS_MS = [2000, 3000, 5000, 8000];
 
+function getOnboardingStageLabel(stage: string | null | undefined): string | null {
+  switch (stage) {
+    case "starter_brand":
+      return "Creating your starter brand";
+    case "brand_os":
+      return "Generating your Brand OS";
+    case "logo":
+      return "Generating your logo";
+    default:
+      return null;
+  }
+}
+
+function inferOnboardingStage(status: OnboardingJobStatus): string | null {
+  if (status.current_stage) return status.current_stage;
+  if (!status.stages) return null;
+
+  const orderedStages = ["starter_brand", "brand_os", "logo"] as const;
+  for (const stageName of orderedStages) {
+    const stage = status.stages[stageName];
+    if (!stage) continue;
+    if (stage.status === "running") return stageName;
+    if (stage.status === "pending") return stageName;
+  }
+  return null;
+}
+
+export function formatOnboardingProgress(status: OnboardingJobStatus): string {
+  const retryPrefix =
+    status.attempt > 1 ? `Retry ${status.attempt - 1} of ${status.max_attempts - 1}. ` : "";
+
+  if (status.status === "queued") {
+    return retryPrefix
+      ? `${retryPrefix}Queued. Preparing your brand setup...`
+      : "Queued. Preparing your brand setup...";
+  }
+
+  if (status.status === "running") {
+    const stageLabel = getOnboardingStageLabel(inferOnboardingStage(status));
+    return stageLabel
+      ? `${retryPrefix}${stageLabel}...`
+      : `${retryPrefix}Finalizing your brand setup...`;
+  }
+
+  if (status.status === "completed") {
+    return "Brand setup ready.";
+  }
+
+  if (status.status === "failed") {
+    return status.last_error || "Brand setup failed. Please retry.";
+  }
+
+  return "Preparing your brand setup...";
+}
+
 /** Poll GET pack until onboarding_background_completed_at is set (after 202 from complete). */
 export async function pollPackUntilOnboardingReady(
   packId: string,
   options?: {
     intervalMs?: number;
     timeoutMs?: number;
+    onProgress?: (status: OnboardingJobStatus, message: string) => void;
   }
 ): Promise<Pack> {
   const timeoutMs = options?.timeoutMs ?? ONBOARDING_POLL_TIMEOUT_MS;
@@ -41,6 +97,9 @@ export async function pollPackUntilOnboardingReady(
           error instanceof Error ? error.message : String(error);
         return null;
       });
+    if (status) {
+      options?.onProgress?.(status, formatOnboardingProgress(status));
+    }
     if (status?.status === "failed") {
       throw new Error(
         status.last_error ||

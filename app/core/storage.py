@@ -1,4 +1,6 @@
-"""Storage: S3 upload/delete via boto3."""
+"""Storage: S3 upload/delete helpers."""
+
+from urllib.parse import quote
 
 from app.core.config import get_settings
 
@@ -74,3 +76,17 @@ def get_presigned_url(key: str, expires_in: int = 3600) -> str | None:
     return client.generate_presigned_url(
         "get_object", Params={"Bucket": bucket, "Key": key}, ExpiresIn=expires_in
     )
+
+
+def get_asset_url(key: str, expires_in: int = 3600) -> str | None:
+    """Return a CDN/public URL when configured, otherwise fall back to a presigned URL."""
+    if not key:
+        return None
+
+    s = get_settings()
+    cdn_base = (s.storage_cdn_url or "").strip().rstrip("/")
+    if cdn_base:
+        encoded_key = "/".join(quote(part, safe="") for part in key.lstrip("/").split("/"))
+        return f"{cdn_base}/{encoded_key}"
+
+    return get_presigned_url(key, expires_in=expires_in)

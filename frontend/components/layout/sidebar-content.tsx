@@ -23,10 +23,6 @@ import { useAuth } from "@/contexts/auth-context";
 import { useTheme } from "@/contexts/theme-context";
 import { PACKS_UPDATED_EVENT_NAME } from "@/contexts/new-pack-modal-context";
 import { packs as packsApi, type Pack } from "@/lib/api";
-import {
-  subscriptionApi,
-  type SubscriptionRead,
-} from "@/api_requests/subscription";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { usePackGates } from "@/hooks/use-pack-gates";
 import { buildItems, resultItems, navToSection } from "./nav-config";
@@ -68,9 +64,6 @@ export function SidebarContent({
   const { logout } = useAuth();
   const [packList, setPackList] = useState<Pack[]>([]);
   const [currentPack, setCurrentPack] = useState<Pack | null>(null);
-  const [subscription, setSubscription] = useState<SubscriptionRead | null>(
-    null,
-  );
   const [packDropdownOpen, setPackDropdownOpen] = useState(false);
 
   const {
@@ -167,13 +160,6 @@ export function SidebarContent({
       document.removeEventListener("keydown", handleEscape);
     };
   }, [packDropdownOpen, packDropdownRefs.reference, packDropdownRefs.floating]);
-
-  useEffect(() => {
-    subscriptionApi
-      .get()
-      .then((s) => setSubscription(s))
-      .catch(() => setSubscription(null));
-  }, []);
 
   const packForLinks = effectivePackId ?? packList[0]?.id ?? null;
   const chatHref = packForLinks ? `/chat?pack=${packForLinks}` : "/chat";
@@ -614,24 +600,6 @@ export function SidebarContent({
           isCollapsed ? "p-2 items-center" : "p-3",
         )}
       >
-        {subscription && !isCollapsed && (
-          <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-muted/50 text-sm">
-            <span className="text-muted-foreground truncate">
-              {subscription.credits_remaining} credits
-            </span>
-            <span className="shrink-0 font-medium capitalize text-foreground">
-              {subscription.plan}
-            </span>
-          </div>
-        )}
-        {subscription && isCollapsed && (
-          <div
-            className="px-2 py-1.5 rounded-lg bg-muted/50 text-xs text-center text-muted-foreground"
-            title={`${subscription.credits_remaining} credits · ${subscription.plan}`}
-          >
-            {subscription.credits_remaining}
-          </div>
-        )}
         <div className="mt-3 pt-3 border-t border-border/50 space-y-1 w-full">
           {!isCollapsed && (
             <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70">

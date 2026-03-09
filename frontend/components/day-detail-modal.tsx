@@ -228,22 +228,15 @@ export function DayDetailModal({
                   <Card className="mb-4 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
                     <CardContent className="flex items-start gap-3 py-4">
                       <Lock className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-                      <div className="space-y-3">
+                      <div>
                         <div>
                           <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                            Upgrade required before this step can be completed
+                            This step cannot be completed yet
                           </p>
                           <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
                             {detail.completion_blocked_message}
                           </p>
                         </div>
-                        {detail.completion_blocked_message
-                          .toLowerCase()
-                          .includes("upgrade") && (
-                          <Link href="/settings" className="inline-flex">
-                            <Button size="sm">Upgrade plan</Button>
-                          </Link>
-                        )}
                       </div>
                     </CardContent>
                   </Card>

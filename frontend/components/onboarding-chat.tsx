@@ -333,8 +333,10 @@ export function useOnboardingChat(options: {
         res.status === "processing" &&
         res.pack_id
       ) {
-        setOnboardingProgress("Finalizing your brand setup...");
-        const pack = await pollPackUntilOnboardingReady(res.pack_id);
+        setOnboardingProgress("Queued. Preparing your brand setup...");
+        const pack = await pollPackUntilOnboardingReady(res.pack_id, {
+          onProgress: (_status, message) => setOnboardingProgress(message),
+        });
         setCompletedPack(pack);
       }
       setOnboardingProgress("");

@@ -65,6 +65,7 @@ export default function InvoicesPage() {
     connected: boolean;
     onboarding_complete: boolean;
   } | null>(null);
+  const [connectLoading, setConnectLoading] = useState(false);
   const [publishLoading, setPublishLoading] = useState(false);
   const [publishedLink, setPublishedLink] = useState<string | null>(null);
 
@@ -143,6 +144,24 @@ export default function InvoicesPage() {
   useEffect(() => {
     if (packs.length > 0 && !createPackId) setCreatePackId(packs[0].id);
   }, [packs, createPackId]);
+
+  const handleConnectStripe = async () => {
+    setConnectLoading(true);
+    setError(null);
+    try {
+      const { url } = await revenue.createConnectOnboardingLink();
+      if (!url) {
+        throw new Error("No redirect URL returned");
+      }
+      window.location.href = url;
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Failed to start Stripe Connect",
+      );
+    } finally {
+      setConnectLoading(false);
+    }
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -350,6 +369,33 @@ export default function InvoicesPage() {
         </div>
       </div>
 
+      {connectStatus && !connectStatus.onboarding_complete && (
+        <div className="mb-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Connect Stripe for payment links</p>
+              <p className="text-sm text-muted-foreground">
+                Invoice payment links stay available here. Billing settings have been removed.
+              </p>
+            </div>
+            <Button
+              variant={connectStatus.connected ? "outline" : "default"}
+              size="sm"
+              onClick={handleConnectStripe}
+              disabled={connectLoading}
+            >
+              {connectLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : connectStatus.connected ? (
+                "Complete Stripe setup"
+              ) : (
+                "Connect Stripe"
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="mb-4 rounded-xl border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm text-destructive">
           {error}
@@ -524,15 +570,25 @@ export default function InvoicesPage() {
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    <Link
-                      href="/settings"
-                      className="text-primary hover:underline"
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Connect Stripe to create a shareable payment link for this invoice.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleConnectStripe}
+                      disabled={connectLoading}
                     >
-                      Connect Stripe
-                    </Link>{" "}
-                    in Settings to create payment links.
-                  </p>
+                      {connectLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : connectStatus?.connected ? (
+                        "Complete Stripe setup"
+                      ) : (
+                        "Connect Stripe"
+                      )}
+                    </Button>
+                  </div>
                 )}
                 <div className="flex flex-wrap gap-2 pt-2">
                   {manageInvoice.status === "draft" && (

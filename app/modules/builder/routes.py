@@ -3,11 +3,11 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
-from app.core.errors import BadRequestError, NotFoundError
+from app.core.errors import BadRequestError, NotFoundError, ServiceUnavailableError
 from app.core.gates import can_generate_website
 from app.modules.packs.models import User
 from app.modules.packs.services import get_pack_for_user
@@ -249,13 +249,10 @@ async def generate_project(
     except RuntimeError as exc:
         message = str(exc)
         if "not configured" in message.lower():
-            return JSONResponse(status_code=503, content={"detail": message})
-        return JSONResponse(
-            status_code=503,
-            content={
-                "detail": "We're having trouble generating right now. Please try again in a few moments."
-            },
-        )
+            raise ServiceUnavailableError(message) from exc
+        raise ServiceUnavailableError(
+            "We're having trouble generating right now. Please try again in a few moments."
+        ) from exc
 
     return StreamingResponse(
         stream,

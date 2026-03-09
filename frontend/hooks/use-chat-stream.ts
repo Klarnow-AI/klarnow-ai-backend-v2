@@ -165,10 +165,6 @@ export function useChatStream(options: UseChatStreamOptions) {
         true,
         controller.signal,
       );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error((err as { detail?: string }).detail || "Failed to send");
-      }
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       if (!reader) throw new Error("No response body");

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
-from app.core.errors import AppError, NotFoundError
+from app.core.errors import AppError, NotFoundError, map_value_error_to_app_error
 from app.modules.packs.models import User
 from app.modules.packs.services import get_pack_for_user
 from app.modules.campaign.schemas import CampaignRead, CampaignUpdate, CampaignCreate
@@ -108,4 +108,4 @@ def regenerate_campaign_route(
         new_campaign = regenerate_campaign(db, pack_id, campaign_id)
         return CampaignRead.model_validate(new_campaign)
     except ValueError as e:
-        raise NotFoundError(str(e))
+        raise map_value_error_to_app_error(e) from e

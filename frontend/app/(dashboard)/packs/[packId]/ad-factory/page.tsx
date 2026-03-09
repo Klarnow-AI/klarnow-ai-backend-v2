@@ -1,15 +1,28 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { adFactory } from "@/api_requests/ad-factory";
+import { creative } from "@/api_requests/creative";
 import type { AdFactoryVariant, GenerateVariantsResponse } from "@/api_requests/ad-factory";
+import type { CreativeAsset } from "@/types/api-types";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
-import { useMediaQuery } from "@/hooks/use-media-query";
+import { AdPreviewPanel } from "./_components/ad-preview-panel";
 
 type Screen = "generate" | "overview" | "script-detail" | "render" | "launch";
+type VideoAsset = CreativeAsset & { created_at: string };
+
+function mergeVideos(existing: VideoAsset[], incoming: VideoAsset[]): VideoAsset[] {
+  const byId = new Map(existing.map((video) => [video.id, video]));
+  for (const video of incoming) {
+    byId.set(video.id, video);
+  }
+  return Array.from(byId.values()).sort(
+    (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)
+  );
+}
 
 export default function AdFactoryPage() {
   const params = useParams();
@@ -18,9 +31,8 @@ export default function AdFactoryPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<GenerateVariantsResponse | null>(null);
+  const [videos, setVideos] = useState<VideoAsset[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<"A" | "B" | "C" | null>(null);
-
-  const isMobile = !useMediaQuery("(min-width: 1024px)");
 
   const handleGenerate = useCallback(async () => {
     if (!packId) return;
@@ -47,6 +59,34 @@ export default function AdFactoryPage() {
     }
   }, [packId]);
 
+  const loadVideos = useCallback(async () => {
+    if (!packId) return;
+    try {
+      const res = await creative.listAssets(packId);
+      setVideos(
+        res.items
+          .filter((asset) => asset.type === "video")
+          .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load rendered videos";
+      toast.error(message);
+    }
+  }, [packId]);
+
+  useEffect(() => {
+    void loadVideos();
+  }, [loadVideos]);
+
+  const refreshVideosAfterRender = useCallback(() => {
+    const delays = [2500, 8000];
+    for (const delay of delays) {
+      window.setTimeout(() => {
+        void loadVideos();
+      }, delay);
+    }
+  }, [loadVideos]);
+
   if (!packId) return null;
 
   return (
@@ -57,11 +97,13 @@ export default function AdFactoryPage() {
             onGenerate={handleGenerate}
             loading={loading}
             error={error}
+            videos={videos}
           />
         )}
         {screen === "overview" && result && (
           <Screen2Overview
             variants={result.variants}
+            videos={videos}
             onRenderWithKling={() => setScreen("render")}
             onSelectVariant={(v) => {
               setSelectedVariant(v);
@@ -85,7 +127,12 @@ export default function AdFactoryPage() {
               setLoading(true);
               try {
                 const res = await adFactory.render(result.render_id, ["A", "B", "C"]);
-                toast.success(`Rendered ${res.asset_ids.length} videos. ${res.credits_used} credits used.`);
+                const renderedVideos = res.assets.filter(
+                  (asset): asset is VideoAsset => asset.type === "video"
+                );
+                setVideos((current) => mergeVideos(current, renderedVideos));
+                refreshVideosAfterRender();
+                toast.success(`Rendered ${res.asset_ids.length} videos.`);
                 setScreen("overview");
               } catch (err) {
                 toast.error(err instanceof Error ? err.message : "Render failed");
@@ -105,41 +152,52 @@ function Screen1Generate({
   onGenerate,
   loading,
   error,
+  videos,
 }: {
   onGenerate: () => void;
   loading: boolean;
   error: string | null;
+  videos: VideoAsset[];
 }) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center">
-      <div className="max-w-md space-y-4">
-        <h2 className="text-xl font-semibold text-foreground">Generate Variants</h2>
-        <p className="text-sm text-muted-foreground">
-          Create exactly 3 conversion-ready ad variants from your BrandBrief and pack context.
-          Deterministic, no prompts.
-        </p>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button onClick={onGenerate} disabled={loading} size="lg" className="w-full">
-          {loading ? (
-            <>
-              <Spinner className="mr-2 h-4 w-4" />
-              Generating…
-            </>
-          ) : (
-            "Generate Variants"
-          )}
-        </Button>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
+      <div className="mx-auto flex min-h-[60vh] w-full max-w-md flex-col items-center justify-center text-center">
+        <div className="max-w-md space-y-4">
+          <h2 className="text-xl font-semibold text-foreground">Generate Variants</h2>
+          <p className="text-sm text-muted-foreground">
+            Create exactly 3 conversion-ready ad variants from your BrandBrief and pack context.
+            Deterministic, no prompts.
+          </p>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button onClick={onGenerate} disabled={loading} size="lg" className="w-full">
+            {loading ? (
+              <>
+                <Spinner className="mr-2 h-4 w-4" />
+                Generating…
+              </>
+            ) : (
+              "Generate Variants"
+            )}
+          </Button>
+        </div>
       </div>
+      {videos.length > 0 && (
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          <AdPreviewPanel videos={videos} />
+        </div>
+      )}
     </div>
   );
 }
 
 function Screen2Overview({
   variants,
+  videos,
   onRenderWithKling,
   onSelectVariant,
 }: {
   variants: AdFactoryVariant[];
+  videos: VideoAsset[];
   onRenderWithKling: () => void;
   onSelectVariant: (slot: "A" | "B" | "C") => void;
 }) {
@@ -166,6 +224,9 @@ function Screen2Overview({
             <p className="text-sm line-clamp-2">{v.core_concept}</p>
           </button>
         ))}
+      </div>
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        <AdPreviewPanel videos={videos} />
       </div>
     </div>
   );
@@ -232,7 +293,7 @@ function Screen4RenderConfirmation({
   onBack: () => void;
   onConfirmAndRender: () => void | Promise<void>;
 }) {
-  const creditsEstimate = 3;
+  const variantsCount = variants.length;
   return (
     <div className="p-4 space-y-6 max-w-md mx-auto">
       <Button variant="ghost" size="sm" onClick={onBack} disabled={loading}>
@@ -240,7 +301,7 @@ function Screen4RenderConfirmation({
       </Button>
       <h2 className="text-lg font-semibold">Render Confirmation</h2>
       <p className="text-sm text-muted-foreground">
-        A/B/C bundle = {creditsEstimate} credits (10s per variant). Credits consumed at Kling render.
+        This will render {variantsCount} video{variantsCount === 1 ? "" : "s"} with Kling.
       </p>
       <Button onClick={onConfirmAndRender} className="w-full" disabled={loading}>
         {loading ? (

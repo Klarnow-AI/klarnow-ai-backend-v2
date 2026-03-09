@@ -155,6 +155,13 @@ export type OnboardingCompleteAccepted = {
   job_id?: string | null;
 };
 
+export type OnboardingStageStatus = {
+  status: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  last_error?: string | null;
+};
+
 /** Response from GET .../onboarding/status. */
 export type OnboardingJobStatus = {
   status: "not_started" | "queued" | "running" | "completed" | "failed";
@@ -165,6 +172,8 @@ export type OnboardingJobStatus = {
   started_at?: string | null;
   completed_at?: string | null;
   last_error?: string | null;
+  current_stage?: string | null;
+  stages?: Record<string, OnboardingStageStatus> | null;
 };
 
 /** Brand OS domain types (match backend domain_schema). */
@@ -499,6 +508,8 @@ export type CreativeAsset = {
   template_id: string | null;
   source_code: string | null;
   output_key: string | null;
+  output_url: string | null;
+  poster_url: string | null;
   script: string | null;
   srt_key: string | null;
   sprint_day: number | null;

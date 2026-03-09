@@ -2,12 +2,12 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
 
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
-from app.core.errors import NotFoundError
+from app.core.errors import NotFoundError, map_value_error_to_app_error
 from app.modules.ad_factory.render_service import render_with_kling
 from app.modules.ad_factory.services import generate_variants, get_render
 from app.modules.packs.models import User
@@ -29,25 +29,32 @@ def post_generate(
     db=Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Generate 3 ad variants. Runs Engines 0-5, validates, persists. No credits consumed."""
+    """Generate 3 ad variants. Runs Engines 0-5, validates, persists."""
     try:
         return generate_variants(db, body.pack_id, current_user.id)
     except ValueError as e:
-        raise NotFoundError(str(e))
+        raise map_value_error_to_app_error(e) from e
 
 
 @router.post("/renders/{render_id}/render", response_model=dict)
 def post_render(
     render_id: UUID,
     body: RenderBody,
+    background_tasks: BackgroundTasks,
     db=Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Render selected variants via Kling. Deducts credits, creates Assets."""
+    """Render selected variants via Kling and create Assets."""
     try:
-        return render_with_kling(db, render_id, current_user.id, body.variant_slots)
+        return render_with_kling(
+            db,
+            render_id,
+            current_user.id,
+            body.variant_slots,
+            background_tasks=background_tasks,
+        )
     except ValueError as e:
-        raise NotFoundError(str(e))
+        raise map_value_error_to_app_error(e) from e
 
 
 @router.get("/renders/{render_id}", response_model=dict)

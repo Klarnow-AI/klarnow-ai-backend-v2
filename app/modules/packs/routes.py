@@ -63,6 +63,7 @@ from app.modules.packs.onboarding_services import extract_brand, generate_starte
 from app.modules.packs.logo_generation import generate_logo
 from app.modules.packs.brand_identity_suggestions import suggest_typography, suggest_palette
 from app.modules.packs.onboarding_jobs import (
+    onboarding_job_matches_current_inputs,
     dispatch_onboarding_job_from_api,
     enqueue_onboarding_job,
     get_onboarding_job_status,
@@ -520,7 +521,8 @@ def complete_onboarding_route(
             status_code=400,
         )
     job_status = get_onboarding_job_status(pack)
-    if job_status["status"] in {"queued", "running"}:
+    job_matches_current_inputs = onboarding_job_matches_current_inputs(pack)
+    if job_status["status"] in {"queued", "running"} and job_matches_current_inputs:
         if job_status["status"] == "queued" and job_status.get("job_id"):
             try:
                 dispatch_onboarding_job_from_api(pack_id, str(job_status["job_id"]))
@@ -537,7 +539,7 @@ def complete_onboarding_route(
                 "job_id": job_status.get("job_id"),
             },
         )
-    if job_status["status"] == "completed":
+    if job_status["status"] == "completed" and job_matches_current_inputs:
         return OnboardingCompleteResponse(
             pack=PackRead.model_validate(pack),
             is_existing_brand=answers.get("has_existing_brand") == "yes",

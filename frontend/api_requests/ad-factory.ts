@@ -1,4 +1,5 @@
 import { api } from "@/lib/http";
+import type { CreativeAsset } from "@/types/api-types";
 
 const AD_FACTORY_PREFIX = "/api/v1/ad-factory";
 
@@ -28,7 +29,7 @@ export type GenerateVariantsResponse = {
 
 export type RenderResponse = {
   asset_ids: string[];
-  credits_used: number;
+  assets: CreativeAsset[];
 };
 
 export const adFactory = {

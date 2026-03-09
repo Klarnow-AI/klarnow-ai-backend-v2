@@ -3,12 +3,13 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
-from app.core.errors import BadRequestError, NotFoundError
+from app.core.errors import BadRequestError, NotFoundError, ServiceUnavailableError
 from app.core.gates import can_generate_assets
+from app.core.storage import get_asset_url
 from app.modules.creative.generation import (
     create_poster_generation_stream,
     normalize_reference_images,
@@ -31,11 +32,27 @@ from app.modules.packs.services import get_pack_for_user
 from app.shared.services.generation_context import load_generation_brand_context
 
 router = APIRouter()
+ASSET_URL_TTL_SECONDS = 86400
 
 
 def _ensure_pack_access(db, pack_id: UUID, user_id: UUID) -> None:
     if not get_pack_for_user(db, pack_id, user_id):
         raise NotFoundError("Pack not found")
+
+
+def _serialize_asset(asset) -> AssetRead:
+    payload = AssetRead.model_validate(asset).model_dump()
+    payload["output_url"] = (
+        get_asset_url(asset.output_key, expires_in=ASSET_URL_TTL_SECONDS)
+        if asset.output_key
+        else asset.preview_url
+    )
+    payload["poster_url"] = (
+        get_asset_url(asset.preview_image_key, expires_in=ASSET_URL_TTL_SECONDS)
+        if asset.preview_image_key
+        else None
+    )
+    return AssetRead.model_validate(payload)
 
 
 @router.post("/assets", response_model=AssetRead)
@@ -55,7 +72,7 @@ def create_asset_route(
         template_id=body.template_id,
         chat_messages=body.chat_messages,
     )
-    return AssetRead.model_validate(asset)
+    return _serialize_asset(asset)
 
 
 @router.get("/assets", response_model=AssetList)
@@ -67,7 +84,7 @@ def list_assets(
     """List assets for a pack. Pack must belong to current user."""
     _ensure_pack_access(db, pack_id, current_user.id)
     items = list_assets_for_pack(db, pack_id)
-    return AssetList(items=[AssetRead.model_validate(a) for a in items], total=len(items))
+    return AssetList(items=[_serialize_asset(a) for a in items], total=len(items))
 
 
 @router.get("/assets/{asset_id}", response_model=AssetRead)
@@ -80,7 +97,7 @@ def get_asset(
     asset = get_asset_for_pack_user(db, asset_id, current_user.id)
     if not asset:
         raise NotFoundError("Asset not found")
-    return AssetRead.model_validate(asset)
+    return _serialize_asset(asset)
 
 
 @router.post("/assets/{asset_id}/regenerate", response_model=AssetRead)
@@ -94,7 +111,7 @@ def regenerate_asset_route(
     if not asset:
         raise NotFoundError("Asset not found")
     new_asset = regenerate_asset(db, asset)
-    return AssetRead.model_validate(new_asset)
+    return _serialize_asset(new_asset)
 
 
 @router.delete("/assets/{asset_id}", status_code=204)
@@ -144,13 +161,10 @@ async def generate_posters(
     except RuntimeError as exc:
         message = str(exc)
         if "not configured" in message.lower():
-            return JSONResponse(status_code=503, content={"detail": message})
-        return JSONResponse(
-            status_code=503,
-            content={
-                "detail": "We're having trouble generating right now. Please try again in a few moments."
-            },
-        )
+            raise ServiceUnavailableError(message) from exc
+        raise ServiceUnavailableError(
+            "We're having trouble generating right now. Please try again in a few moments."
+        ) from exc
 
     return StreamingResponse(
         stream,

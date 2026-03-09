@@ -10,7 +10,6 @@ from app.core.gates import (
     can_pass_day7_gate,
     can_pass_day8_gate,
     can_pass_pack_gate,
-    can_pass_paywall_gate,
 )
 from app.modules.clients.models import LEAD_STATUS_NEW
 from app.modules.clients.services import list_leads_for_pack
@@ -23,7 +22,6 @@ from app.modules.sprint.services import (
     get_day_card,
 )
 from app.modules.tasks.services import get_overdue_tasks
-from app.modules.subscription.services import check_credits
 from app.modules.packs.models import User
 
 
@@ -96,22 +94,9 @@ def get_next_action(
                 "progress_counters": None,
             }
 
-    # --- 1. Hard blockers (paywall, pack gate, day 7, day 8) ---
+    # --- 1. Hard blockers (pack gate, day 7, day 8) ---
     active_sprint = get_active_sprint_for_pack(db, pack.id)
     current_day = active_sprint.current_day if active_sprint else 0
-
-    can_paywall, paywall_msg = can_pass_paywall_gate(db, user_id, current_day)
-    if not can_paywall:
-        return {
-            "action_text": "Upgrade to continue",
-            "action_chips": [_chip("Upgrade", f"{pack_path}")],
-            "stage": "blocked",
-            "can_proceed": False,
-            "blocker_message": paywall_msg,
-            "why_it_matters": "Free plan includes Steps 0-4. Unlock the full sprint with Standard or Premium.",
-            "time_estimate": None,
-            "progress_counters": None,
-        }
 
     can_pack, pack_msg = can_pass_pack_gate(pack)
     if not can_pack:
@@ -150,12 +135,11 @@ def get_next_action(
                 "can_proceed": False,
                 "blocker_message": d8_msg,
                 "why_it_matters": "Locking rules keeps your responses consistent and saves time.",
-                "time_estimate": "10 mins",
-                "progress_counters": None,
-            }
+            "time_estimate": "10 mins",
+            "progress_counters": None,
+        }
 
     # --- 2. Revenue leaks (overdue follow-ups) ---
-    credits = check_credits(db, user_id)
     overdue = get_overdue_tasks(db, pack.id)
     if overdue:
         return {
@@ -192,8 +176,6 @@ def get_next_action(
 
         day_href = day_path
         chips = [_chip(f"Step {day_num}", day_href), _chip("Overview", sprint_path)]
-        if credits == 0 and day_num >= 4:
-            chips.append(_chip("Buy credits", "/settings"))
         return {
             "action_text": f"Step {day_num}: work on today's tasks",
             "action_chips": chips,

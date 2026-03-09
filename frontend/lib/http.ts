@@ -10,6 +10,15 @@ type ApiOptions = RequestInit & {
   _retriedAfterRefresh?: boolean;
 };
 
+type ErrorResponseBody = {
+  isSuccess?: unknown;
+  message?: unknown;
+  data?: unknown;
+  detail?: unknown;
+  error?: unknown;
+  request_id?: unknown;
+};
+
 let refreshPromise: Promise<string | null> | null = null;
 
 export function getToken(): string | null {
@@ -57,6 +66,67 @@ function normalizeDetail(detail: unknown): string {
   }
   if (typeof detail === "object" && "msg" in detail) return String((detail as { msg?: unknown }).msg);
   return String(detail);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getPayloadData(payload: ErrorResponseBody): Record<string, unknown> {
+  return isRecord(payload.data) ? payload.data : {};
+}
+
+function getRequestIdFromPayload(payload: ErrorResponseBody): unknown {
+  const data = getPayloadData(payload);
+  return payload.request_id ?? data.request_id;
+}
+
+function appendRequestId(message: string, requestId: unknown): string {
+  if (typeof requestId !== "string" || !requestId.trim()) return message;
+  return `${message} (request ${requestId})`;
+}
+
+export function getReadableFetchError(
+  error: unknown,
+  fallback = "Request could not reach the server. Check that the backend is running and try again.",
+): string {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return error.message;
+  }
+  if (error instanceof Error) {
+    const message = error.message.trim();
+    if (message && message !== "Failed to fetch") return message;
+  }
+  return fallback;
+}
+
+export function getApiErrorMessage(
+  payload: ErrorResponseBody,
+  fallback: string,
+): string {
+  const data = getPayloadData(payload);
+  const messageText =
+    typeof payload.message === "string" ? payload.message.trim() : "";
+  const detail = normalizeDetail(payload.detail);
+  const errorName =
+    typeof payload.error === "string" && payload.error.trim()
+      ? payload.error.trim().replace(/_/g, " ")
+      : "";
+  const nestedDetail = normalizeDetail(data.detail);
+  const message = messageText || detail || nestedDetail || errorName || fallback;
+  return appendRequestId(message, getRequestIdFromPayload(payload));
+}
+
+export function parseApiErrorText(
+  bodyText: string,
+  fallback: string,
+): string {
+  try {
+    const parsed = JSON.parse(bodyText) as ErrorResponseBody;
+    return getApiErrorMessage(parsed, fallback);
+  } catch {
+    return bodyText.trim() || fallback;
+  }
 }
 
 async function performRefreshAccessToken(): Promise<string | null> {
@@ -113,11 +183,16 @@ export async function api<T>(
   if (rest.body instanceof FormData) {
     delete headers["Content-Type"];
   }
-  const res = await fetch(url, {
-    ...rest,
-    credentials: rest.credentials ?? "include",
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...rest,
+      credentials: rest.credentials ?? "include",
+      headers,
+    });
+  } catch (error) {
+    throw new Error(getReadableFetchError(error));
+  }
   if (res.status === 401 && retryOnAuthError && !_retriedAfterRefresh) {
     const nextAccessToken = await refreshAccessToken();
     if (nextAccessToken) {
@@ -129,8 +204,10 @@ export async function api<T>(
     handleUnauthorized();
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    const message = normalizeDetail(err.detail) || String(res.status);
+    const err = await res
+      .json()
+      .catch(() => ({ message: res.statusText, request_id: res.headers.get("x-request-id") } satisfies ErrorResponseBody));
+    const message = getApiErrorMessage(err, String(res.status));
     throw new Error(message);
   }
   if (res.status === 204) return undefined as T;

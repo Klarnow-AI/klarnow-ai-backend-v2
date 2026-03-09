@@ -71,13 +71,29 @@ export function AdPreviewPanel({
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {videos.map((video) => (
+          {videos.map((video, index) => (
             <div
               key={video.id}
               className="group flex flex-col rounded-xl border border-border bg-card overflow-hidden"
             >
               <div className="relative flex aspect-video items-center justify-center bg-muted">
-                <Film className="h-12 w-12 text-muted-foreground" />
+                {video.output_url ? (
+                  <video
+                    className="h-full w-full bg-black object-cover"
+                    controls
+                    playsInline
+                    preload={index < 2 ? "auto" : "metadata"}
+                    poster={video.poster_url ?? undefined}
+                    src={video.output_url}
+                  />
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center">
+                    <Film className="h-12 w-12 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">
+                      Video rendered, but no playback URL is available.
+                    </p>
+                  </div>
+                )}
                 {onDelete && (
                   <IconButton
                     type="button"
@@ -96,6 +112,16 @@ export function AdPreviewPanel({
                   <p className="text-xs text-muted-foreground line-clamp-3">
                     {video.script}
                   </p>
+                )}
+                {video.output_url && (
+                  <a
+                    href={video.output_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex text-xs font-medium text-primary hover:underline"
+                  >
+                    Open video
+                  </a>
                 )}
                 <p className="text-xs text-muted-foreground/70">
                   {formatDate(video.created_at)}

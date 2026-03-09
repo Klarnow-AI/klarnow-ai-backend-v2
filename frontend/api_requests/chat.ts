@@ -1,5 +1,11 @@
 import { API_BASE } from "@/lib/utils";
-import { getHeaders, getToken, handleUnauthorized } from "@/lib/http";
+import {
+  getApiErrorMessage,
+  getHeaders,
+  getReadableFetchError,
+  getToken,
+  handleUnauthorized,
+} from "@/lib/http";
 import { api } from "@/lib/http";
 import type {
   ChatAttachment,
@@ -66,9 +72,23 @@ export const chat = {
       headers: getHeaders() as HeadersInit,
       body: JSON.stringify(body),
       signal,
-    }).then((res) => {
-      if (res.status === 401 && getToken()) handleUnauthorized();
-      return res;
-    });
+    })
+      .catch((error) => {
+        throw new Error(
+          getReadableFetchError(
+            error,
+            "Chat request could not reach the server. Check that the backend is running and try again.",
+          ),
+        );
+      })
+      .then(async (res) => {
+        if (res.status === 401 && getToken()) handleUnauthorized();
+        if (res.ok) return res;
+
+        const err = await res
+          .json()
+          .catch(() => ({ message: res.statusText, request_id: res.headers.get("x-request-id") }));
+        throw new Error(getApiErrorMessage(err, String(res.status)));
+      });
   },
 };

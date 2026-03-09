@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from app.core.config import get_settings
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
-from app.core.errors import BadRequestError, NotFoundError
+from app.core.errors import BadRequestError, NotFoundError, map_value_error_to_app_error
 from app.core.storage import upload_file as storage_upload_file
 from app.modules.packs.models import User
 from app.modules.chat.models import ChatAttachment
@@ -159,7 +159,7 @@ def get_suggested_prompts(
     try:
         prompts = suggest_pack_chat_prompts(db, current_user.id, pack_id)
     except ValueError as e:
-        raise NotFoundError(str(e))
+        raise map_value_error_to_app_error(e) from e
     return SuggestedPromptsResponse(prompts=prompts)
 
 
@@ -201,7 +201,7 @@ def create_conversation_route(
             day_context=body.day_context,
         )
     except ValueError as e:
-        raise NotFoundError(str(e))
+        raise map_value_error_to_app_error(e) from e
     return ConversationRead.model_validate(conv)
 
 
@@ -298,7 +298,7 @@ def send_message(
             attachment_ids=body.attachment_ids,
         )
     except ValueError as e:
-        raise NotFoundError(str(e))
+        raise map_value_error_to_app_error(e) from e
     return SendMessageResponse(
         assistant_content=result.get("assistant_content", ""),
         message_id=result.get("message_id"),

@@ -180,6 +180,48 @@ export function Day0Modal({
     if (current) setInput(getStepValue(current, values));
   }, [step, values, steps]);
 
+  useEffect(() => {
+    if (!open || !packId || saving) return;
+    if (!pack?.onboarding_completed_at || pack.onboarding_background_completed_at) return;
+
+    let cancelled = false;
+    setOnboardingProgress((current) => current || "Queued. Preparing your brand setup...");
+
+    void pollPackUntilOnboardingReady(packId, {
+      onProgress: (_status, message) => {
+        if (!cancelled) setOnboardingProgress(message);
+      },
+    })
+      .then((completedPack) => {
+        if (cancelled) return;
+        setPack(completedPack);
+        setOnboardingProgress("");
+        dispatchPackRefresh({
+          packId,
+          scopes: ["summary", "today-tasks", "next-action", "gates", "sprint"],
+        });
+      })
+      .catch((pollErr) => {
+        if (cancelled) return;
+        setOnboardingProgress("");
+        setError(
+          pollErr instanceof Error
+            ? pollErr.message
+            : "Brand setup is still processing. Refresh to check again.",
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    open,
+    packId,
+    pack?.onboarding_completed_at,
+    pack?.onboarding_background_completed_at,
+    saving,
+  ]);
+
   const handleChoice = async (value: string) => {
     setError("");
     setSaving(true);
@@ -320,11 +362,13 @@ export function Day0Modal({
               { suppressPackRefresh: true },
             );
           }
-          setOnboardingProgress("Finalizing your brand setup and generating Brand OS...");
+          setOnboardingProgress("Queued. Preparing your brand setup...");
           const res = await packs.completeOnboarding(packId);
           let completedPack: Pack | null = null;
           if ("status" in res && res.status === "processing" && res.pack_id) {
-            completedPack = await pollPackUntilOnboardingReady(res.pack_id);
+            completedPack = await pollPackUntilOnboardingReady(res.pack_id, {
+              onProgress: (_status, message) => setOnboardingProgress(message),
+            });
           } else if ("pack" in res && res.pack) {
             completedPack = res.pack;
           }

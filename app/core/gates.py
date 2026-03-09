@@ -1,21 +1,9 @@
 """Stage gates: enforce MVP flow. Raise GateBlockedError when prerequisite not met."""
 
-from datetime import datetime, timezone
-
-from uuid import UUID
-
 from sqlalchemy.orm import Session
 
 from app.core.errors import GateBlockedError
 from app.modules.packs.models import Pack
-
-STEP_4_UPGRADE_GATE_BYPASS_UNTIL = datetime(2026, 3, 6, 23, 59, 59, tzinfo=timezone.utc)
-
-
-def is_step_4_upgrade_gate_bypassed(now: datetime | None = None) -> bool:
-    """Temporary grace window for the Step 4 upgrade gate."""
-    current_time = now or datetime.now(timezone.utc)
-    return current_time <= STEP_4_UPGRADE_GATE_BYPASS_UNTIL
 
 
 def can_generate_website(db: Session, pack: Pack) -> None:
@@ -26,6 +14,7 @@ def can_generate_website(db: Session, pack: Pack) -> None:
 def can_generate_sprint(db: Session, pack: Pack) -> None:
     """Gate: Website must be published before starting the 7-day sprint."""
     from app.modules.builder.services import get_published_for_pack
+
     if get_published_for_pack(db, pack.id) is None:
         raise GateBlockedError(
             "Publish your website before starting the 7-Day Sprint. The site must be live and CTA working."
@@ -35,6 +24,7 @@ def can_generate_sprint(db: Session, pack: Pack) -> None:
 def can_generate_assets(db: Session, pack: Pack) -> None:
     """Gate: An active 14-day sprint must exist before generating ads/posters."""
     from app.modules.sprint.services import get_active_sprint_for_pack
+
     if get_active_sprint_for_pack(db, pack.id) is None:
         raise GateBlockedError(
             "Start your 14-day sprint before generating ads or posters. Create the sprint first."
@@ -44,6 +34,7 @@ def can_generate_assets(db: Session, pack: Pack) -> None:
 def can_create_proposal(db: Session, pack: Pack) -> None:
     """Gate: At least one qualified lead is required before creating a proposal."""
     from app.modules.clients.services import count_qualified_leads_for_pack
+
     if count_qualified_leads_for_pack(db, pack.id) < 1:
         raise GateBlockedError(
             "You need at least one qualified lead before creating a proposal. Add and qualify a lead first."
@@ -53,6 +44,7 @@ def can_create_proposal(db: Session, pack: Pack) -> None:
 def can_create_invoice(db: Session, pack: Pack) -> None:
     """Gate: Invoice only created from an accepted proposal (MVP rule)."""
     from app.modules.revenue.services import list_proposals_for_pack
+
     proposals = list_proposals_for_pack(db, pack.id)
     has_accepted = any(p.status == "accepted" for p in proposals)
     if not has_accepted:
@@ -61,18 +53,9 @@ def can_create_invoice(db: Session, pack: Pack) -> None:
         )
 
 
-def can_pass_paywall_gate(db: Session, user_id: UUID, current_day: int) -> tuple[bool, str]:
-    """Paywall gate: Free users blocked after Day 4 unless grace window is active."""
-    from app.modules.subscription.services import get_user_subscription
-    from app.modules.subscription.models import PLAN_FREE
-    
-    subscription = get_user_subscription(db, user_id)
-    if (
-        subscription.plan == PLAN_FREE
-        and current_day > 4
-        and not is_step_4_upgrade_gate_bypassed()
-    ):
-        return False, "Upgrade to Standard to continue past Day 4"
+def can_pass_paywall_gate(db: Session, user_id, current_day: int) -> tuple[bool, str]:
+    """Legacy paywall gate retained for API compatibility; app monetization is disabled."""
+    _ = (db, user_id, current_day)
     return True, ""
 
 
@@ -92,46 +75,39 @@ def can_pass_day7_gate(db: Session, pack: Pack) -> tuple[bool, str]:
     from app.modules.builder.services import get_published_for_pack
     from app.modules.proof_vault.models import Proof
     from app.modules.proof_vault.services import ensure_proof_exists
-    
+
     site = get_published_for_pack(db, pack.id)
-    
+
     if not site:
         return False, "Publish your website first"
-    
+
     proof_count = db.query(Proof).filter(Proof.pack_id == pack.id).count()
     if proof_count == 0:
         ensure_proof_exists(db, pack.id, "process")
         proof_count = db.query(Proof).filter(Proof.pack_id == pack.id).count()
     if proof_count == 0:
         return False, "Add at least one proof asset"
-    
+
     return True, ""
 
 
 def can_pass_day8_gate(db: Session, pack: Pack) -> tuple[bool, str]:
     """Day 8 gate: Require response rules locked."""
     from app.modules.response_rules.services import are_rules_locked
-    
+
     if not are_rules_locked(db, pack.id):
         return False, "Lock your response rules before proceeding"
-    
+
     return True, ""
 
 
 def can_complete_day(db: Session, day_card, day_number: int, pack: Pack) -> tuple[bool, str]:
     """
     Daily completion gates:
-    - Day 4 completion requires a paid plan to unlock Day 5 unless grace window is active.
     - Day 7 requires a published website and proof.
     - Day 8 requires locked response rules.
     """
-    from app.modules.subscription.models import PLAN_FREE
-    from app.modules.subscription.services import get_user_subscription
-
-    if day_number == 4:
-        subscription = get_user_subscription(db, pack.created_by_user_id)
-        if subscription.plan == PLAN_FREE and not is_step_4_upgrade_gate_bypassed():
-            return False, "Upgrade to Standard to complete Step 4 and unlock Step 5."
+    _ = day_card
 
     if day_number == 7:
         return can_pass_day7_gate(db, pack)

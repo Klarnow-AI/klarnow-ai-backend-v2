@@ -29,6 +29,8 @@ class Asset(Base):
     template_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     source_code: Mapped[str | None] = mapped_column(Text, nullable=True)  # React/TSX code for poster/flyer
     output_key: Mapped[str | None] = mapped_column(String(512), nullable=True)  # S3 key
+    preview_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)  # provider temp URL
+    preview_image_key: Mapped[str | None] = mapped_column(String(512), nullable=True)  # S3 key
     script: Mapped[str | None] = mapped_column(String(8000), nullable=True)  # video script
     srt_key: Mapped[str | None] = mapped_column(String(512), nullable=True)  # S3 key for subtitles
     sprint_day: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 1-7 for 7-day sprint

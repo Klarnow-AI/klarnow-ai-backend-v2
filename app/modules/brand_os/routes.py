@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
-from app.core.errors import NotFoundError
+from app.core.errors import NotFoundError, map_value_error_to_app_error
 from app.modules.packs.models import User
 from app.modules.packs.services import get_pack_for_user
 from app.modules.brand_os.schemas import (
@@ -134,4 +134,4 @@ def regenerate_brand_os_route(
         new_brand_os = regenerate_brand_os(db, pack_id, brand_os_id)
         return brand_os_read_from_orm(new_brand_os)
     except ValueError as e:
-        raise NotFoundError(str(e))
+        raise map_value_error_to_app_error(e) from e

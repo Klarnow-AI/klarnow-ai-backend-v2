@@ -4,12 +4,21 @@ import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import get_settings
 from app.core.db.observability import get_db_query_count, get_db_query_duration_ms, reset_db_query_stats
-from app.core.errors import AppError, app_error_handler
+from app.core.errors import (
+    AppError,
+    app_error_handler,
+    error_response,
+    http_exception_handler,
+    request_validation_error_handler,
+    value_error_handler,
+)
 from app.core.metrics import record_request, snapshot
 from app.core.request_context import set_correlation_id
 from app.core.auth.routes import router as auth_router
@@ -24,7 +33,6 @@ from app.modules.chat.routes import router as chat_router
 from app.modules.creative.routes import router as creative_router
 from app.modules.landing.routes import router as landing_router
 from app.modules.agents.routes import router as agents_router
-from app.modules.subscription.routes import router as subscription_router
 from app.modules.tasks.routes import router as tasks_router
 from app.modules.response_rules.routes import router as response_rules_router
 from app.modules.builder.routes import router as builder_router, public_router as builder_public_router
@@ -61,18 +69,22 @@ app.add_middleware(
 )
 
 app.add_exception_handler(AppError, app_error_handler)  # pyright: ignore[reportArgumentType]
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)  # pyright: ignore[reportArgumentType]
+app.add_exception_handler(RequestValidationError, request_validation_error_handler)  # pyright: ignore[reportArgumentType]
+app.add_exception_handler(ValueError, value_error_handler)  # pyright: ignore[reportArgumentType]
 
 
 def _generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Log unhandled exceptions and return a user-safe JSON 500."""
     log = logging.getLogger("uvicorn.error")
-    log.exception("Unhandled exception: %s", exc)
-    response = JSONResponse(
+    log.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
+    message = GENERIC_SERVER_ERROR_MESSAGE
+    if settings.app_env == "development":
+        message = str(exc).strip() or f"Unhandled server error ({exc.__class__.__name__})"
+    response = error_response(
+        request,
+        message=message,
         status_code=500,
-        content={
-            "detail": GENERIC_SERVER_ERROR_MESSAGE,
-            "request_id": getattr(request.state, "request_id", None),
-        },
     )
     # Add CORS headers so browser doesn't report CORS instead of 500
     origin = request.headers.get("origin")
@@ -147,7 +159,6 @@ app.include_router(chat_router, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(creative_router, prefix="/api/v1/creative", tags=["creative"])
 app.include_router(landing_router, prefix="/api/v1/me", tags=["me"])
 app.include_router(agents_router, prefix="/api/v1/agents", tags=["agents"])
-app.include_router(subscription_router, tags=["subscription"])
 app.include_router(tasks_router, tags=["tasks"])
 app.include_router(response_rules_router, tags=["response-rules"])
 app.include_router(builder_router, prefix="/api/v1/builder", tags=["builder"])

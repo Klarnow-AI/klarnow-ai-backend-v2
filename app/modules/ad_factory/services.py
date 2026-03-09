@@ -9,7 +9,6 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.gates import can_generate_assets
-from app.core.errors import GateBlockedError
 from app.modules.ad_factory.engines.engine0_pack_context import run as run_engine0
 from app.modules.ad_factory.engines.engine1_context_builder import run as run_engine1
 from app.modules.ad_factory.engines.engine2_variation_controller import run as run_engine2
@@ -49,7 +48,7 @@ def build_brand_brief_from_pack(db: Session, pack: Pack) -> BrandBrief:
     campaign = get_active_for_pack(db, pack.id)
     site = get_published_for_pack(db, pack.id)
 
-    cta_raw = (campaign.primary_cta or pack.primary_cta or "Visit the link").strip()
+    cta_raw = ((campaign.primary_cta if campaign else None) or pack.primary_cta or "Visit the link").strip()
     cta_action = _infer_cta_action(cta_raw)
 
     destination_value = ""
@@ -130,10 +129,7 @@ def generate_variants(db: Session, pack_id: UUID, user_id: UUID) -> dict:
     pack = get_pack_for_user(db, pack_id, user_id)
     if not pack:
         raise ValueError("Pack not found")
-    try:
-        can_generate_assets(db, pack)
-    except GateBlockedError as e:
-        raise ValueError(str(e))
+    can_generate_assets(db, pack)
 
     brand_brief = build_brand_brief_from_pack(db, pack)
     pack_snapshot = build_pack_snapshot(db, pack)

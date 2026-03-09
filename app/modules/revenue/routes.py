@@ -341,9 +341,9 @@ def publish_invoice_route(
     owner_id = pack.created_by_user_id
     owner = db.query(User).filter(User.id == owner_id).first()
     if not owner or not owner.stripe_connect_account_id:
-        raise BadRequestError("Connect your Stripe account in Settings to create payment links.")
+        raise BadRequestError("Connect your Stripe account to create payment links.")
     if not owner.stripe_connect_onboarding_complete:
-        raise BadRequestError("Complete Stripe onboarding in Settings before creating payment links.")
+        raise BadRequestError("Complete Stripe onboarding before creating payment links.")
 
     if invoice.stripe_hosted_url:
         return InvoicePublishResponse(

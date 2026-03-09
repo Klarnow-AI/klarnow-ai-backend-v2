@@ -5,7 +5,7 @@ import { Paperclip, Send, Stop } from "@/components/icons";
 import { IconButton } from "@/components/ui/icon-button";
 import { AssistantAvatar } from "@/components/assistant-avatar";
 import { SearchInput } from "@/components/ui/search-input";
-import { getHeaders, resolveApiUrl } from "@/lib/http";
+import { getHeaders, getReadableFetchError, parseApiErrorText, resolveApiUrl } from "@/lib/http";
 import type { BrandContext } from "@/types/generation";
 
 type Message = {
@@ -104,16 +104,10 @@ export function BuilderChatPanel({
 
         if (!res.ok) {
           const errText = await res.text();
-          let message: string;
-          try {
-            const parsed = JSON.parse(errText) as {
-              error?: string;
-              detail?: string;
-            };
-            message = parsed.error ?? parsed.detail ?? errText;
-          } catch {
-            message = errText;
-          }
+          const message = parseApiErrorText(
+            errText,
+            res.statusText || "Builder generation failed",
+          );
           setMessages((prev) => [
             ...prev,
             { role: "assistant", content: message },
@@ -166,7 +160,7 @@ export function BuilderChatPanel({
               content:
                 err instanceof Error && err.message.includes("pipe")
                   ? "We're having trouble generating right now. Please try again in a few moments."
-                  : `Error: ${err instanceof Error ? err.message : "Something went wrong"}`,
+                  : `Error: ${getReadableFetchError(err, "Something went wrong")}`,
             },
           ]);
         }

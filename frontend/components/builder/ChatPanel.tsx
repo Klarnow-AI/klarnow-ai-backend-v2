@@ -28,7 +28,7 @@ import {
   type ParsedQuestion,
 } from "@/components/builder/QuestionForm";
 import { cn } from "@/lib/utils";
-import { getHeaders, resolveApiUrl } from "@/lib/http";
+import { getHeaders, getReadableFetchError, parseApiErrorText, resolveApiUrl } from "@/lib/http";
 import type { BrandContext } from "@/types/generation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -409,16 +409,10 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
 
         if (!res.ok) {
           const errText = await res.text();
-          let message: string;
-          try {
-            const parsed = JSON.parse(errText) as {
-              error?: string;
-              detail?: string;
-            };
-            message = parsed.error ?? parsed.detail ?? errText;
-          } catch {
-            message = errText;
-          }
+          const message = parseApiErrorText(
+            errText,
+            res.statusText || "Builder generation failed",
+          );
           setMessages((prev) => [
             ...prev,
             { role: "assistant", content: message },
@@ -501,7 +495,7 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
               content:
                 err instanceof Error && err.message.includes("pipe")
                   ? "We're having trouble generating right now. Please try again in a few moments."
-                  : `Error: ${err instanceof Error ? err.message : "Something went wrong"}`,
+                  : `Error: ${getReadableFetchError(err, "Something went wrong")}`,
             },
           ]);
         }

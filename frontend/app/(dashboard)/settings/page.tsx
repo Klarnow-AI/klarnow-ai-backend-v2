@@ -5,16 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Settings as SettingsIcon,
-  Wallet,
   Loader2,
   Sun,
   Moon,
   Monitor,
   User as UserIcon,
   LogOut,
-  AlertCircle,
   Lock,
-  Receipt,
   Bell,
   FolderKanban,
   Trash2,
@@ -41,13 +38,8 @@ import {
 import { useTheme, type Theme } from "@/contexts/theme-context";
 import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
-import { revenue } from "@/api_requests/revenue";
 import { auth } from "@/api_requests/auth";
 import { me } from "@/api_requests/me";
-import {
-  subscriptionApi,
-  type SubscriptionRead,
-} from "@/api_requests/subscription";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { PackDeleteModal } from "@/components/pack-delete-modal";
 import { packs as packsApi } from "@/api_requests/packs";
@@ -66,24 +58,12 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const { logout } = useAuth();
 
-  const [connectStatus, setConnectStatus] = useState<{
-    connected: boolean;
-    onboarding_complete: boolean;
-  } | null>(null);
-  const [connectLoading, setConnectLoading] = useState(false);
-  const [connectError, setConnectError] = useState<string | null>(null);
-
   const [profile, setProfile] = useState<{
     email: string;
     created_at: string;
     last_activity_at: string | null;
   } | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
-
-  const [subscription, setSubscription] = useState<SubscriptionRead | null>(
-    null,
-  );
-  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -103,7 +83,6 @@ export default function SettingsPage() {
     | "general"
     | "account"
     | "security"
-    | "billing"
     | "notifications"
     | "packs";
   const [section, setSection] = useState<Section>("account");
@@ -120,44 +99,11 @@ export default function SettingsPage() {
   const packs = packsData?.items ?? [];
 
   useEffect(() => {
-    revenue
-      .getConnectStatus()
-      .then((r) => setConnectStatus(r))
-      .catch(() =>
-        setConnectStatus({ connected: false, onboarding_complete: false }),
-      );
-  }, []);
-
-  useEffect(() => {
     me.getProfile()
       .then(setProfile)
       .catch(() => setProfile(null))
       .finally(() => setProfileLoading(false));
   }, []);
-
-  useEffect(() => {
-    subscriptionApi
-      .get()
-      .then(setSubscription)
-      .catch(() => setSubscription(null))
-      .finally(() => setSubscriptionLoading(false));
-  }, []);
-
-  const handleConnectStripe = async () => {
-    setConnectLoading(true);
-    setConnectError(null);
-    try {
-      const { url } = await revenue.createConnectOnboardingLink();
-      if (url) window.location.href = url;
-      else setConnectError("No redirect URL returned");
-    } catch (e) {
-      setConnectError(
-        e instanceof Error ? e.message : "Failed to start Stripe Connect",
-      );
-    } finally {
-      setConnectLoading(false);
-    }
-  };
 
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== "delete") return;
@@ -222,7 +168,6 @@ export default function SettingsPage() {
       { id: "general", label: "General", icon: SettingsIcon },
       { id: "account", label: "Account", icon: UserIcon },
       { id: "security", label: "Security", icon: Lock },
-      { id: "billing", label: "Billing", icon: Receipt },
       { id: "notifications", label: "Notifications", icon: Bell },
       { id: "packs", label: "Packs", icon: FolderKanban },
     ];
@@ -541,113 +486,6 @@ export default function SettingsPage() {
                     <LogOut className="h-4 w-4" />
                     Sign out
                   </Button>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* Billing */}
-          {section === "billing" && (
-            <>
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold tracking-tight">
-                  Billing
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Your plan, credits, and payments.
-                </p>
-              </div>
-              <div className="space-y-8">
-                <div>
-                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Subscription
-                  </Label>
-                  {subscriptionLoading ? (
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Loading…
-                    </p>
-                  ) : subscription ? (
-                    <div className="mt-2 space-y-2">
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm font-medium capitalize">
-                          {subscription.plan}
-                        </span>
-                        <span className="text-sm text-muted-foreground">
-                          {subscription.credits_remaining} /{" "}
-                          {subscription.credits_total} credits
-                        </span>
-                      </div>
-                      {subscription.plan === "free" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            subscriptionApi
-                              .upgradePlan("standard")
-                              .then(() =>
-                                subscriptionApi.get().then(setSubscription),
-                              )
-                          }
-                        >
-                          Upgrade plan
-                        </Button>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Could not load subscription.
-                    </p>
-                  )}
-                </div>
-                <div className="pt-6">
-                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Stripe Connect
-                  </Label>
-                  <p className="text-sm text-muted-foreground mt-2 mb-4">
-                    Connect your Stripe account to create shareable invoice
-                    payment links.
-                  </p>
-                  {connectError && (
-                    <p className="text-sm text-destructive mb-2">
-                      {connectError}
-                    </p>
-                  )}
-                  {connectStatus?.connected &&
-                  connectStatus?.onboarding_complete ? (
-                    <p className="text-sm text-muted-foreground">
-                      Stripe connected.{" "}
-                      <Link
-                        href="/invoices"
-                        className="text-primary hover:underline"
-                      >
-                        Create payment links
-                      </Link>
-                    </p>
-                  ) : connectStatus?.connected ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleConnectStripe}
-                      disabled={connectLoading}
-                    >
-                      {connectLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        "Complete Stripe setup"
-                      )}
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={handleConnectStripe}
-                      disabled={connectLoading}
-                    >
-                      {connectLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        "Connect Stripe"
-                      )}
-                    </Button>
-                  )}
                 </div>
               </div>
             </>

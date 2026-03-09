@@ -18,6 +18,8 @@ class AssetRead(BaseModel):
     template_id: str | None
     source_code: str | None
     output_key: str | None
+    output_url: str | None = None
+    poster_url: str | None = None
     script: str | None
     srt_key: str | None
     sprint_day: int | None

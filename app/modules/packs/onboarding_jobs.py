@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
 from dataclasses import dataclass
@@ -23,6 +24,9 @@ from app.modules.packs.services import append_suggested_logo, merge_onboarding_a
 
 ONBOARDING_JOB_KEY = "_onboarding_job"
 ONBOARDING_JOB_MAX_ATTEMPTS = 3
+STARTER_BRAND_INPUT_FINGERPRINT_KEY = "_starter_brand_input_fingerprint"
+BRAND_OS_INPUT_FINGERPRINT_KEY = "_onboarding_brand_os_input_fingerprint"
+LOGO_INPUT_FINGERPRINT_KEY = "_final_logo_input_fingerprint"
 
 STAGE_STARTER_BRAND = "starter_brand"
 STAGE_BRAND_OS = "brand_os"
@@ -35,6 +39,23 @@ ONBOARDING_JOB_STAGES = (
 
 logger = get_logger("klarnow.onboarding_jobs")
 
+_IGNORED_ONBOARDING_INPUT_KEYS = {
+    ONBOARDING_JOB_KEY,
+    STARTER_BRAND_INPUT_FINGERPRINT_KEY,
+    BRAND_OS_INPUT_FINGERPRINT_KEY,
+    LOGO_INPUT_FINGERPRINT_KEY,
+    "wordmark_svg_or_url",
+    "palette",
+    "starter_brand_job_id",
+    "starter_brand_completed_at",
+    "suggested_logos",
+    "onboarding_brand_os_id",
+    "onboarding_brand_os_job_id",
+    "onboarding_brand_os_completed_at",
+    "final_logo_job_id",
+    "final_logo_completed_at",
+}
+
 
 @dataclass(slots=True)
 class OnboardingRunResult:
@@ -45,6 +66,38 @@ class OnboardingRunResult:
 
 def _iso_now() -> str:
     return utc_now().isoformat()
+
+
+def _normalize_hash_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            str(key): _normalize_hash_value(inner_value)
+            for key, inner_value in sorted(value.items(), key=lambda item: str(item[0]))
+        }
+    if isinstance(value, (list, tuple)):
+        return [_normalize_hash_value(item) for item in value]
+    if isinstance(value, str):
+        text = value.strip()
+        if text and text[0] in {"{", "["}:
+            try:
+                return _normalize_hash_value(json.loads(text))
+            except (json.JSONDecodeError, TypeError):
+                return text
+        return text
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    return str(value)
+
+
+def _fingerprint_payload(payload: Any) -> str:
+    normalized = _normalize_hash_value(payload)
+    encoded = json.dumps(
+        normalized,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _default_stage_state() -> dict[str, Any]:
@@ -80,6 +133,7 @@ def _normalize_job_data(raw: Any) -> dict[str, Any] | None:
     normalized = dict(raw)
     normalized["job_id"] = str(raw.get("job_id") or "")
     normalized["status"] = str(raw.get("status") or "queued")
+    normalized["input_fingerprint"] = str(raw.get("input_fingerprint") or "")
     normalized["attempt"] = int(raw.get("attempt") or 0)
     normalized["max_attempts"] = int(raw.get("max_attempts") or ONBOARDING_JOB_MAX_ATTEMPTS)
     normalized["queued_at"] = raw.get("queued_at")
@@ -105,6 +159,79 @@ def _set_job_data(pack: Pack, job_data: dict[str, Any]) -> None:
     answers = dict(pack.onboarding_answers or {})
     answers[ONBOARDING_JOB_KEY] = _normalize_job_data(job_data)
     pack.onboarding_answers = answers
+
+
+def _get_cached_fingerprint(pack: Pack, key: str) -> str:
+    answers = pack.onboarding_answers or {}
+    return str(answers.get(key) or "").strip()
+
+
+def _build_brand_os_input_payload(pack: Pack) -> dict[str, Any]:
+    answers = pack.onboarding_answers or {}
+    filtered_answers = {
+        key: value
+        for key, value in answers.items()
+        if key not in _IGNORED_ONBOARDING_INPUT_KEYS and value is not None
+    }
+    return {
+        "pack_name": (pack.name or "").strip(),
+        "pack_type": (pack.pack_type or "").strip(),
+        "brand_name": (pack.brand_name or "").strip() or _resolve_brand_name(pack),
+        "primary_cta": (pack.primary_cta or "").strip(),
+        "usp_statement": (pack.usp_statement or "").strip(),
+        "usp_proof": (pack.usp_proof or "").strip(),
+        "proof_text": (pack.proof_text or "").strip(),
+        "offer_one_liner": (pack.offer_one_liner or "").strip(),
+        "target_audience": (pack.target_audience or "").strip(),
+        "primary_pain": (pack.primary_pain or "").strip(),
+        "primary_outcome": (pack.primary_outcome or "").strip(),
+        "hero_angle": (pack.hero_angle or "").strip(),
+        "answers": filtered_answers,
+    }
+
+
+def _compute_starter_brand_input_fingerprint(pack: Pack) -> str:
+    return _fingerprint_payload(
+        {
+            "has_existing_brand": (pack.onboarding_answers or {}).get("has_existing_brand"),
+            "brand_name": _resolve_brand_name(pack),
+            "vibe_chips": _resolve_vibe_chips(pack),
+            "onboarding_context": _build_onboarding_context(pack),
+        }
+    )
+
+
+def _compute_brand_os_input_fingerprint(pack: Pack) -> str:
+    return _fingerprint_payload(_build_brand_os_input_payload(pack))
+
+
+def _compute_logo_input_fingerprint(pack: Pack) -> str:
+    return _fingerprint_payload(
+        {
+            "brand_name": (pack.brand_name or pack.name or "My Brand").strip(),
+            "palette": _extract_palette(pack.onboarding_answers or {}),
+            "brand_os_input_fingerprint": _compute_brand_os_input_fingerprint(pack),
+        }
+    )
+
+
+def compute_onboarding_input_fingerprint(pack: Pack) -> str:
+    answers = pack.onboarding_answers or {}
+    has_existing_brand = answers.get("has_existing_brand") == "yes"
+    return _fingerprint_payload(
+        {
+            "has_existing_brand": answers.get("has_existing_brand"),
+            "brand_os": _compute_brand_os_input_fingerprint(pack),
+            "starter_brand": None if has_existing_brand else _compute_starter_brand_input_fingerprint(pack),
+        }
+    )
+
+
+def onboarding_job_matches_current_inputs(pack: Pack) -> bool:
+    job = _get_job_data(pack)
+    if not job:
+        return False
+    return str(job.get("input_fingerprint") or "") == compute_onboarding_input_fingerprint(pack)
 
 
 def _public_stage_summary(stage_state: dict[str, Any]) -> dict[str, Any]:
@@ -265,7 +392,13 @@ def _build_onboarding_context(pack: Pack) -> dict[str, Any] | None:
     return onboarding_context or None
 
 
-def _get_existing_onboarding_brand_os(db: Session, pack: Pack, job_id: str):
+def _get_existing_onboarding_brand_os(
+    db: Session,
+    pack: Pack,
+    job_id: str,
+    *,
+    expected_input_fingerprint: str | None = None,
+):
     from app.modules.brand_os.services import get_by_id_and_pack, get_by_source_job_id
 
     existing = get_by_source_job_id(db, pack.id, job_id)
@@ -273,6 +406,11 @@ def _get_existing_onboarding_brand_os(db: Session, pack: Pack, job_id: str):
         return existing
 
     answers = pack.onboarding_answers or {}
+    if expected_input_fingerprint and (
+        _get_cached_fingerprint(pack, BRAND_OS_INPUT_FINGERPRINT_KEY)
+        != expected_input_fingerprint
+    ):
+        return None
     brand_os_id = answers.get("onboarding_brand_os_id")
     if not brand_os_id:
         return None
@@ -298,8 +436,13 @@ def _run_starter_brand_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
         raise RuntimeError("Onboarding job is no longer available")
     stage = job["stages"][STAGE_STARTER_BRAND]
     answers = pack.onboarding_answers or {}
+    input_fingerprint = _compute_starter_brand_input_fingerprint(pack)
 
-    if stage["status"] == "completed" or _has_starter_brand_outputs(pack):
+    if stage["status"] == "completed" or (
+        _has_starter_brand_outputs(pack)
+        and _get_cached_fingerprint(pack, STARTER_BRAND_INPUT_FINGERPRINT_KEY)
+        == input_fingerprint
+    ):
         return _mark_stage(
             db,
             pack_id,
@@ -329,6 +472,7 @@ def _run_starter_brand_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
             "palette": result["palette"],
             "starter_brand_job_id": job_id,
             "starter_brand_completed_at": _iso_now(),
+            STARTER_BRAND_INPUT_FINGERPRINT_KEY: input_fingerprint,
         },
         commit=False,
     )
@@ -349,8 +493,14 @@ def _run_brand_os_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
     if not pack or not job:
         raise RuntimeError("Onboarding job is no longer available")
     stage = job["stages"][STAGE_BRAND_OS]
+    input_fingerprint = _compute_brand_os_input_fingerprint(pack)
 
-    existing_brand_os = _get_existing_onboarding_brand_os(db, pack, job_id)
+    existing_brand_os = _get_existing_onboarding_brand_os(
+        db,
+        pack,
+        job_id,
+        expected_input_fingerprint=input_fingerprint,
+    )
     if stage["status"] == "completed" or existing_brand_os:
         if existing_brand_os:
             pack = merge_onboarding_answers(
@@ -360,6 +510,7 @@ def _run_brand_os_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
                     "onboarding_brand_os_id": str(existing_brand_os.id),
                     "onboarding_brand_os_job_id": job_id,
                     "onboarding_brand_os_completed_at": _iso_now(),
+                    BRAND_OS_INPUT_FINGERPRINT_KEY: input_fingerprint,
                 },
                 commit=False,
             )
@@ -378,7 +529,12 @@ def _run_brand_os_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
     pack, job = _load_pack_and_job(db, pack_id, job_id)
     if not pack or not job:
         raise RuntimeError("Onboarding job is no longer available")
-    brand_os = _get_existing_onboarding_brand_os(db, pack, job_id)
+    brand_os = _get_existing_onboarding_brand_os(
+        db,
+        pack,
+        job_id,
+        expected_input_fingerprint=input_fingerprint,
+    )
     if not brand_os:
         raise RuntimeError("Brand OS generation did not produce a result")
     pack = merge_onboarding_answers(
@@ -388,6 +544,7 @@ def _run_brand_os_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
             "onboarding_brand_os_id": str(brand_os.id),
             "onboarding_brand_os_job_id": job_id,
             "onboarding_brand_os_completed_at": _iso_now(),
+            BRAND_OS_INPUT_FINGERPRINT_KEY: input_fingerprint,
         },
         commit=False,
     )
@@ -410,10 +567,15 @@ def _run_logo_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
     if not pack or not job:
         raise RuntimeError("Onboarding job is no longer available")
     stage = job["stages"][STAGE_LOGO]
+    input_fingerprint = _compute_logo_input_fingerprint(pack)
 
     if stage["status"] == "skipped":
         return pack
-    if stage["status"] == "completed" or _has_final_logo_output(pack):
+    if stage["status"] == "completed" or (
+        _has_final_logo_output(pack)
+        and _get_cached_fingerprint(pack, LOGO_INPUT_FINGERPRINT_KEY)
+        == input_fingerprint
+    ):
         return _mark_stage(db, pack_id, job_id, STAGE_LOGO, "completed")
 
     palette = _extract_palette(pack.onboarding_answers or {})
@@ -450,6 +612,7 @@ def _run_logo_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
             "wordmark_svg_or_url": logo_url,
             "final_logo_job_id": job_id,
             "final_logo_completed_at": _iso_now(),
+            LOGO_INPUT_FINGERPRINT_KEY: input_fingerprint,
         },
         commit=False,
     )
@@ -493,9 +656,11 @@ def enqueue_onboarding_job(db: Session, pack_id: UUID) -> dict[str, Any]:
     pack = db.get(Pack, pack_id)
     if not pack:
         raise ValueError("Pack not found")
+    input_fingerprint = compute_onboarding_input_fingerprint(pack)
     job = {
         "job_id": str(uuid.uuid4()),
         "status": "queued",
+        "input_fingerprint": input_fingerprint,
         "attempt": 0,
         "max_attempts": ONBOARDING_JOB_MAX_ATTEMPTS,
         "queued_at": _iso_now(),

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
-from app.core.errors import NotFoundError
+from app.core.errors import NotFoundError, map_value_error_to_app_error
 from app.modules.packs.models import User
 from app.modules.packs.services import get_pack_for_user
 from app.modules.sprint.schemas import (
@@ -75,7 +75,7 @@ def create_sprint(
     try:
         sprint = create_sprint_for_pack(db, pack_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise map_value_error_to_app_error(e) from e
     return SprintRead.model_validate(sprint)
 
 
@@ -133,7 +133,7 @@ def patch_today_task(
     except StaleDayError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise map_value_error_to_app_error(e) from e
     return SprintTodayTasksRead.model_validate(data)
 
 
@@ -218,7 +218,7 @@ def complete_sprint_day(
     try:
         sprint = complete_day(db, sprint, day_number, user_selections)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise map_value_error_to_app_error(e) from e
     
     return SprintRead.model_validate(sprint)
 
@@ -239,5 +239,5 @@ def day_14_checkin(
     try:
         new_sprint = complete_sprint_and_reload(db, pack_id, sprint_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise map_value_error_to_app_error(e) from e
     return SprintRead.model_validate(new_sprint)
