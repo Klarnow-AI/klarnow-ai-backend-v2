@@ -62,15 +62,20 @@ export function Day3Modal({
 
   async function handleRefinePitch() {
     setRefiningPitch(true);
+    setError("");
     try {
       const res = await sprintApi.suggestField(packId, {
         day: 3,
         field: "pitch_script",
         current_value: pitchScript || undefined,
       });
+      if (res.source === "fallback") {
+        setError(res.reason ?? "AI suggestions are currently unavailable.");
+        return;
+      }
       setPitchScript(res.suggestion);
-    } catch {
-      setError("Could not get suggestion");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not get suggestion");
     } finally {
       setRefiningPitch(false);
     }

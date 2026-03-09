@@ -5,9 +5,11 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { auth as authApi } from "@/lib/api";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useChatStore } from "@/app/(dashboard)/chat/_store/chat-store";
@@ -31,6 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const lastUnauthorizedToastAtRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,7 +68,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const on401 = () => {
+    const on401 = (event: Event) => {
+      const now = Date.now();
+      const detail =
+        event instanceof CustomEvent && typeof event.detail?.message === "string"
+          ? event.detail.message
+          : "Your session expired. Sign in again to continue.";
+      if (now - lastUnauthorizedToastAtRef.current > 5000) {
+        toast.error(detail);
+        lastUnauthorizedToastAtRef.current = now;
+      }
       authApi.clearLocalAuth();
       clearStores();
       setIsAuthenticated(false);

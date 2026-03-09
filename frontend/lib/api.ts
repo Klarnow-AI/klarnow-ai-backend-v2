@@ -5,6 +5,7 @@
 
 export { api } from "./http";
 export { API_BASE } from "./utils";
+export { AppRequestError } from "./http";
 export { auth } from "@/api_requests/auth";
 export { me } from "@/api_requests/me";
 export { packs } from "@/api_requests/packs";

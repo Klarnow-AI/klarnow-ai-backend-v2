@@ -1,5 +1,6 @@
 import logging
 import time
+import traceback
 import uuid
 from contextlib import asynccontextmanager
 
@@ -19,6 +20,7 @@ from app.core.errors import (
     request_validation_error_handler,
     value_error_handler,
 )
+from app.core.failure_alerts import capture_request_body_preview, queue_failure_alert_if_needed
 from app.core.metrics import record_request, snapshot
 from app.core.request_context import set_correlation_id
 from app.core.auth.routes import router as auth_router
@@ -85,6 +87,10 @@ def _generic_exception_handler(request: Request, exc: Exception) -> JSONResponse
         request,
         message=message,
         status_code=500,
+        cause_exc=exc,
+        traceback_text="".join(
+            traceback.format_exception(type(exc), exc, exc.__traceback__)
+        ),
     )
     # Add CORS headers so browser doesn't report CORS instead of 500
     origin = request.headers.get("origin")
@@ -102,10 +108,16 @@ async def request_observability_middleware(request: Request, call_next):
     request.state.request_id = request_id
     set_correlation_id(request_id)
     reset_db_query_stats()
+    await capture_request_body_preview(request)
     start = time.perf_counter()
     response: Response | None = None
     try:
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            response = _generic_exception_handler(request, exc)
+        if response.status_code >= 400:  # type: ignore
+            queue_failure_alert_if_needed(request, response) # type: ignore
         return response
     finally:
         duration_ms = (time.perf_counter() - start) * 1000

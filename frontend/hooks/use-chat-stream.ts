@@ -8,6 +8,7 @@ import {
   streamingPlaceholderId,
   transientMessageId,
 } from "@/app/(dashboard)/chat/helpers";
+import { getApiError, isRequestCancelled } from "@/lib/http";
 import type { ChatAttachment, Message } from "@/types/api-types";
 
 type SendMode = "use" | "preview" | "apply";
@@ -56,6 +57,17 @@ function mergeToolResultsWithActions(
   if (chips.length === 0) return toolResults ?? null;
   if (isObjectLike(toolResults)) return { ...toolResults, actions: chips };
   return { actions: chips };
+}
+
+function normalizeStreamError(payload: unknown): Error {
+  if (isObjectLike(payload)) {
+    const apiError = getApiError(payload, "Chat request failed.");
+    return apiError;
+  }
+  if (typeof payload === "string" && payload.trim()) {
+    return new Error(payload.trim());
+  }
+  return new Error("Chat request failed.");
 }
 
 type UseChatStreamOptions = {
@@ -224,9 +236,9 @@ export function useChatStream(options: UseChatStreamOptions) {
                 action_chips?: unknown;
                 references?: unknown;
                 preview?: boolean;
-                error?: string;
+                error?: unknown;
               };
-              if (payload.error) throw new Error(payload.error);
+              if (payload.error) throw normalizeStreamError(payload.error);
               const finalContent = payload.assistant_content ?? accumulated;
               const mergedToolResults = mergeToolResultsWithActions(
                 payload.tool_results,
@@ -273,8 +285,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           }
           if (event === "error" && data) {
             try {
-              const parsed = JSON.parse(data) as { error?: string };
-              throw new Error(parsed.error ?? "Stream error");
+              throw normalizeStreamError(JSON.parse(data) as unknown);
             } catch (error) {
               onError(error instanceof Error ? error.message : "Stream error");
               setMessages((prev) =>
@@ -288,8 +299,7 @@ export function useChatStream(options: UseChatStreamOptions) {
         }
       }
     } catch (error) {
-      const isAbort = error instanceof Error && error.name === "AbortError";
-      if (isAbort) {
+      if (isRequestCancelled(error)) {
         const finalContent = streamingContentRef.current || "(stopped)";
         setMessages((prev) =>
           dedupeMessagesById(

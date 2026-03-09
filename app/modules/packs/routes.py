@@ -12,7 +12,7 @@ from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
 from app.core.errors import BadRequestError, NotFoundError
 from app.modules.packs.models import Pack, User
-from app.core.storage import upload_file as storage_upload_file, get_presigned_url
+from app.core.storage import upload_file as storage_upload_file, get_asset_url
 from app.modules.packs.schemas import (
     DayReadinessResponse,
     PackCreate,
@@ -674,7 +674,7 @@ async def upload_logo_route(
     if not uploaded_key:
         from app.core.errors import AppError
         raise AppError("Storage not configured; cannot upload logo", status_code=503)
-    logo_url = get_presigned_url(key, expires_in=86400 * 7)
+    logo_url = get_asset_url(key, expires_in=86400 * 7)
     if not logo_url:
         logo_url = f"key:{key}"
     pack = merge_onboarding_answers(

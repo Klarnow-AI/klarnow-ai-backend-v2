@@ -65,15 +65,20 @@ export function Day1Modal({
 
   async function handleRefineOffer() {
     setRefiningOffer(true);
+    setError("");
     try {
       const res = await sprintApi.suggestField(packId, {
         day: 1,
         field: "offer_one_liner",
         current_value: offerOneLiner || undefined,
       });
+      if (res.source === "fallback") {
+        setError(res.reason ?? "AI suggestions are currently unavailable.");
+        return;
+      }
       setOfferOneLiner(res.suggestion);
-    } catch {
-      setError("Could not get suggestion");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not get suggestion");
     } finally {
       setRefiningOffer(false);
     }

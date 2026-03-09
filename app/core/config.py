@@ -9,7 +9,6 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         # Load backend env from repository root regardless of process working dir.
@@ -48,8 +47,9 @@ class Settings(BaseSettings):
 
     # Optional: Resend
     resend_api_key: str = ""
-    resend_from_email: str = "noreply@example.com"
-    support_email: str = "sooreoluwa@klarnow.co.uk"
+    resend_from_email: str = ""
+    support_email: str = "sooreoluwaa@gmail.com"
+    failure_alert_to_email: str = ""
 
     # Optional: Storage (S3)
     storage_provider: str = "s3"

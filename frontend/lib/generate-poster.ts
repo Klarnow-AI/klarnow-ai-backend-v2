@@ -7,7 +7,11 @@ import {
   validatePosterTsxFile,
   validatePosterTsxFiles,
 } from "@/lib/poster-output";
-import { getReadableFetchError, getToken, parseApiErrorText, resolveApiUrl } from "@/lib/http";
+import {
+  fetchApiResponse,
+  getApiErrorFromResponse,
+  getToken,
+} from "@/lib/http";
 
 export type PosterReferenceImage = {
   name: string;
@@ -59,33 +63,24 @@ export async function streamPosterGeneration(
   }
 
   let res: Response;
-  try {
-    res = await fetch(resolveApiUrl(apiRoute), {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        messages,
-        brandContext: brandContext ?? undefined,
-        packId: packId ?? undefined,
-        generationMode: generationMode ?? "manual",
-        referenceImages:
-          referenceImages && referenceImages.length > 0
-            ? referenceImages
-            : undefined,
-      }),
-    });
-  } catch (error) {
-    throw new Error(
-      getReadableFetchError(
-        error,
-        "Poster generation request could not reach the server. Check that the backend is running and try again.",
-      ),
-    );
-  }
+  res = await fetchApiResponse(apiRoute, {
+    method: "POST",
+    authToken: token,
+    headers,
+    body: JSON.stringify({
+      messages,
+      brandContext: brandContext ?? undefined,
+      packId: packId ?? undefined,
+      generationMode: generationMode ?? "manual",
+      referenceImages:
+        referenceImages && referenceImages.length > 0
+          ? referenceImages
+          : undefined,
+    }),
+  });
 
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(parseApiErrorText(errText, res.statusText || "Poster generation failed"));
+    throw await getApiErrorFromResponse(res, "Poster generation failed");
   }
 
   const reader = res.body?.getReader();

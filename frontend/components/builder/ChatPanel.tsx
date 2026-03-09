@@ -28,7 +28,11 @@ import {
   type ParsedQuestion,
 } from "@/components/builder/QuestionForm";
 import { cn } from "@/lib/utils";
-import { getHeaders, getReadableFetchError, parseApiErrorText, resolveApiUrl } from "@/lib/http";
+import {
+  fetchApiResponse,
+  getApiErrorFromResponse,
+  isRequestCancelled,
+} from "@/lib/http";
 import type { BrandContext } from "@/types/generation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -392,11 +396,10 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
           return;
         }
 
-        const res = await fetch(
-          resolveApiUrl(`/api/v1/builder/projects/${encodeURIComponent(projectId)}/generate`),
+        const res = await fetchApiResponse(
+          `/api/v1/builder/projects/${encodeURIComponent(projectId)}/generate`,
           {
             method: "POST",
-            headers: getHeaders(),
             body: JSON.stringify({
               messages: currentMessages,
               files: currentFiles,
@@ -408,11 +411,10 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
         );
 
         if (!res.ok) {
-          const errText = await res.text();
-          const message = parseApiErrorText(
-            errText,
-            res.statusText || "Builder generation failed",
-          );
+          const message = (await getApiErrorFromResponse(
+            res,
+            "Builder generation failed",
+          )).message;
           setMessages((prev) => [
             ...prev,
             { role: "assistant", content: message },
@@ -482,7 +484,7 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
           });
         }
       } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") {
+        if (isRequestCancelled(err)) {
           setMessages((prev) => [
             ...prev,
             { role: "assistant", content: "Stopped." },
@@ -493,9 +495,9 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
             {
               role: "assistant",
               content:
-                err instanceof Error && err.message.includes("pipe")
-                  ? "We're having trouble generating right now. Please try again in a few moments."
-                  : `Error: ${getReadableFetchError(err, "Something went wrong")}`,
+                err instanceof Error
+                  ? err.message
+                  : "We're having trouble on our side. Please try again in a few moments.",
             },
           ]);
         }

@@ -221,7 +221,12 @@ export const packs = {
     packId: string,
     body?: { current_headline?: string | null; current_body?: string | null }
   ) =>
-    api<{ headline_font: string; body_font: string }>(
+    api<{
+      headline_font: string;
+      body_font: string;
+      source?: "ai" | "fallback";
+      reason?: string | null;
+    }>(
       `${PACKS_PREFIX}/${packId}/brand-identity/suggest-typography`,
       { method: "POST", body: JSON.stringify(body ?? {}) }
     ),
@@ -236,6 +241,8 @@ export const packs = {
       accent: string;
       background?: string | null;
       surface?: string | null;
+      source?: "ai" | "fallback";
+      reason?: string | null;
     }>(`${PACKS_PREFIX}/${packId}/brand-identity/suggest-palette`, {
       method: "POST",
       body: JSON.stringify(body ?? {}),

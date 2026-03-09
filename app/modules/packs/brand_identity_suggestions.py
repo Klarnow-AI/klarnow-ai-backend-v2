@@ -14,6 +14,18 @@ from app.modules.packs.models import Pack
 logger = get_logger("klarnow.packs.brand_identity_suggestions")
 
 
+def _brand_identity_ai_unavailable_reason() -> str | None:
+    settings = get_settings()
+    if not settings.openai_api_key:
+        return "Brand identity AI suggestions need OPENAI_API_KEY to be set."
+    if not settings.ai_brand_identity_suggestions_enabled:
+        return (
+            "Brand identity AI suggestions are disabled. Set "
+            "AI_BRAND_IDENTITY_SUGGESTIONS_ENABLED=true and restart the backend."
+        )
+    return None
+
+
 def _pack_context_for_suggestions(db: Session, pack: Pack) -> str:
     """Build context string from pack and optional Brand OS for LLM prompts."""
     parts = []
@@ -85,11 +97,17 @@ Respond with ONLY a valid JSON object with exactly two keys: "headline_font" and
 Each value must be a single font family name (e.g. "Playfair Display", "Inter", "Lato").
 Use only web-safe or Google Fonts that are free and widely available. No markdown, no explanation."""
 
-    settings = get_settings()
-    if not settings.openai_api_key or not settings.ai_brand_identity_suggestions_enabled:
-        return {"headline_font": "Inter", "body_font": "Open Sans"}
+    unavailable_reason = _brand_identity_ai_unavailable_reason()
+    if unavailable_reason:
+        return {
+            "headline_font": current_headline or "Inter",
+            "body_font": current_body or "Open Sans",
+            "source": "fallback",
+            "reason": unavailable_reason,
+        }
 
     try:
+        settings = get_settings()
         client = OpenAI(api_key=settings.openai_api_key)
         r = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -102,10 +120,20 @@ Use only web-safe or Google Fonts that are free and widely available. No markdow
         data = json.loads(text)
         headline = (data.get("headline_font") or "Inter").strip()
         body = (data.get("body_font") or "Open Sans").strip()
-        return {"headline_font": headline, "body_font": body}
+        return {
+            "headline_font": headline,
+            "body_font": body,
+            "source": "ai",
+            "reason": None,
+        }
     except Exception as e:
         logger.warning("suggest_typography failed: %s", e)
-        return {"headline_font": "Inter", "body_font": "Open Sans"}
+        return {
+            "headline_font": current_headline or "Inter",
+            "body_font": current_body or "Open Sans",
+            "source": "fallback",
+            "reason": "Brand identity AI suggestions are temporarily unavailable. Please try again.",
+        }
 
 
 def suggest_palette(
@@ -146,11 +174,25 @@ Return ONLY a valid JSON object with keys: "primary", "secondary", "accent".
 Each value must be a hex color (e.g. "#2563eb"). Optionally add "background" and "surface" (hex).
 Ensure colors work well together and are accessible. No markdown, no explanation."""
 
-    settings = get_settings()
-    if not settings.openai_api_key or not settings.ai_brand_identity_suggestions_enabled:
-        return {"primary": "#2563eb", "secondary": "#64748b", "accent": "#f59e0b"}
+    unavailable_reason = _brand_identity_ai_unavailable_reason()
+    if unavailable_reason:
+        fallback_palette = {
+            "primary": (current_palette or {}).get("primary") or "#2563eb",
+            "secondary": (current_palette or {}).get("secondary") or "#64748b",
+            "accent": (current_palette or {}).get("accent") or "#f59e0b",
+            "source": "fallback",
+            "reason": unavailable_reason,
+        }
+        background = (current_palette or {}).get("background")
+        surface = (current_palette or {}).get("surface")
+        if background:
+            fallback_palette["background"] = background
+        if surface:
+            fallback_palette["surface"] = surface
+        return fallback_palette
 
     try:
+        settings = get_settings()
         client = OpenAI(api_key=settings.openai_api_key)
         r = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -165,6 +207,8 @@ Ensure colors work well together and are accessible. No markdown, no explanation
             "primary": (data.get("primary") or "#2563eb").strip(),
             "secondary": (data.get("secondary") or "#64748b").strip(),
             "accent": (data.get("accent") or "#f59e0b").strip(),
+            "source": "ai",
+            "reason": None,
         }
         if data.get("background"):
             out["background"] = data["background"].strip()
@@ -173,4 +217,17 @@ Ensure colors work well together and are accessible. No markdown, no explanation
         return out
     except Exception as e:
         logger.warning("suggest_palette failed: %s", e)
-        return {"primary": "#2563eb", "secondary": "#64748b", "accent": "#f59e0b"}
+        fallback_palette = {
+            "primary": (current_palette or {}).get("primary") or "#2563eb",
+            "secondary": (current_palette or {}).get("secondary") or "#64748b",
+            "accent": (current_palette or {}).get("accent") or "#f59e0b",
+            "source": "fallback",
+            "reason": "Brand identity AI suggestions are temporarily unavailable. Please try again.",
+        }
+        background = (current_palette or {}).get("background")
+        surface = (current_palette or {}).get("surface")
+        if background:
+            fallback_palette["background"] = background
+        if surface:
+            fallback_palette["surface"] = surface
+        return fallback_palette

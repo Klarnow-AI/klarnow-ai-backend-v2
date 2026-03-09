@@ -1,6 +1,7 @@
 """Sprint and DayCard Pydantic schemas."""
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -120,6 +121,8 @@ class SuggestDayResponse(BaseModel):
     primary_pain: str | None = None
     primary_outcome: str | None = None
     pitch_script: str | None = None
+    source: Literal["ai", "fallback"] = "ai"
+    reason: str | None = None
 
     model_config = {"extra": "forbid"}
 
@@ -135,3 +138,5 @@ class SuggestFieldRequest(BaseModel):
 
 class SuggestFieldResponse(BaseModel):
     suggestion: str
+    source: Literal["ai", "fallback"] = "ai"
+    reason: str | None = None

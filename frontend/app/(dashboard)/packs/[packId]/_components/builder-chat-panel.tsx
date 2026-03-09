@@ -5,7 +5,11 @@ import { Paperclip, Send, Stop } from "@/components/icons";
 import { IconButton } from "@/components/ui/icon-button";
 import { AssistantAvatar } from "@/components/assistant-avatar";
 import { SearchInput } from "@/components/ui/search-input";
-import { getHeaders, getReadableFetchError, parseApiErrorText, resolveApiUrl } from "@/lib/http";
+import {
+  fetchApiResponse,
+  getApiErrorFromResponse,
+  isRequestCancelled,
+} from "@/lib/http";
 import type { BrandContext } from "@/types/generation";
 
 type Message = {
@@ -92,9 +96,8 @@ export function BuilderChatPanel({
       abortRef.current = controller;
 
       try {
-        const res = await fetch(resolveApiUrl(apiRoute), {
+        const res = await fetchApiResponse(apiRoute, {
           method: "POST",
-          headers: getHeaders(),
           body: JSON.stringify({
             messages: currentMessages,
             brandContext: brandContext ?? undefined,
@@ -103,11 +106,10 @@ export function BuilderChatPanel({
         });
 
         if (!res.ok) {
-          const errText = await res.text();
-          const message = parseApiErrorText(
-            errText,
-            res.statusText || "Builder generation failed",
-          );
+          const message = (await getApiErrorFromResponse(
+            res,
+            "Builder generation failed",
+          )).message;
           setMessages((prev) => [
             ...prev,
             { role: "assistant", content: message },
@@ -147,7 +149,7 @@ export function BuilderChatPanel({
           { role: "assistant", content: displayMessage },
         ]);
       } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") {
+        if (isRequestCancelled(err)) {
           setMessages((prev) => [
             ...prev,
             { role: "assistant", content: "Stopped." },
@@ -158,9 +160,9 @@ export function BuilderChatPanel({
             {
               role: "assistant",
               content:
-                err instanceof Error && err.message.includes("pipe")
-                  ? "We're having trouble generating right now. Please try again in a few moments."
-                  : `Error: ${getReadableFetchError(err, "Something went wrong")}`,
+                err instanceof Error
+                  ? err.message
+                  : "We're having trouble on our side. Please try again in a few moments.",
             },
           ]);
         }

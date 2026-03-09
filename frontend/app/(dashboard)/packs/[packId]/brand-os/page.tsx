@@ -427,6 +427,12 @@ export default function BrandOSPage() {
         current_headline: currentHeadline,
         current_body: currentBody,
       });
+      if (res.source === "fallback") {
+        setSuggestIdentityError(
+          res.reason ?? "AI suggestions are currently unavailable.",
+        );
+        return;
+      }
       await packsApi.patch(packId, {
         onboarding_answers: {
           ...(pack.onboarding_answers as Record<string, string>),
@@ -444,7 +450,7 @@ export default function BrandOSPage() {
     }
   }
 
-  async function handleSuggestPalette() {
+  async function handleSuggestPalette(options?: { silentFallback?: boolean }) {
     if (!pack) return;
     setSuggestIdentityError(null);
     setSuggestPaletteLoading(true);
@@ -467,6 +473,14 @@ export default function BrandOSPage() {
         packId,
         current ? { current_palette: current } : undefined,
       );
+      if (res.source === "fallback") {
+        if (!options?.silentFallback) {
+          setSuggestIdentityError(
+            res.reason ?? "AI suggestions are currently unavailable.",
+          );
+        }
+        return;
+      }
       const nextPalette: Record<string, string> = {
         primary: res.primary,
         secondary: res.secondary,
@@ -511,7 +525,7 @@ export default function BrandOSPage() {
     const hasExtracted = !!extracted?.color_candidates?.length;
     if (hasPalette || hasExtracted) return;
     hasAutoSuggestedPaletteRef.current = true;
-    handleSuggestPalette();
+    handleSuggestPalette({ silentFallback: true });
   }, [pack]);
 
   if (active === undefined) {
@@ -787,7 +801,9 @@ export default function BrandOSPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={handleSuggestPalette}
+                      onClick={() => {
+                        void handleSuggestPalette();
+                      }}
                       disabled={suggestPaletteLoading}
                       className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                     >

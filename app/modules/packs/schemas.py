@@ -1,6 +1,7 @@
 """Pydantic schemas for packs."""
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
@@ -176,6 +177,8 @@ class SuggestTypographyBody(BaseModel):
 class SuggestTypographyResponse(BaseModel):
     headline_font: str
     body_font: str
+    source: Literal["ai", "fallback"] = "ai"
+    reason: str | None = None
 
 
 class SuggestPaletteBody(BaseModel):
@@ -190,6 +193,8 @@ class SuggestPaletteResponse(BaseModel):
     accent: str
     background: str | None = None
     surface: str | None = None
+    source: Literal["ai", "fallback"] = "ai"
+    reason: str | None = None
 
 
 class OnboardingComplete(BaseModel):

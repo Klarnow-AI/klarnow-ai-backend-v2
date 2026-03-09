@@ -167,10 +167,10 @@ def suggest_field(
 ):
     """Suggest or refine a single sprint day field (Refine with AI)."""
     _ensure_pack_access(db, pack_id, current_user.id)
-    suggestion = suggest_sprint_field(
+    suggestion_data = suggest_sprint_field(
         db, pack_id, body.day, body.field, body.current_value
     )
-    return SuggestFieldResponse(suggestion=suggestion)
+    return SuggestFieldResponse(**suggestion_data)
 
 
 @router.patch("/packs/{pack_id}/sprint/{sprint_id}/day/{day_number}", response_model=DayCardRead)

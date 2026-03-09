@@ -8,6 +8,18 @@ from app.core.config import get_settings
 from app.modules.packs.models import Pack
 
 
+def _sprint_ai_unavailable_reason() -> str | None:
+    settings = get_settings()
+    if not settings.openai_api_key:
+        return "Sprint AI suggestions need OPENAI_API_KEY to be set."
+    if not settings.ai_sprint_field_suggestions_enabled:
+        return (
+            "Sprint AI suggestions are disabled. Set "
+            "AI_SPRINT_FIELD_SUGGESTIONS_ENABLED=true and restart the backend."
+        )
+    return None
+
+
 def _pack_context_for_suggestions(pack: Pack) -> str:
     """Build a short context string for LLM prompts from pack data."""
     parts: list[str] = []
@@ -47,13 +59,23 @@ def suggest_day_fields(db: Session, pack_id: UUID, day_number: int) -> dict:
     """
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
-        return _empty_day_response(day_number)
+        return _empty_day_response(
+            day_number,
+            source="fallback",
+            reason="Pack not found.",
+        )
 
     context = _pack_context_for_suggestions(pack)
-    settings = get_settings()
-    if not settings.openai_api_key or not settings.ai_sprint_field_suggestions_enabled:
-        return _fallback_day_response(day_number, pack)
+    unavailable_reason = _sprint_ai_unavailable_reason()
+    if unavailable_reason:
+        return _fallback_day_response(
+            day_number,
+            pack,
+            source="fallback",
+            reason=unavailable_reason,
+        )
 
+    settings = get_settings()
     from openai import OpenAI
     client = OpenAI(api_key=settings.openai_api_key)
 
@@ -65,7 +87,11 @@ def suggest_day_fields(db: Session, pack_id: UUID, day_number: int) -> dict:
             current_value=(pack.offer_one_liner or "").strip(),
             instruction="Suggest a compelling one-sentence offer that someone can say yes or no to.",
         )
-        return {"offer_one_liner": suggestion or (pack.offer_one_liner or "")}
+        return {
+            "offer_one_liner": suggestion or (pack.offer_one_liner or ""),
+            "source": "ai",
+            "reason": None,
+        }
 
     if day_number == 2:
         pain = _call_llm_single(
@@ -85,6 +111,8 @@ def suggest_day_fields(db: Session, pack_id: UUID, day_number: int) -> dict:
         return {
             "primary_pain": pain or (pack.primary_pain or ""),
             "primary_outcome": outcome or (pack.primary_outcome or ""),
+            "source": "ai",
+            "reason": None,
         }
 
     if day_number == 3:
@@ -98,9 +126,13 @@ def suggest_day_fields(db: Session, pack_id: UUID, day_number: int) -> dict:
             current_value="",
             instruction="Write a short pitch script (under 60 seconds) using the pack's offer, pain, and outcome. Template: Hi [Name], I help [who] with [problem]. Most people struggle with [pain], but we [solution]. Interested in [CTA]?",
         )
-        return {"pitch_script": pitch or ""}
+        return {"pitch_script": pitch or "", "source": "ai", "reason": None}
 
-    return _empty_day_response(day_number)
+    return _empty_day_response(
+        day_number,
+        source="fallback",
+        reason="Unsupported sprint day.",
+    )
 
 
 def _call_llm_single(
@@ -110,6 +142,7 @@ def _call_llm_single(
     field_label: str,
     current_value: str,
     instruction: str,
+    suppress_errors: bool = True,
 ) -> str:
     """One LLM call: suggest or refine a single text value."""
     current_phrase = (
@@ -137,31 +170,55 @@ Respond with ONLY the suggested value. No explanation, no markdown, no quotes ar
         )
         return (r.choices[0].message.content or "").strip() or current_value
     except Exception:
+        if not suppress_errors:
+            raise
         return current_value
 
 
-def _empty_day_response(day_number: int) -> dict:
+def _empty_day_response(
+    day_number: int,
+    *,
+    source: str = "fallback",
+    reason: str | None = None,
+) -> dict:
     if day_number == 1:
-        return {"offer_one_liner": ""}
+        return {"offer_one_liner": "", "source": source, "reason": reason}
     if day_number == 2:
-        return {"primary_pain": "", "primary_outcome": ""}
+        return {
+            "primary_pain": "",
+            "primary_outcome": "",
+            "source": source,
+            "reason": reason,
+        }
     if day_number == 3:
-        return {"pitch_script": ""}
+        return {"pitch_script": "", "source": source, "reason": reason}
     return {}
 
 
-def _fallback_day_response(day_number: int, pack: Pack) -> dict:
+def _fallback_day_response(
+    day_number: int,
+    pack: Pack,
+    *,
+    source: str = "fallback",
+    reason: str | None = None,
+) -> dict:
     """When API key is missing, return current pack values where applicable."""
     if day_number == 1:
-        return {"offer_one_liner": (pack.offer_one_liner or "").strip()}
+        return {
+            "offer_one_liner": (pack.offer_one_liner or "").strip(),
+            "source": source,
+            "reason": reason,
+        }
     if day_number == 2:
         return {
             "primary_pain": (pack.primary_pain or "").strip(),
             "primary_outcome": (pack.primary_outcome or "").strip(),
+            "source": source,
+            "reason": reason,
         }
     if day_number == 3:
-        return {"pitch_script": ""}
-    return _empty_day_response(day_number)
+        return {"pitch_script": "", "source": source, "reason": reason}
+    return _empty_day_response(day_number, source=source, reason=reason)
 
 
 SPRINT_DAY_FIELDS = {"offer_one_liner", "primary_pain", "primary_outcome", "pitch_script"}
@@ -259,23 +316,37 @@ def suggest_sprint_field(
     day: int,
     field: str,
     current_value: str | None = None,
-) -> str:
+) -> dict:
     """
     Suggest or refine a single sprint day field. Uses pack context.
     field must be one of: offer_one_liner, primary_pain, primary_outcome, pitch_script.
     """
+    current = (current_value or "").strip()
     if field not in SPRINT_DAY_FIELDS:
-        return (current_value or "").strip()
+        return {
+            "suggestion": current,
+            "source": "fallback",
+            "reason": f"Unsupported sprint field: {field}.",
+        }
 
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
-        return (current_value or "").strip()
+        return {
+            "suggestion": current,
+            "source": "fallback",
+            "reason": "Pack not found.",
+        }
 
     context = _pack_context_for_suggestions(pack)
-    settings = get_settings()
-    if not settings.openai_api_key or not settings.ai_sprint_field_suggestions_enabled:
-        return (current_value or "").strip()
+    unavailable_reason = _sprint_ai_unavailable_reason()
+    if unavailable_reason:
+        return {
+            "suggestion": current,
+            "source": "fallback",
+            "reason": unavailable_reason,
+        }
 
+    settings = get_settings()
     from openai import OpenAI
     client = OpenAI(api_key=settings.openai_api_key)
 
@@ -292,10 +363,24 @@ def suggest_sprint_field(
         "pitch_script": "Write a short pitch script (under 60 seconds) using offer, pain, and outcome.",
     }
 
-    return _call_llm_single(
-        client,
-        context=context,
-        field_label=labels.get(field, field.replace("_", " ")),
-        current_value=(current_value or "").strip(),
-        instruction=instructions.get(field, "Suggest a value for this field."),
-    )
+    try:
+        suggestion = _call_llm_single(
+            client,
+            context=context,
+            field_label=labels.get(field, field.replace("_", " ")),
+            current_value=current,
+            instruction=instructions.get(field, "Suggest a value for this field."),
+            suppress_errors=False,
+        )
+    except Exception:
+        return {
+            "suggestion": current,
+            "source": "fallback",
+            "reason": "Sprint AI suggestions are temporarily unavailable. Please try again.",
+        }
+
+    return {
+        "suggestion": suggestion,
+        "source": "ai",
+        "reason": None,
+    }

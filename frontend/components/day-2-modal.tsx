@@ -70,15 +70,20 @@ export function Day2Modal({
 
   async function handleRefinePain() {
     setRefiningPain(true);
+    setError("");
     try {
       const res = await sprintApi.suggestField(packId, {
         day: 2,
         field: "primary_pain",
         current_value: primaryPain || undefined,
       });
+      if (res.source === "fallback") {
+        setError(res.reason ?? "AI suggestions are currently unavailable.");
+        return;
+      }
       setPrimaryPain(res.suggestion);
-    } catch {
-      setError("Could not get suggestion");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not get suggestion");
     } finally {
       setRefiningPain(false);
     }
@@ -86,15 +91,20 @@ export function Day2Modal({
 
   async function handleRefineOutcome() {
     setRefiningOutcome(true);
+    setError("");
     try {
       const res = await sprintApi.suggestField(packId, {
         day: 2,
         field: "primary_outcome",
         current_value: primaryOutcome || undefined,
       });
+      if (res.source === "fallback") {
+        setError(res.reason ?? "AI suggestions are currently unavailable.");
+        return;
+      }
       setPrimaryOutcome(res.suggestion);
-    } catch {
-      setError("Could not get suggestion");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not get suggestion");
     } finally {
       setRefiningOutcome(false);
     }

@@ -1,6 +1,4 @@
-import { api } from "@/lib/http";
-import { getApiErrorMessage, getHeaders, getReadableFetchError } from "@/lib/http";
-import { API_BASE } from "@/lib/utils";
+import { api, fetchApiResponse, getApiErrorFromResponse } from "@/lib/http";
 import type {
   Invoice,
   InvoiceCreateBody,
@@ -50,23 +48,14 @@ export const revenue = {
 
   /** Fetch proposal PDF with auth and trigger browser download. */
   downloadProposalPdf: async (proposalId: string): Promise<void> => {
-    const url = `${API_BASE}${REVENUE_PREFIX}/proposals/${proposalId}/pdf`;
-    let res: Response;
-    try {
-      res = await fetch(url, { headers: getHeaders() });
-    } catch (error) {
-      throw new Error(
-        getReadableFetchError(
-          error,
-          "Proposal download request could not reach the server. Check that the backend is running and try again.",
-        ),
-      );
-    }
+    const res = await fetchApiResponse(
+      `${REVENUE_PREFIX}/proposals/${proposalId}/pdf`,
+      {
+        defaultContentType: false,
+      },
+    );
     if (!res.ok) {
-      const err = await res
-        .json()
-        .catch(() => ({ message: res.statusText, request_id: res.headers.get("x-request-id") }));
-      throw new Error(getApiErrorMessage(err, "Failed to download PDF"));
+      throw await getApiErrorFromResponse(res, "Failed to download PDF");
     }
     const blob = await res.blob();
     const a = document.createElement("a");

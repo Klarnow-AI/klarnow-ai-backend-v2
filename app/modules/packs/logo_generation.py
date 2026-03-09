@@ -10,7 +10,7 @@ import requests
 from app.core.config import get_settings
 from app.core.errors import BadRequestError
 from app.core.logging import get_logger, log_service_action
-from app.core.storage import upload_file, get_presigned_url
+from app.core.storage import upload_file, get_asset_url
 
 OPENAI_IMAGE_MODEL = "dall-e-3"
 OPENAI_IMAGE_SIZE = "1024x1024"
@@ -164,7 +164,7 @@ def generate_logo_with_openai(
     if not uploaded:
         logger.warning("logo_generation: upload_file returned falsy")
         raise BadRequestError("Logo was generated but storage upload failed. Check storage configuration.")
-    url = get_presigned_url(key, expires_in=86400 * 7) or f"key:{key}"
+    url = get_asset_url(key, expires_in=86400 * 7) or f"key:{key}"
     return {"logo_url": url, "wordmark_svg_or_url": None}
 
 

@@ -4,7 +4,7 @@ import uuid as uuid_lib
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.core.config import get_settings
@@ -250,6 +250,7 @@ def list_messages(
 @router.post("/conversations/{conversation_id}/messages", response_model=SendMessageResponse)
 def send_message(
     conversation_id: UUID,
+    request: Request,
     body: SendMessageBody,
     stream: bool = Query(
         False,
@@ -279,6 +280,7 @@ def send_message(
                 mode=body.mode,
                 apply_to_message_id=body.apply_to_message_id,
                 attachment_ids=body.attachment_ids,
+                request_id=getattr(request.state, "request_id", None),
             ):
                 yield chunk
         return StreamingResponse(

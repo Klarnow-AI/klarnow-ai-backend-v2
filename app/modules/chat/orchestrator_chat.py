@@ -9,8 +9,9 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.errors import AppError, build_error_payload, map_value_error_to_app_error
 from app.core.logging import get_logger
-from app.core.storage import get_presigned_url
+from app.core.storage import get_asset_url
 from app.modules.agents.orchestrator import assemble_context, CHAT_CONTEXT_LAST_N_MESSAGES
 from app.modules.agents.registry import REGISTRY, execute
 from app.modules.packs.services import get_pack_for_user
@@ -43,6 +44,7 @@ BRAND_OS_KEYWORDS = ("brand os", "brand strategy", "positioning", "messaging")
 IMAGE_ATTACHMENT_CONTENT_TYPE_PREFIX = "image/"
 IMAGE_ATTACHMENT_MAX_FOR_MODEL = 3
 IMAGE_ATTACHMENT_URL_TTL_SECONDS = 900
+GENERIC_STREAM_ERROR_MESSAGE = "We're having trouble on our side. Please try again in a few moments."
 
 
 def get_openai_tools(allowed_tool_names: set[str] | None = None) -> list[dict]:
@@ -110,9 +112,9 @@ def _serialize_attachment_snapshot(
     storage_key = getattr(attachment, "storage_key", None)
     if _is_image_attachment(content_type) and isinstance(storage_key, str) and storage_key:
         try:
-            image_url = get_presigned_url(storage_key, expires_in=IMAGE_ATTACHMENT_URL_TTL_SECONDS)
+            image_url = get_asset_url(storage_key, expires_in=IMAGE_ATTACHMENT_URL_TTL_SECONDS)
         except Exception as e:
-            logger.warning("chat_attachment_presign_failed | attachment_id=%s | error=%s", attachment.id, e)
+            logger.warning("chat_attachment_asset_url_failed | attachment_id=%s | error=%s", attachment.id, e)
 
     excerpt = _attachment_text_excerpt(getattr(attachment, "text_content", None), excerpt_chars)
     return {
@@ -812,6 +814,39 @@ def _sse_status(phase: str, label: str) -> str:
     return _sse_event("status", {"phase": phase, "label": label})
 
 
+def _stream_error_payload(exc: Exception, request_id: str | None = None) -> dict:
+    if isinstance(exc, AppError):
+        return build_error_payload(
+            exc.message,
+            status_code=exc.status_code,
+            request_id=request_id,
+            data=exc.data,
+            category=exc.category,
+            code=exc.code,
+            retryable=exc.retryable,
+        )
+    if isinstance(exc, ValueError):
+        mapped = map_value_error_to_app_error(exc)
+        return build_error_payload(
+            mapped.message,
+            status_code=mapped.status_code,
+            request_id=request_id,
+            data=mapped.data,
+            category=mapped.category,
+            code=mapped.code,
+            retryable=mapped.retryable,
+        )
+    logger.exception("chat_stream_unhandled_error | request_id=%s | error=%s", request_id, exc)
+    return build_error_payload(
+        GENERIC_STREAM_ERROR_MESSAGE,
+        status_code=500,
+        request_id=request_id,
+        category="server",
+        code="server_error",
+        retryable=True,
+    )
+
+
 def run_chat_turn_stream(
     db: Session,
     user_id: UUID,
@@ -821,6 +856,7 @@ def run_chat_turn_stream(
     mode: str = "use",
     apply_to_message_id: UUID | None = None,
     attachment_ids: list[UUID] | None = None,
+    request_id: str | None = None,
 ):
     """
     Generator that yields SSE events:
@@ -837,7 +873,17 @@ def run_chat_turn_stream(
             Conversation.user_id == user_id,
         ).first()
         if not conv:
-            yield _sse_event("error", {"error": "Conversation not found"})
+            yield _sse_event(
+                "error",
+                build_error_payload(
+                    "Conversation not found",
+                    status_code=404,
+                    request_id=request_id,
+                    category="not_found",
+                    code="not_found",
+                    retryable=False,
+                ),
+            )
             return
 
         # Apply: no model stream; execute preview tool_calls and return done.
@@ -856,7 +902,7 @@ def run_chat_turn_stream(
                 )
                 yield _sse_event("done", result)
             except Exception as e:
-                yield _sse_event("error", {"error": str(e)})
+                yield _sse_event("error", _stream_error_payload(e, request_id=request_id))
             return
 
         allow_account_scope = _wants_account_scope(user_content)
@@ -1142,4 +1188,4 @@ def run_chat_turn_stream(
             done_payload["action_chips"] = action_chips
         yield _sse_event("done", done_payload)
     except Exception as e:
-        yield _sse_event("error", {"error": str(e)})
+        yield _sse_event("error", _stream_error_payload(e, request_id=request_id))

@@ -24,6 +24,14 @@ export type SuggestDayResponse = {
   primary_pain?: string | null;
   primary_outcome?: string | null;
   pitch_script?: string | null;
+  source?: "ai" | "fallback";
+  reason?: string | null;
+};
+
+export type SuggestFieldResponse = {
+  suggestion: string;
+  source?: "ai" | "fallback";
+  reason?: string | null;
 };
 
 type CompleteDayOptions = {
@@ -114,7 +122,7 @@ export const sprintApi = {
       current_value?: string | null;
     }
   ) =>
-    api<{ suggestion: string }>(
+    api<SuggestFieldResponse>(
       `${PACKS_PREFIX}/${packId}/sprint/suggest-field`,
       {
         method: "POST",

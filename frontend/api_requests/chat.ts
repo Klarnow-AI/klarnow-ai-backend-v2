@@ -1,12 +1,8 @@
-import { API_BASE } from "@/lib/utils";
 import {
-  getApiErrorMessage,
-  getHeaders,
-  getReadableFetchError,
-  getToken,
-  handleUnauthorized,
+  api,
+  fetchApiResponse,
+  getApiErrorFromResponse,
 } from "@/lib/http";
-import { api } from "@/lib/http";
 import type {
   ChatAttachment,
   Conversation,
@@ -53,7 +49,7 @@ export const chat = {
       { method: "POST", body: form }
     );
   },
-  sendMessage: (
+  sendMessage: async (
     conversationId: string,
     body: {
       content: string;
@@ -64,31 +60,17 @@ export const chat = {
     stream = false,
     signal?: AbortSignal
   ): Promise<Response> => {
-    const url = `${API_BASE}${CHAT_PREFIX}/conversations/${conversationId}/messages${
+    const path = `${CHAT_PREFIX}/conversations/${conversationId}/messages${
       stream ? "?stream=true" : ""
     }`;
-    return fetch(url, {
+    const res = await fetchApiResponse(path, {
       method: "POST",
-      headers: getHeaders() as HeadersInit,
       body: JSON.stringify(body),
       signal,
-    })
-      .catch((error) => {
-        throw new Error(
-          getReadableFetchError(
-            error,
-            "Chat request could not reach the server. Check that the backend is running and try again.",
-          ),
-        );
-      })
-      .then(async (res) => {
-        if (res.status === 401 && getToken()) handleUnauthorized();
-        if (res.ok) return res;
-
-        const err = await res
-          .json()
-          .catch(() => ({ message: res.statusText, request_id: res.headers.get("x-request-id") }));
-        throw new Error(getApiErrorMessage(err, String(res.status)));
-      });
+    });
+    if (!res.ok) {
+      throw await getApiErrorFromResponse(res, "Chat request failed.");
+    }
+    return res;
   },
 };

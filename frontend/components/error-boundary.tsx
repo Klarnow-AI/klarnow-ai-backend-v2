@@ -29,13 +29,17 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   render() {
     if (this.state.error) {
+      const isDevelopment = process.env.NODE_ENV === "development";
+      const body = isDevelopment
+        ? this.state.error.message || "An unexpected error occurred."
+        : "We're having trouble on our side. Please try again in a few moments.";
       return (
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 p-8 text-center">
           <h2 className="text-lg font-semibold text-foreground">
             {this.props.fallbackTitle ?? "Something went wrong"}
           </h2>
           <p className="max-w-md text-sm text-muted-foreground">
-            {this.state.error.message || "An unexpected error occurred."}
+            {body}
           </p>
           <div className="flex gap-3">
             <Button

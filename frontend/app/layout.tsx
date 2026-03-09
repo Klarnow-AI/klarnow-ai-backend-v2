@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/auth-context";
 import { ThemeProvider } from "@/contexts/theme-context";
+import { ConnectivityBanner } from "@/components/connectivity-banner";
 import { ErrorBoundary } from "@/components/error-boundary";
 
 const inter = Inter({
@@ -52,6 +53,7 @@ export default function RootLayout({
         className={`${inter.variable} ${jetbrainsMono.variable} ${googleSansFlex.variable} font-sans min-h-screen antialiased`}
       >
         <ThemeProvider>
+          <ConnectivityBanner />
           <ErrorBoundary>
             <AuthProvider>{children}</AuthProvider>
           </ErrorBoundary>
