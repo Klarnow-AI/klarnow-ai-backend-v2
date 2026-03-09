@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     secret_key: str = ""
     cors_allow_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
     access_token_expiry_time: int = 60  # minutes
+    refresh_token_expiry_days: int = 30
     frontend_url: str = "http://localhost:3000"
     google_oauth_client_id: str = ""
     # Optional: when set, published sites use subdomains (e.g. sites.klarnow.com → acme.sites.klarnow.com)

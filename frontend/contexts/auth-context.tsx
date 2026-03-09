@@ -22,7 +22,7 @@ type AuthContextValue = {
   requestLoginCode: (email: string) => Promise<void>;
   verifyLoginCode: (email: string, code: string) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -33,8 +33,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setIsAuthenticated(authApi.isAuthenticated());
-    setIsLoading(false);
+    let cancelled = false;
+
+    const initializeAuth = async () => {
+      try {
+        const authenticated =
+          authApi.isAuthenticated() || (await authApi.restoreSession());
+        if (cancelled) return;
+        setIsAuthenticated(authenticated);
+      } catch {
+        if (cancelled) return;
+        setIsAuthenticated(false);
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void initializeAuth();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function clearStores() {
@@ -45,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const on401 = () => {
-      authApi.logout();
+      authApi.clearLocalAuth();
       clearStores();
       setIsAuthenticated(false);
       router.replace("/");
@@ -87,10 +108,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await authApi.requestPasswordReset(email);
   }, []);
 
-  const logout = useCallback(() => {
-    authApi.logout();
-    clearStores();
-    setIsAuthenticated(false);
+  const logout = useCallback(async () => {
+    try {
+      await authApi.logout();
+    } finally {
+      clearStores();
+      setIsAuthenticated(false);
+    }
   }, []);
 
   return (

@@ -87,7 +87,7 @@ export function ProfileDropdown({
       <button
         type="button"
         onClick={() => {
-          logout();
+          void logout();
           onOpenChange(false);
         }}
         className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all text-left focus-visible:outline-none focus-visible:ring-0 hover:scale-[1.02]"

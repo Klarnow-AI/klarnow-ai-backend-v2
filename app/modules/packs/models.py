@@ -36,6 +36,9 @@ class User(Base):
     packs: Mapped[list["Pack"]] = relationship(
         "Pack", back_populates="created_by_user", cascade="all, delete-orphan"
     )
+    refresh_token_sessions: Mapped[list["RefreshTokenSession"]] = relationship(
+        "RefreshTokenSession", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class EmailLoginCode(Base):
@@ -54,6 +57,26 @@ class PasswordResetToken(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     token: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class RefreshTokenSession(Base):
+    __tablename__ = "refresh_token_session"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped["User"] = relationship("User", back_populates="refresh_token_sessions")
 
 
 # Pack type: determines flow (Enquiries / Quotes / Sales). Default enquiries.

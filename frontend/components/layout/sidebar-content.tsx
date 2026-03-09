@@ -649,7 +649,7 @@ export function SidebarContent({
           </Link>
           <button
             type="button"
-            onClick={() => logout()}
+            onClick={() => void logout()}
             title="Sign out"
             className={cn(
               "flex items-center rounded-xl text-sm font-medium transition-all duration-200 w-full",

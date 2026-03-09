@@ -2,16 +2,26 @@
 
 import secrets
 from datetime import datetime, timezone, timedelta
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.core.auth.deps import get_current_user, get_current_user_record
+from app.core.auth.deps import get_current_user_record
 from app.core.auth.google import verify_google_identity_token
 from app.core.auth.jwt import create_access_token
 from app.core.auth.password import hash_password, verify_password
+from app.core.auth.sessions import (
+    clear_refresh_token_cookie,
+    create_refresh_token_session,
+    get_refresh_token_from_request,
+    revoke_refresh_token_session,
+    revoke_user_refresh_token_sessions,
+    rotate_refresh_token_session,
+    set_refresh_token_cookie,
+)
 from app.core.config import get_settings
 from app.core.db.session import get_db
 from app.core.errors import AppError, UnauthorizedError
@@ -71,6 +81,22 @@ class CheckEmailResponse(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+def _issue_token_response(
+    *,
+    request: Request,
+    response: Response,
+    db: Session,
+    user_id: UUID,
+) -> TokenResponse:
+    current_refresh_token = get_refresh_token_from_request(request)
+    if current_refresh_token:
+        revoke_refresh_token_session(db, current_refresh_token)
+    refresh_token = create_refresh_token_session(db, user_id)
+    db.commit()
+    set_refresh_token_cookie(response, refresh_token)
+    return TokenResponse(access_token=create_access_token(user_id))
 
 
 def _send_login_code_email(to_email: str, code: str) -> bool:
@@ -145,6 +171,8 @@ def send_login_code(
 @router.post("/verify-login-code", response_model=TokenResponse)
 def verify_login_code(
     body: VerifyLoginCodeBody,
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     """Verify the code sent to email; create user if new, return JWT."""
@@ -171,13 +199,19 @@ def verify_login_code(
         db.refresh(user)
     db.delete(row)
     db.commit()
-    token = create_access_token(user.id)
-    return TokenResponse(access_token=token)
+    return _issue_token_response(
+        request=request,
+        response=response,
+        db=db,
+        user_id=user.id,
+    )
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(
     body: RegisterBody,
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     """Create a user and return a JWT (for local/dev; tighten in production)."""
@@ -191,26 +225,38 @@ def register(
     db.add(user)
     db.commit()
     db.refresh(user)
-    token = create_access_token(user.id)
-    return TokenResponse(access_token=token)
+    return _issue_token_response(
+        request=request,
+        response=response,
+        db=db,
+        user_id=user.id,
+    )
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(
     body: LoginBody,
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     """Authenticate with email and password; return JWT."""
     user = db.query(User).filter(User.email == body.email).first()
     if not user or not verify_password(body.password, user.hashed_password):
         raise UnauthorizedError("Invalid email or password")
-    token = create_access_token(user.id)
-    return TokenResponse(access_token=token)
+    return _issue_token_response(
+        request=request,
+        response=response,
+        db=db,
+        user_id=user.id,
+    )
 
 
 @router.post("/google", response_model=TokenResponse)
 def google_login(
     body: GoogleLoginBody,
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     """Authenticate with a Google ID token, then return app JWT."""
@@ -221,8 +267,12 @@ def google_login(
     # Prefer direct provider link when present.
     user = db.query(User).filter(User.google_sub == google_sub).first()
     if user:
-        token = create_access_token(user.id)
-        return TokenResponse(access_token=token)
+        return _issue_token_response(
+            request=request,
+            response=response,
+            db=db,
+            user_id=user.id,
+        )
 
     # Fallback: link to existing account by verified email.
     user = db.query(User).filter(User.email == email).first()
@@ -238,8 +288,12 @@ def google_login(
         db.add(user)
         db.commit()
         db.refresh(user)
-        token = create_access_token(user.id)
-        return TokenResponse(access_token=token)
+        return _issue_token_response(
+            request=request,
+            response=response,
+            db=db,
+            user_id=user.id,
+        )
 
     # New account via Google: keep local password optional.
     user = User(
@@ -250,8 +304,50 @@ def google_login(
     db.add(user)
     db.commit()
     db.refresh(user)
-    token = create_access_token(user.id)
-    return TokenResponse(access_token=token)
+    return _issue_token_response(
+        request=request,
+        response=response,
+        db=db,
+        user_id=user.id,
+    )
+
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh_access_token(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """Rotate the refresh token cookie and return a fresh access token."""
+    refresh_token = get_refresh_token_from_request(request)
+    if not refresh_token:
+        clear_refresh_token_cookie(response)
+        raise UnauthorizedError("Missing refresh token")
+
+    try:
+        session, next_refresh_token = rotate_refresh_token_session(db, refresh_token)
+        db.commit()
+    except UnauthorizedError:
+        clear_refresh_token_cookie(response)
+        raise
+
+    set_refresh_token_cookie(response, next_refresh_token)
+    return TokenResponse(access_token=create_access_token(session.user_id))
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """Revoke the current refresh token session and clear the cookie."""
+    refresh_token = get_refresh_token_from_request(request)
+    if refresh_token:
+        revoke_refresh_token_session(db, refresh_token)
+        db.commit()
+    clear_refresh_token_cookie(response)
+    return None
 
 
 @router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
@@ -297,6 +393,7 @@ def reset_password(
     if not user:
         raise AppError("Invalid or expired reset link", status_code=status.HTTP_400_BAD_REQUEST)
     user.hashed_password = hash_password(body.new_password)
+    revoke_user_refresh_token_sessions(db, user.id)
     db.delete(row)
     db.commit()
     return None
@@ -305,20 +402,45 @@ def reset_password(
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
 def change_password(
     body: ChangePasswordBody,
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_record),
 ):
     """Change password for the authenticated user."""
     if not verify_password(body.current_password, current_user.hashed_password):
-        raise UnauthorizedError("Current password is incorrect")
+        raise AppError("Current password is incorrect", status_code=status.HTTP_400_BAD_REQUEST)
+
     current_user.hashed_password = hash_password(body.new_password)
+    current_refresh_token = get_refresh_token_from_request(request)
+    next_refresh_token: str | None = None
+
+    if current_refresh_token:
+        try:
+            revoke_user_refresh_token_sessions(
+                db,
+                current_user.id,
+                exclude_raw_token=current_refresh_token,
+            )
+            _, next_refresh_token = rotate_refresh_token_session(db, current_refresh_token)
+        except UnauthorizedError:
+            revoke_user_refresh_token_sessions(db, current_user.id)
+            current_refresh_token = None
+    else:
+        revoke_user_refresh_token_sessions(db, current_user.id)
+
     db.add(current_user)
     db.commit()
+    if next_refresh_token:
+        set_refresh_token_cookie(response, next_refresh_token)
+    else:
+        clear_refresh_token_cookie(response)
     return None
 
 
 @router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
 def delete_account(
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_record),
 ):
@@ -333,6 +455,8 @@ def delete_account(
     db.query(PasswordResetToken).filter(PasswordResetToken.email == current_user.email).delete()
     # Deleting the user cascades to: Pack, Client, Conversation (and Message via Conversation).
     # Pack deletion cascades to all pack-scoped tables (brand_os, campaign, etc.)
+    # Refresh-token sessions also cascade via user_id.
     db.delete(current_user)
     db.commit()
+    clear_refresh_token_cookie(response)
     return None

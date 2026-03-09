@@ -1,8 +1,30 @@
+import type { AuthAccessToken } from "@/types/api-types";
 import { API_BASE } from "./utils";
+
+const ACCESS_TOKEN_STORAGE_KEY = "klarnow_token";
+const REFRESH_PATH = "/api/v1/auth/refresh";
+
+type ApiOptions = RequestInit & {
+  base?: string;
+  retryOnAuthError?: boolean;
+  _retriedAfterRefresh?: boolean;
+};
+
+let refreshPromise: Promise<string | null> | null = null;
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("klarnow_token");
+  return localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+}
+
+export function setToken(token: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, token);
+}
+
+export function clearToken(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
 }
 
 export function getHeaders(includeAuth = true): HeadersInit {
@@ -20,7 +42,7 @@ export function resolveApiUrl(path: string): string {
 
 export function handleUnauthorized(): void {
   if (typeof window === "undefined") return;
-  localStorage.removeItem("klarnow_token");
+  clearToken();
   window.dispatchEvent(new CustomEvent("auth:401"));
 }
 
@@ -37,11 +59,52 @@ function normalizeDetail(detail: unknown): string {
   return String(detail);
 }
 
+async function performRefreshAccessToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+
+  const res = await fetch(resolveApiUrl(REFRESH_PATH), {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    clearToken();
+    return null;
+  }
+
+  const data = (await res.json()) as AuthAccessToken;
+  if (!data.access_token) {
+    clearToken();
+    return null;
+  }
+
+  setToken(data.access_token);
+  return data.access_token;
+}
+
+export async function refreshAccessToken(): Promise<string | null> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = performRefreshAccessToken().finally(() => {
+    refreshPromise = null;
+  });
+
+  return refreshPromise;
+}
+
 export async function api<T>(
   path: string,
-  options: RequestInit & { base?: string } = {}
+  options: ApiOptions = {}
 ): Promise<T> {
-  const { base = API_BASE, ...rest } = options;
+  const {
+    base = API_BASE,
+    retryOnAuthError = true,
+    _retriedAfterRefresh = false,
+    ...rest
+  } = options;
   const url = path.startsWith("http") ? path : `${base}${path}`;
   const headers: Record<string, string> = {
     ...(getHeaders() as Record<string, string>),
@@ -52,10 +115,20 @@ export async function api<T>(
   }
   const res = await fetch(url, {
     ...rest,
+    credentials: rest.credentials ?? "include",
     headers,
   });
+  if (res.status === 401 && retryOnAuthError && !_retriedAfterRefresh) {
+    const nextAccessToken = await refreshAccessToken();
+    if (nextAccessToken) {
+      return api<T>(path, {
+        ...options,
+        _retriedAfterRefresh: true,
+      });
+    }
+    handleUnauthorized();
+  }
   if (!res.ok) {
-    if (res.status === 401 && getToken()) handleUnauthorized();
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     const message = normalizeDetail(err.detail) || String(res.status);
     throw new Error(message);
