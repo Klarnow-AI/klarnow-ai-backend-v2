@@ -19,21 +19,8 @@ def is_step_4_upgrade_gate_bypassed(now: datetime | None = None) -> bool:
 
 
 def can_generate_website(db: Session, pack: Pack) -> None:
-    """Gate: Brand OS and Campaign (with CTA) must exist before building website."""
-    if not pack.active_brand_os_id:
-        raise GateBlockedError(
-            "You need a Brand OS before building your website. Complete Core (generate Brand OS) first."
-        )
-    if not pack.active_campaign_id:
-        raise GateBlockedError(
-            "You need a Campaign with a primary CTA before building your website. Set up your offer and CTA first."
-        )
-    from app.modules.campaign.services import get_active_for_pack
-    campaign = get_active_for_pack(db, pack.id)
-    if not campaign or not campaign.primary_cta:
-        raise GateBlockedError(
-            "Your campaign must have a primary CTA before building the website."
-        )
+    """Website builder is intentionally ungated."""
+    _ = (db, pack)
 
 
 def can_generate_sprint(db: Session, pack: Pack) -> None:
