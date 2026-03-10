@@ -135,13 +135,18 @@ def generate_variants(db: Session, pack_id: UUID, user_id: UUID) -> dict:
     pack_snapshot = build_pack_snapshot(db, pack)
     selection_seed = secrets.token_hex(16)
 
+    # Release the read transaction before the in-memory generation pipeline runs so
+    # the final insert uses a fresh pooled connection instead of an idle one held
+    # since the initial pack lookup.
+    db.rollback()
+
     engine0 = run_engine0(pack_snapshot)
     engine1 = run_engine1(brand_brief, engine0)
     engine2 = run_engine2(brand_brief, engine1, selection_seed)
     engine3 = run_engine3(brand_brief, engine2, engine1.proof_strategy.strategy_id, selection_seed)
     engine4 = run_engine4(brand_brief, engine2, engine3)
-    engine5 = run_engine5(engine2, engine4)
-    engine6 = run_engine6(engine4.scripts, engine5)
+    engine5 = run_engine5(brand_brief, engine2, engine4)
+    engine6 = run_engine6(brand_brief, engine2, engine4, engine5)
 
     engines_output = {
         "engine0_packContext": engine0.model_dump(),

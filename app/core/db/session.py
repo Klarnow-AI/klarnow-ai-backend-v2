@@ -8,7 +8,10 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.config import get_settings
 from app.core.db.base import Base
+from app.core.db.model_registry import load_model_metadata
 from app.core.db.observability import record_db_query
+
+load_model_metadata()
 
 _settings = get_settings()
 engine_kwargs = {
@@ -56,5 +59,11 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         db.close()

@@ -13,15 +13,40 @@ import { AdPreviewPanel } from "./_components/ad-preview-panel";
 
 type Screen = "generate" | "overview" | "script-detail" | "render" | "launch";
 type VideoAsset = CreativeAsset & { created_at: string };
+const RENDER_POLL_DELAY_MS = 3000;
+const RENDER_POLL_MAX_ATTEMPTS = 20;
+const RECENT_PENDING_WINDOW_MS = 10 * 60 * 1000;
+
+function isVideoAsset(asset: CreativeAsset): asset is VideoAsset {
+  return asset.type === "video";
+}
+
+function sortVideos(items: VideoAsset[]): VideoAsset[] {
+  return [...items].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+}
+
+function isPendingVideo(video: VideoAsset): boolean {
+  return !video.output_key;
+}
+
+function isRecentlyRendered(iso: string): boolean {
+  const createdAt = Date.parse(iso);
+  return Number.isFinite(createdAt) && Date.now() - createdAt < RECENT_PENDING_WINDOW_MS;
+}
+
+function sameIds(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  const leftSorted = [...left].sort();
+  const rightSorted = [...right].sort();
+  return leftSorted.every((value, index) => value === rightSorted[index]);
+}
 
 function mergeVideos(existing: VideoAsset[], incoming: VideoAsset[]): VideoAsset[] {
   const byId = new Map(existing.map((video) => [video.id, video]));
   for (const video of incoming) {
     byId.set(video.id, video);
   }
-  return Array.from(byId.values()).sort(
-    (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)
-  );
+  return sortVideos(Array.from(byId.values()));
 }
 
 export default function AdFactoryPage() {
@@ -32,6 +57,7 @@ export default function AdFactoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<GenerateVariantsResponse | null>(null);
   const [videos, setVideos] = useState<VideoAsset[]>([]);
+  const [pendingVideoIds, setPendingVideoIds] = useState<string[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<"A" | "B" | "C" | null>(null);
 
   const handleGenerate = useCallback(async () => {
@@ -59,33 +85,90 @@ export default function AdFactoryPage() {
     }
   }, [packId]);
 
+  const fetchVideos = useCallback(async (): Promise<VideoAsset[]> => {
+    if (!packId) return [];
+    const res = await creative.listAssets(packId);
+    return sortVideos(res.items.filter(isVideoAsset));
+  }, [packId]);
+
   const loadVideos = useCallback(async () => {
-    if (!packId) return;
     try {
-      const res = await creative.listAssets(packId);
-      setVideos(
-        res.items
-          .filter((asset) => asset.type === "video")
-          .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
-      );
+      setVideos(await fetchVideos());
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load rendered videos";
       toast.error(message);
     }
-  }, [packId]);
+  }, [fetchVideos]);
 
   useEffect(() => {
     void loadVideos();
   }, [loadVideos]);
 
-  const refreshVideosAfterRender = useCallback(() => {
-    const delays = [2500, 8000];
-    for (const delay of delays) {
-      window.setTimeout(() => {
-        void loadVideos();
-      }, delay);
-    }
-  }, [loadVideos]);
+  useEffect(() => {
+    const recentPendingIds = videos
+      .filter((video) => isPendingVideo(video) && isRecentlyRendered(video.created_at))
+      .map((video) => video.id);
+    if (sameIds(recentPendingIds, pendingVideoIds)) return;
+    setPendingVideoIds(recentPendingIds);
+  }, [pendingVideoIds, videos]);
+
+  useEffect(() => {
+    if (!packId || pendingVideoIds.length === 0) return;
+
+    let cancelled = false;
+    let timeoutId: number | null = null;
+    let attempts = 0;
+
+    const scheduleNextPoll = () => {
+      timeoutId = window.setTimeout(() => {
+        void pollForPlaybackUrls();
+      }, RENDER_POLL_DELAY_MS);
+    };
+
+    const pollForPlaybackUrls = async () => {
+      attempts += 1;
+      try {
+        const latestVideos = await fetchVideos();
+        if (cancelled) return;
+
+        setVideos(latestVideos);
+        const remainingPending = pendingVideoIds.filter((assetId) => {
+          const asset = latestVideos.find((video) => video.id === assetId);
+          return asset ? isPendingVideo(asset) : true;
+        });
+
+        if (remainingPending.length === 0) {
+          setPendingVideoIds([]);
+          return;
+        }
+
+        if (attempts < RENDER_POLL_MAX_ATTEMPTS) {
+          scheduleNextPoll();
+          return;
+        }
+
+        setPendingVideoIds(remainingPending);
+        toast.error("Rendered videos are still being prepared for playback.");
+      } catch (err) {
+        if (cancelled) return;
+        if (attempts < RENDER_POLL_MAX_ATTEMPTS) {
+          scheduleNextPoll();
+          return;
+        }
+        const message = err instanceof Error ? err.message : "Failed to refresh rendered videos";
+        toast.error(message);
+      }
+    };
+
+    scheduleNextPoll();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [fetchVideos, packId, pendingVideoIds]);
 
   if (!packId) return null;
 
@@ -128,10 +211,9 @@ export default function AdFactoryPage() {
               try {
                 const res = await adFactory.render(result.render_id, ["A", "B", "C"]);
                 const renderedVideos = res.assets.filter(
-                  (asset): asset is VideoAsset => asset.type === "video"
+                  isVideoAsset
                 );
                 setVideos((current) => mergeVideos(current, renderedVideos));
-                refreshVideosAfterRender();
                 toast.success(`Rendered ${res.asset_ids.length} videos.`);
                 setScreen("overview");
               } catch (err) {

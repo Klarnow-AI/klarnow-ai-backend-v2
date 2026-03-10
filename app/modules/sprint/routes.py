@@ -45,6 +45,13 @@ def _ensure_pack_access(db, pack_id: UUID, user_id: UUID) -> None:
         raise NotFoundError("Pack not found")
 
 
+def _serialize_sprint(sprint, pack) -> SprintRead:
+    response = SprintRead.model_validate(sprint)
+    if response.current_day >= 3 and pack.onboarding_completed_at is None:
+        response.current_day = 2
+    return response
+
+
 @router.get("/packs/{pack_id}/sprint", response_model=SprintRead | None)
 def get_sprint(
     pack_id: UUID,
@@ -56,7 +63,10 @@ def get_sprint(
     sprint = get_sprint_for_pack(db, pack_id)
     if not sprint:
         return None
-    return SprintRead.model_validate(sprint)
+    pack = get_pack_for_user(db, pack_id, current_user.id)
+    if not pack:
+        raise NotFoundError("Pack not found")
+    return _serialize_sprint(sprint, pack)
 
 
 @router.post(
@@ -76,7 +86,10 @@ def create_sprint(
         sprint = create_sprint_for_pack(db, pack_id)
     except ValueError as e:
         raise map_value_error_to_app_error(e) from e
-    return SprintRead.model_validate(sprint)
+    pack = get_pack_for_user(db, pack_id, current_user.id)
+    if not pack:
+        raise NotFoundError("Pack not found")
+    return _serialize_sprint(sprint, pack)
 
 
 @router.get(
@@ -219,8 +232,11 @@ def complete_sprint_day(
         sprint = complete_day(db, sprint, day_number, user_selections)
     except ValueError as e:
         raise map_value_error_to_app_error(e) from e
-    
-    return SprintRead.model_validate(sprint)
+
+    pack = get_pack_for_user(db, pack_id, current_user.id)
+    if not pack:
+        raise NotFoundError("Pack not found")
+    return _serialize_sprint(sprint, pack)
 
 
 @router.post(
@@ -240,4 +256,7 @@ def day_14_checkin(
         new_sprint = complete_sprint_and_reload(db, pack_id, sprint_id)
     except ValueError as e:
         raise map_value_error_to_app_error(e) from e
-    return SprintRead.model_validate(new_sprint)
+    pack = get_pack_for_user(db, pack_id, current_user.id)
+    if not pack:
+        raise NotFoundError("Pack not found")
+    return _serialize_sprint(new_sprint, pack)

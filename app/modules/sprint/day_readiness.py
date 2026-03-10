@@ -1,5 +1,6 @@
 """Day 0-3 readiness: check if all required questions are answered before showing Mark day complete."""
 
+from typing import TypedDict
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -8,23 +9,25 @@ from app.modules.packs.models import Pack
 from app.modules.sprint.day_definitions import get_day_conversation_steps
 
 
+class DayReadinessState(TypedDict):
+    ready: bool
+    reason: str | None
+
+
 def _has_value(val: str | None) -> bool:
     return bool(val and str(val).strip())
 
 
-def is_day_ready_to_complete(db: Session, pack_id: UUID, day_number: int) -> bool:
-    """
-    Return True if all required questions for the given day (0-3) have been answered.
-    Uses pack fields and onboarding_answers.
-    """
+def get_day_readiness_state(db: Session, pack_id: UUID, day_number: int) -> DayReadinessState:
+    """Return readiness plus the first missing requirement, if any."""
     if day_number < 0 or day_number > 3:
-        return False
+        return {"ready": False, "reason": f"Day {day_number} is not available."}
 
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
-        return False
+        return {"ready": False, "reason": "Pack not found."}
 
-    oa = pack.onboarding_answers or {}
+    oa = pack.onboarding_answers if isinstance(pack.onboarding_answers, dict) else {}
     steps = get_day_conversation_steps(day_number)
 
     # Skip brand_url if has_existing_brand is not "yes"
@@ -68,6 +71,18 @@ def is_day_ready_to_complete(db: Session, pack_id: UUID, day_number: int) -> boo
             val = oa.get(key) or getattr(pack, key, None)
 
         if not _has_value(val):
-            return False
+            field_label = str(label or key or "this field").strip()
+            return {
+                "ready": False,
+                "reason": f'Please complete "{field_label}" before finishing Step {day_number}.',
+            }
 
-    return True
+    return {"ready": True, "reason": None}
+
+
+def is_day_ready_to_complete(db: Session, pack_id: UUID, day_number: int) -> bool:
+    """
+    Return True if all required questions for the given day (0-3) have been answered.
+    Uses pack fields and onboarding_answers.
+    """
+    return get_day_readiness_state(db, pack_id, day_number)["ready"]

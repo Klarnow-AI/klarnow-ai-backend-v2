@@ -6,6 +6,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import type { CreativeAsset } from "@/types/api-types";
 
 type VideoAsset = CreativeAsset & { created_at: string };
+const RECENT_PENDING_WINDOW_MS = 10 * 60 * 1000;
 
 type AdPreviewPanelProps = {
   videos?: VideoAsset[];
@@ -24,6 +25,16 @@ function formatDate(iso: string): string {
   } catch {
     return "";
   }
+}
+
+function isPlayableVideo(video: VideoAsset): boolean {
+  return Boolean(video.output_key && video.output_url);
+}
+
+function isRecentlyPendingVideo(video: VideoAsset): boolean {
+  if (video.output_key) return false;
+  const createdAt = Date.parse(video.created_at);
+  return Number.isFinite(createdAt) && Date.now() - createdAt < RECENT_PENDING_WINDOW_MS;
 }
 
 export function AdPreviewPanel({
@@ -71,64 +82,71 @@ export function AdPreviewPanel({
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {videos.map((video, index) => (
-            <div
-              key={video.id}
-              className="group flex flex-col rounded-xl border border-border bg-card overflow-hidden"
-            >
-              <div className="relative flex aspect-video items-center justify-center bg-muted">
-                {video.output_url ? (
-                  <video
-                    className="h-full w-full bg-black object-cover"
-                    controls
-                    playsInline
-                    preload={index < 2 ? "auto" : "metadata"}
-                    poster={video.poster_url ?? undefined}
-                    src={video.output_url}
-                  />
-                ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center">
-                    <Film className="h-12 w-12 text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground">
-                      Video rendered, but no playback URL is available.
+          {videos.map((video, index) => {
+            const playable = isPlayableVideo(video);
+            const playbackUrl = video.output_url ?? undefined;
+
+            return (
+              <div
+                key={video.id}
+                className="group flex flex-col rounded-xl border border-border bg-card overflow-hidden"
+              >
+                <div className="relative flex aspect-video items-center justify-center bg-muted">
+                  {playable ? (
+                    <video
+                      className="h-full w-full bg-black object-cover"
+                      controls
+                      playsInline
+                      preload={index < 2 ? "auto" : "metadata"}
+                      poster={video.poster_url ?? undefined}
+                      src={playbackUrl}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center">
+                      <Film className="h-12 w-12 text-muted-foreground" />
+                      <p className="text-xs text-muted-foreground">
+                        {isRecentlyPendingVideo(video)
+                          ? "Preparing playback. This can take a minute."
+                          : "Playback URL is not available for this video."}
+                      </p>
+                    </div>
+                  )}
+                  {onDelete && (
+                    <IconButton
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label="Delete video"
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-destructive/90"
+                      onClick={() => onDelete(video.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </IconButton>
+                  )}
+                </div>
+                <div className="p-3 space-y-1">
+                  {video.script && (
+                    <p className="text-xs text-muted-foreground line-clamp-3">
+                      {video.script}
                     </p>
-                  </div>
-                )}
-                {onDelete && (
-                  <IconButton
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    aria-label="Delete video"
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-destructive/90"
-                    onClick={() => onDelete(video.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </IconButton>
-                )}
-              </div>
-              <div className="p-3 space-y-1">
-                {video.script && (
-                  <p className="text-xs text-muted-foreground line-clamp-3">
-                    {video.script}
+                  )}
+                  {playable && playbackUrl && (
+                    <a
+                      href={playbackUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex text-xs font-medium text-primary hover:underline"
+                    >
+                      Open video
+                    </a>
+                  )}
+                  <p className="text-xs text-muted-foreground/70">
+                    {formatDate(video.created_at)}
                   </p>
-                )}
-                {video.output_url && (
-                  <a
-                    href={video.output_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex text-xs font-medium text-primary hover:underline"
-                  >
-                    Open video
-                  </a>
-                )}
-                <p className="text-xs text-muted-foreground/70">
-                  {formatDate(video.created_at)}
-                </p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

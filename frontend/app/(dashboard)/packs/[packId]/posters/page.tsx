@@ -407,6 +407,7 @@ poster-v4-4x5.tsx, poster-v4-9x16.tsx, poster-v4-16x9.tsx, poster-v4-1x1.tsx.
         apiRoute: "/api/v1/creative/generate",
         messages: [{ role: "user", content: prompt }],
         brandContext,
+        packId,
         generationMode: "auto",
       },
       {

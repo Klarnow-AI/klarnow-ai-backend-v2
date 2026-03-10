@@ -1,30 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CreativeTemplateCard,
   type CreativeTemplateCardAsset,
 } from "./creative-template-card";
 import { Image, Lock } from "@/components/icons";
 import { Spinner } from "@/components/ui/page-loader";
-
-let cachedPosterLoadingAnimationData: object | null = null;
-
-async function loadPosterLoadingAnimationData(): Promise<object | null> {
-  if (cachedPosterLoadingAnimationData) {
-    return cachedPosterLoadingAnimationData;
-  }
-
-  try {
-    const res = await fetch("/assets/jsons/ai-loading.json");
-    if (!res.ok) return null;
-    const data = await res.json();
-    cachedPosterLoadingAnimationData = data;
-    return data;
-  } catch {
-    return null;
-  }
-}
+import { inferPosterCanvasDimensions } from "@/lib/poster-canvas";
 
 export type CreativeGenerationDisplay = {
   kind: "prompt" | "background_task";
@@ -53,6 +36,9 @@ type CreativeTemplateGridProps = {
   onAssetClick: (asset: CreativeTemplateCardAsset) => void;
 };
 
+const MASONRY_AUTO_ROW_PX = 8;
+const MASONRY_ESTIMATED_TILE_WIDTH_PX = 240;
+
 function renderGroupHeader(
   display: CreativeGenerationDisplay,
   progress?: {
@@ -80,44 +66,96 @@ function renderGroupHeader(
   return null;
 }
 
-function GeneratingTile() {
-  const [animationData, setAnimationData] = useState<object | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
+function MasonryTile({
+  aspectRatio,
+  children,
+}: {
+  aspectRatio: number;
+  children: React.ReactNode;
+}) {
+  const itemRef = useRef<HTMLDivElement>(null);
+  const [rowSpan, setRowSpan] = useState(() =>
+    Math.max(
+      1,
+      Math.ceil(
+        (MASONRY_ESTIMATED_TILE_WIDTH_PX * aspectRatio) / MASONRY_AUTO_ROW_PX,
+      ),
+    ),
+  );
 
   useEffect(() => {
-    let cancelled = false;
+    if (!itemRef.current) return;
 
-    loadPosterLoadingAnimationData()
-      .then((data) => {
-        if (cancelled) return;
-        setAnimationData(data);
-        setLoadFailed(!data);
-      })
-      .catch(() => {
-        if (!cancelled) setLoadFailed(true);
-      });
+    const element = itemRef.current;
 
-    return () => {
-      cancelled = true;
+    const updateRowSpan = () => {
+      const grid = element.parentElement;
+      const itemWidth = element.clientWidth;
+      if (!grid || itemWidth <= 0) return;
+
+      const gridStyles = window.getComputedStyle(grid);
+      const rowGap = Number.parseFloat(gridStyles.rowGap || "0");
+      const nextRowSpan = Math.max(
+        1,
+        Math.ceil(
+          (itemWidth * aspectRatio + rowGap) / (MASONRY_AUTO_ROW_PX + rowGap),
+        ),
+      );
+
+      setRowSpan((current) =>
+        current === nextRowSpan ? current : nextRowSpan,
+      );
     };
-  }, []);
+
+    updateRowSpan();
+
+    const resizeObserver = new ResizeObserver(updateRowSpan);
+    resizeObserver.observe(element);
+
+    return () => resizeObserver.disconnect();
+  }, [aspectRatio]);
 
   return (
-    <div className="min-w-0">
-      <div className="flex aspect-[4/5] items-center justify-center min-w-0">
-        {loadFailed || !animationData ? (
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-foreground" />
-        ) : (
-          // <Lottie
-          //   animationData={animationData}
-          //   loop
-          //   autoplay
-          //   className="h-full w-full"
-          // />
-          <Spinner className="h-10 w-10" />
-        )}
-      </div>
+    <div
+      ref={itemRef}
+      className="min-w-0"
+      style={{ gridRow: `span ${rowSpan} / span ${rowSpan}` }}
+    >
+      {children}
     </div>
+  );
+}
+
+function PosterTile({
+  asset,
+  onAssetClick,
+}: {
+  asset: CreativeTemplateCardAsset;
+  onAssetClick: (asset: CreativeTemplateCardAsset) => void;
+}) {
+  const canvas = useMemo(
+    () => inferPosterCanvasDimensions(asset.name, asset.code),
+    [asset.code, asset.name],
+  );
+
+  return (
+    <MasonryTile aspectRatio={canvas.height / canvas.width}>
+      <CreativeTemplateCard
+        asset={asset}
+        onClick={() => onAssetClick(asset)}
+        className="h-full"
+      />
+    </MasonryTile>
+  );
+}
+
+function GeneratingTile() {
+  return (
+    <MasonryTile aspectRatio={5 / 4}>
+      <div className="flex h-full items-center justify-center min-w-0 rounded-xl bg-muted/20">
+        <Spinner className="h-10 w-10" />
+      </div>
+    </MasonryTile>
   );
 }
 
@@ -184,14 +222,13 @@ export function CreativeTemplateGrid({
               ? generationProgress
               : null,
           )}
-          <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] sm:grid-cols-[repeat(3,minmax(0,1fr))] md:grid-cols-[repeat(4,minmax(0,1fr))] gap-4">
+          <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] sm:grid-cols-[repeat(3,minmax(0,1fr))] md:grid-cols-[repeat(4,minmax(0,1fr))] auto-rows-[8px] gap-4 grid-flow-dense items-start">
             {group.results.map((asset, i) => (
-              <div key={asset.id ?? `${asset.name}-${i}`} className="min-w-0">
-                <CreativeTemplateCard
-                  asset={asset}
-                  onClick={() => onAssetClick(asset)}
-                />
-              </div>
+              <PosterTile
+                key={asset.id ?? `${asset.name}-${i}`}
+                asset={asset}
+                onAssetClick={onAssetClick}
+              />
             ))}
             {isGenerating && group.display.displayKey === activeDisplayKey && (
               <GeneratingTile />
@@ -202,7 +239,7 @@ export function CreativeTemplateGrid({
       {isGenerating && generationDisplay && !hasActiveGroup && (
         <div className="space-y-4 min-w-0">
           {renderGroupHeader(generationDisplay, generationProgress)}
-          <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] sm:grid-cols-[repeat(3,minmax(0,1fr))] md:grid-cols-[repeat(4,minmax(0,1fr))] gap-4">
+          <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] sm:grid-cols-[repeat(3,minmax(0,1fr))] md:grid-cols-[repeat(4,minmax(0,1fr))] auto-rows-[8px] gap-4 grid-flow-dense items-start">
             <GeneratingTile />
           </div>
         </div>

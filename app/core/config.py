@@ -2,12 +2,29 @@ import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlparse
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+_LOCAL_DB_HOSTS = {"", "localhost", "127.0.0.1", "::1"}
+
+
+def _database_uses_remote_host(database_url: str) -> bool:
+    try:
+        parsed = urlparse(database_url)
+    except ValueError:
+        return False
+
+    scheme = (parsed.scheme or "").split("+", 1)[0]
+    if scheme == "sqlite":
+        return False
+
+    host = (parsed.hostname or "").strip().lower()
+    return host not in _LOCAL_DB_HOSTS
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -34,7 +51,7 @@ class Settings(BaseSettings):
     db_pool_size: int = 5
     db_max_overflow: int = 0
     db_pool_timeout_seconds: int = 30
-    # Leave unset to auto-enable in staging/production and disable in development.
+    # Leave unset to auto-enable for staging/production and remote databases.
     db_pool_pre_ping: bool | None = None
     # Recycle long-lived connections periodically to avoid stale remote sockets.
     db_pool_recycle_seconds: int = 1800
@@ -172,7 +189,10 @@ class Settings(BaseSettings):
             raise ValueError("DATABASE_URL is required")
 
         if self.db_pool_pre_ping is None:
-            self.db_pool_pre_ping = self.app_env in {"production", "staging"}
+            self.db_pool_pre_ping = (
+                self.app_env in {"production", "staging"}
+                or _database_uses_remote_host(self.database_url)
+            )
 
         if self.app_env in {"production", "staging"}:
             missing: list[str] = []

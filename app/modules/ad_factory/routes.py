@@ -4,15 +4,35 @@ from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import DBAPIError, OperationalError
 
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
-from app.core.errors import NotFoundError, map_value_error_to_app_error
+from app.core.errors import (
+    NotFoundError,
+    ServiceUnavailableError,
+    map_value_error_to_app_error,
+)
 from app.modules.ad_factory.render_service import render_with_kling
 from app.modules.ad_factory.services import generate_variants, get_render
 from app.modules.packs.models import User
 
 router = APIRouter()
+_TRANSIENT_DB_ERROR_MARKERS = (
+    "ssl error",
+    "server closed the connection unexpectedly",
+    "connection not open",
+    "connection reset by peer",
+    "could not receive data from server",
+    "terminating connection due to administrator command",
+)
+
+
+def _is_transient_db_connection_error(exc: Exception) -> bool:
+    if isinstance(exc, DBAPIError) and exc.connection_invalidated:
+        return True
+    message = str(exc).lower()
+    return any(marker in message for marker in _TRANSIENT_DB_ERROR_MARKERS)
 
 
 class GenerateBody(BaseModel):
@@ -34,6 +54,16 @@ def post_generate(
         return generate_variants(db, body.pack_id, current_user.id)
     except ValueError as e:
         raise map_value_error_to_app_error(e) from e
+    except OperationalError as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        if _is_transient_db_connection_error(e):
+            raise ServiceUnavailableError(
+                "Database connection dropped while saving ad variants. Please retry."
+            ) from e
+        raise
 
 
 @router.post("/renders/{render_id}/render", response_model=dict)

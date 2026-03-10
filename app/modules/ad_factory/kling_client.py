@@ -72,7 +72,7 @@ def _build_text_to_video_payload(
         "prompt": prompt_text[:KLING_MAX_PROMPT_CHARS],
         "duration": str(duration),
         "aspect_ratio": aspect_ratio,
-        "sound": "off",
+        "sound": "on",
     }
 
 

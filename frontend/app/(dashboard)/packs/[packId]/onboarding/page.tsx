@@ -5,7 +5,6 @@ import {
   useOnboardingChat,
   OnboardingSharedStepLayout,
 } from "@/components/onboarding-chat";
-import { CoreConceptLockModal } from "@/components/core-concept-lock-modal";
 
 export default function OnboardingPage() {
   const params = useParams();
@@ -14,7 +13,7 @@ export default function OnboardingPage() {
   const state = useOnboardingChat({
     initialPackId: packId,
     onComplete: (id) => {
-      router.push(`/chat?pack=${id}`);
+      router.push(`/packs/${id}`);
       router.refresh();
     },
   });
@@ -38,14 +37,6 @@ export default function OnboardingPage() {
         onSubmit={state.handleSend}
         onboardingProgress={state.onboardingProgress}
         retryFailedStep={state.retryFailedStep}
-      />
-
-      <CoreConceptLockModal
-        open={state.showCoreConceptModal}
-        packId={state.completedPack?.id ?? null}
-        initialCoreConcept={state.completedPack?.core_concept ?? null}
-        onConfirm={state.handleCoreConceptConfirm}
-        loading={state.loading}
       />
     </div>
   );

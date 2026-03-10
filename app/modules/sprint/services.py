@@ -274,6 +274,14 @@ def _seed_ad_factory_videos_after_day_3(db: Session, sprint: Sprint) -> None:
     render_video(db=db, pack_id=sprint.pack_id, count=4, sprint_day=4)
 
 
+def _effective_current_day(sprint: Sprint, pack: Pack | None) -> int:
+    """Clamp Step 3 until Step 2 onboarding finalization has succeeded."""
+    current_day = sprint.current_day
+    if pack and current_day >= 3 and pack.onboarding_completed_at is None:
+        return 2
+    return current_day
+
+
 @log_service_action()
 def get_active_sprint_for_pack(db: Session, pack_id: UUID) -> Sprint | None:
     """Return the active sprint for the pack, or None."""
@@ -421,6 +429,11 @@ def complete_day(db: Session, sprint: Sprint, day_number: int, user_selections: 
     pack = db.query(Pack).filter(Pack.id == sprint.pack_id).first()
     if not pack:
         raise ValueError(f"Pack {sprint.pack_id} not found")
+
+    if day_number == 2 and pack.onboarding_completed_at is None:
+        raise ValueError(
+            "Generate your Brand OS to complete Step 2 before moving to Step 3."
+        )
     
     # Check daily completion gate (Days 4-13)
     can_pass, blocker_msg = can_complete_day(db, card, day_number, pack)
@@ -435,8 +448,8 @@ def complete_day(db: Session, sprint: Sprint, day_number: int, user_selections: 
         sprint.status = SPRINT_STATUS_COMPLETED
         sprint.completed_at = now
     
-    # Sync Pack fields for Day 1 & 2
-    if user_selections and day_number in (1, 2):
+    # Sync Pack fields for Day 1-3
+    if user_selections and day_number in (1, 2, 3):
         if day_number == 1:
             # Day 1: Offer
             if "offer_one_liner" in user_selections:
@@ -449,7 +462,14 @@ def complete_day(db: Session, sprint: Sprint, day_number: int, user_selections: 
                 pack.primary_outcome = (user_selections["primary_outcome"] or "").strip() or None
             if "target_audience" in user_selections:
                 pack.target_audience = (user_selections["target_audience"] or "").strip() or None
-    
+        elif day_number == 3:
+            answers = dict(pack.onboarding_answers or {})
+            if "pitch_script" in user_selections:
+                answers["pitch_script"] = (user_selections["pitch_script"] or "").strip()
+            if "voice_notes_sent" in user_selections:
+                answers["voice_notes_sent"] = str(user_selections["voice_notes_sent"]).strip()
+            pack.onboarding_answers = answers
+
     db.commit()
     db.refresh(sprint)
     return sprint
@@ -489,10 +509,14 @@ def get_sprint_day_detail(db: Session, pack_id: UUID, day_number: int) -> dict |
         return None
 
     pack = db.query(Pack).filter(Pack.id == sprint.pack_id).first()
-
-    unlocked = day_number <= sprint.current_day
+    effective_current_day = _effective_current_day(sprint, pack)
+    unlocked = day_number <= effective_current_day
     blocker_message: str | None = None
     completion_blocked_message: str | None = None
+
+    if day_number == 3 and pack and pack.onboarding_completed_at is None:
+        unlocked = False
+        blocker_message = "Complete Step 2 and generate your Brand OS first."
 
     if unlocked and pack:
         from app.core.gates import (
@@ -543,7 +567,8 @@ def get_or_generate_today_tasks(db: Session, pack_id: UUID) -> dict[str, Any]:
             time_estimate="10 mins",
         )
 
-    day_number = sprint.current_day
+    pack = db.query(Pack).filter(Pack.id == sprint.pack_id).first()
+    day_number = _effective_current_day(sprint, pack)
     day_def = get_day_definition(day_number)
     fallback_labels, overview = _fallback_task_labels(day_number, sprint.mode)
     day_title = str(day_def.get("title") or f"Day {day_number}")
@@ -553,7 +578,6 @@ def get_or_generate_today_tasks(db: Session, pack_id: UUID) -> dict[str, Any]:
 
     cache = _get_cached_today_tasks(card, day_number)
     if not cache:
-        pack = db.query(Pack).filter(Pack.id == sprint.pack_id).first()
         context = _pack_context_for_today_tasks(pack) if pack else "No pack context available yet."
         llm_labels = _generate_today_task_labels_with_llm(
             day_number=day_number,
@@ -610,9 +634,11 @@ def toggle_today_task_check(
     sprint = get_active_sprint_for_pack(db, pack_id)
     if not sprint:
         raise ValueError("No active sprint")
-    if day_number != sprint.current_day:
+    pack = db.query(Pack).filter(Pack.id == sprint.pack_id).first()
+    effective_current_day = _effective_current_day(sprint, pack)
+    if day_number != effective_current_day:
         raise StaleDayError(
-            f"Checklist moved to Day {sprint.current_day}. Refresh and try again."
+            f"Checklist moved to Day {effective_current_day}. Refresh and try again."
         )
 
     card = get_day_card(db, sprint.id, day_number)

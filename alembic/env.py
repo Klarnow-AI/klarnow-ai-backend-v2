@@ -7,17 +7,9 @@ from alembic import context
 
 from app.core.config import get_settings
 from app.core.db.base import Base
-from app.modules.brand_os import models as brand_os_models  # noqa: F401
-from app.modules.campaign import models as campaign_models  # noqa: F401
-from app.modules.packs import models as packs_models  # noqa: F401
-from app.modules.agents import models as agents_models  # noqa: F401
-from app.modules.creative import models as creative_models  # noqa: F401
-from app.modules.clients import models as clients_models  # noqa: F401
-from app.modules.revenue import models as revenue_models  # noqa: F401
-from app.modules.proof_vault import models as proof_vault_models  # noqa: F401
-from app.modules.chat import models as chat_models  # noqa: F401
-from app.modules.builder import models as builder_models  # noqa: F401
-from app.modules.ad_factory import models as ad_factory_models  # noqa: F401
+from app.core.db.model_registry import load_model_metadata
+
+load_model_metadata()
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

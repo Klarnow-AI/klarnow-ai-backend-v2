@@ -1,6 +1,7 @@
 """Brand OS tools: generate_brand_os (Strategy Agent), suggest_field_value. Writes only via this layer."""
 
 import json
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -10,6 +11,7 @@ from app.modules.brand_os.domain_schema import BrandOS as BrandOSDomain
 from app.modules.brand_os.models import BrandOS
 from app.modules.brand_os.services import get_active_for_pack, get_by_source_job_id, list_versions_for_pack
 from app.modules.packs.models import Pack
+from app.modules.packs.services import build_step_2_finalization_payload
 
 
 GENERATE_BRAND_OS_SCHEMA = {
@@ -96,6 +98,57 @@ def _stub_brand_os_domain() -> BrandOSDomain:
             ),
         ),
     )
+
+
+def _build_brand_os_context_payload(
+    pack: Pack,
+    onboarding_answers_override: dict | None = None,
+) -> dict[str, Any]:
+    payload = build_step_2_finalization_payload(pack)
+    if not onboarding_answers_override:
+        return payload
+
+    override = dict(onboarding_answers_override)
+    answers = dict(payload.get("answers") or {})
+    answers.update({key: value for key, value in override.items() if value is not None})
+    payload["answers"] = answers
+
+    override_field_map = {
+        "pack_name": "pack_name",
+        "pack_type": "pack_type",
+        "brand_name": "brand_name",
+        "primary_cta": "primary_cta",
+        "usp_category": "usp_category",
+        "usp_statement": "usp_statement",
+        "usp_proof": "usp_proof",
+        "proof_text": "proof_text",
+        "offer_one_liner": "offer_one_liner",
+        "primary_pain": "primary_pain",
+        "primary_outcome": "primary_outcome",
+        "target_audience": "target_audience",
+    }
+    for payload_key, override_key in override_field_map.items():
+        raw_value = override.get(override_key)
+        if isinstance(raw_value, str) and raw_value.strip():
+            payload[payload_key] = raw_value.strip()
+
+    if override.get("has_existing_brand") is not None:
+        payload["has_existing_brand"] = override.get("has_existing_brand")
+    if override.get("brand_url") is not None:
+        payload["brand_url"] = override.get("brand_url")
+    if override.get("extracted_brand") is not None:
+        payload["extracted_brand"] = override.get("extracted_brand")
+    if override.get("vibe_chips") is not None:
+        payload["vibe_chips"] = override.get("vibe_chips")
+
+    if not payload.get("target_audience"):
+        for fallback_key in ("who_is_it_for", "q1"):
+            raw_value = override.get(fallback_key)
+            if isinstance(raw_value, str) and raw_value.strip():
+                payload["target_audience"] = raw_value.strip()
+                break
+
+    return payload
 
 
 def _call_openai_for_brand_os(context: str) -> BrandOSDomain:
@@ -193,6 +246,7 @@ def generate_brand_os(
     pack_id: UUID | str,
     onboarding_answers: dict | None = None,
     source_job_id: str | None = None,
+    allow_without_onboarding_complete: bool = False,
 ) -> dict:
     """Create a new Brand OS version (A or B) for the pack. Strategy Agent only."""
     pack_id = UUID(str(pack_id)) if isinstance(pack_id, str) else pack_id
@@ -211,16 +265,22 @@ def generate_brand_os(
     # Do not generate Brand OS for new brands until Day 0 (onboarding) is complete.
     answers = onboarding_answers if onboarding_answers is not None else (pack.onboarding_answers or {})
     is_new_brand = answers.get("has_existing_brand") == "no"
-    if is_new_brand and pack.onboarding_completed_at is None:
+    if is_new_brand and pack.onboarding_completed_at is None and not allow_without_onboarding_complete:
         raise ValueError(
             "Complete Day 0 onboarding before generating Brand OS for new brands."
         )
 
     context = ""
     if onboarding_answers is not None:
-        context = str(onboarding_answers)
+        context = json.dumps(
+            _build_brand_os_context_payload(pack, onboarding_answers),
+            ensure_ascii=True,
+        )
     elif pack.onboarding_answers:
-        context = str(pack.onboarding_answers)
+        context = json.dumps(
+            _build_brand_os_context_payload(pack),
+            ensure_ascii=True,
+        )
     else:
         existing = list_versions_for_pack(db, pack_id)
         if existing:

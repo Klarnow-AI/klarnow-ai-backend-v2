@@ -1,8 +1,20 @@
 """Storage: S3 upload/delete helpers."""
 
-from urllib.parse import quote
+import logging
+import threading
+import time
+from urllib.parse import quote, unquote, urlsplit
+
+import requests
 
 from app.core.config import get_settings
+
+CDN_PROBE_TIMEOUT_SECONDS = 2
+CDN_FAILURE_COOLDOWN_SECONDS = 300
+
+logger = logging.getLogger(__name__)
+_CDN_FAILURE_LOCK = threading.Lock()
+_CDN_FAILURE_UNTIL_BY_BASE: dict[str, float] = {}
 
 
 def storage_enabled() -> bool:
@@ -78,6 +90,77 @@ def get_presigned_url(key: str, expires_in: int = 3600) -> str | None:
     )
 
 
+def _build_cdn_url(cdn_base: str, key: str) -> str:
+    encoded_key = "/".join(quote(part, safe="") for part in key.lstrip("/").split("/"))
+    return f"{cdn_base.rstrip('/')}/{encoded_key}"
+
+
+def _cdn_failure_active(cdn_base: str) -> bool:
+    with _CDN_FAILURE_LOCK:
+        failure_until = _CDN_FAILURE_UNTIL_BY_BASE.get(cdn_base, 0.0)
+        if failure_until <= time.monotonic():
+            _CDN_FAILURE_UNTIL_BY_BASE.pop(cdn_base, None)
+            return False
+        return True
+
+
+def _set_cdn_failure_cooldown(cdn_base: str) -> None:
+    with _CDN_FAILURE_LOCK:
+        _CDN_FAILURE_UNTIL_BY_BASE[cdn_base] = time.monotonic() + CDN_FAILURE_COOLDOWN_SECONDS
+
+
+def _cdn_url_available(url: str) -> bool:
+    try:
+        response = requests.head(
+            url,
+            allow_redirects=True,
+            timeout=CDN_PROBE_TIMEOUT_SECONDS,
+        )
+    except requests.RequestException as exc:
+        logger.warning("storage_cdn_probe_failed | url=%s | error=%s", url, exc)
+        return False
+    return response.status_code == 405 or 200 <= response.status_code < 400
+
+
+def extract_storage_key(value: str | None) -> str | None:
+    raw = (value or "").strip()
+    if not raw:
+        return None
+
+    if raw.startswith("key:"):
+        key = raw[4:].lstrip("/")
+        return key or None
+
+    cdn_base = (get_settings().storage_cdn_url or "").strip().rstrip("/")
+    if not cdn_base or not raw.startswith(f"{cdn_base}/"):
+        return None
+
+    base_parts = urlsplit(cdn_base)
+    value_parts = urlsplit(raw)
+    if (
+        value_parts.scheme != base_parts.scheme
+        or value_parts.netloc != base_parts.netloc
+        or not value_parts.path.startswith(f"{base_parts.path.rstrip('/')}/")
+    ):
+        return None
+
+    encoded_key = value_parts.path[len(base_parts.path.rstrip("/")) + 1 :]
+    key = "/".join(unquote(part) for part in encoded_key.split("/"))
+    return key or None
+
+
+def resolve_asset_reference(value: str | None, expires_in: int = 3600) -> str | None:
+    raw = (value or "").strip()
+    if not raw:
+        return None
+
+    key = extract_storage_key(raw)
+    if not key:
+        return raw
+
+    return get_asset_url(key, expires_in=expires_in) or raw
+
+
 def get_asset_url(key: str, expires_in: int = 3600) -> str | None:
     """Return a CDN/public URL when configured, otherwise fall back to a presigned URL."""
     if not key:
@@ -86,7 +169,12 @@ def get_asset_url(key: str, expires_in: int = 3600) -> str | None:
     s = get_settings()
     cdn_base = (s.storage_cdn_url or "").strip().rstrip("/")
     if cdn_base:
-        encoded_key = "/".join(quote(part, safe="") for part in key.lstrip("/").split("/"))
-        return f"{cdn_base}/{encoded_key}"
+        cdn_url = _build_cdn_url(cdn_base, key)
+        if _cdn_failure_active(cdn_base):
+            return get_presigned_url(key, expires_in=expires_in)
+        if _cdn_url_available(cdn_url):
+            return cdn_url
+        _set_cdn_failure_cooldown(cdn_base)
+        logger.warning("storage_cdn_unavailable_falling_back_to_presigned | url=%s", cdn_url)
 
     return get_presigned_url(key, expires_in=expires_in)

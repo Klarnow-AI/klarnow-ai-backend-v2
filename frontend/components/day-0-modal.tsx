@@ -8,7 +8,7 @@ import { SearchInput } from "@/components/ui/search-input";
 import { Spinner } from "@/components/ui/page-loader";
 import { BrandPreviewModal } from "@/components/brand-preview-modal";
 import { OnboardingChoiceButtons } from "@/components/onboarding-chat";
-import { packs, pollPackUntilOnboardingReady } from "@/api_requests/packs";
+import { packs } from "@/api_requests/packs";
 import { sprintApi } from "@/api_requests/sprint";
 import { dispatchPackRefresh } from "@/lib/pack-refresh-events";
 import type { Pack, ExtractBrandResponse } from "@/types/api-types";
@@ -118,7 +118,6 @@ export function Day0Modal({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [onboardingProgress, setOnboardingProgress] = useState("");
   const [step, setStep] = useState(0);
   const [values, setValues] = useState<Record<string, string>>({
     has_existing_brand: "",
@@ -135,12 +134,11 @@ export function Day0Modal({
   const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const hasExistingBrand = values.has_existing_brand === "yes";
-  const onboardingAlreadyComplete = !!pack?.onboarding_completed_at;
-  const onboardingBackgroundReady = !!pack?.onboarding_background_completed_at;
+  const step0AlreadyComplete = !!pack?.day_0_completed_at;
   const steps = useMemo<Day0StepConfig[]>(() => {
-    if (onboardingAlreadyComplete) return DAY0_STEPS_AFTER_CHOICE;
+    if (step0AlreadyComplete) return DAY0_STEPS_AFTER_CHOICE;
     return [STEP_CHOICE, ...(hasExistingBrand ? [STEP_WEBSITE_URL] : []), ...DAY0_STEPS_AFTER_CHOICE];
-  }, [onboardingAlreadyComplete, hasExistingBrand]);
+  }, [step0AlreadyComplete, hasExistingBrand]);
   const totalSteps = steps.length;
   const currentStep = steps[step];
   const isLastStep = step === totalSteps - 1;
@@ -150,7 +148,6 @@ export function Day0Modal({
     if (!open || !packId) return;
     setLoading(true);
     setError("");
-    setOnboardingProgress("");
     setStep(0);
     Promise.all([packs.get(packId), sprintApi.getSprint(packId)])
       .then(([p, s]) => {
@@ -179,48 +176,6 @@ export function Day0Modal({
     const current = steps[step];
     if (current) setInput(getStepValue(current, values));
   }, [step, values, steps]);
-
-  useEffect(() => {
-    if (!open || !packId || saving) return;
-    if (!pack?.onboarding_completed_at || pack.onboarding_background_completed_at) return;
-
-    let cancelled = false;
-    setOnboardingProgress((current) => current || "Queued. Preparing your brand setup...");
-
-    void pollPackUntilOnboardingReady(packId, {
-      onProgress: (_status, message) => {
-        if (!cancelled) setOnboardingProgress(message);
-      },
-    })
-      .then((completedPack) => {
-        if (cancelled) return;
-        setPack(completedPack);
-        setOnboardingProgress("");
-        dispatchPackRefresh({
-          packId,
-          scopes: ["summary", "today-tasks", "next-action", "gates", "sprint"],
-        });
-      })
-      .catch((pollErr) => {
-        if (cancelled) return;
-        setOnboardingProgress("");
-        setError(
-          pollErr instanceof Error
-            ? pollErr.message
-            : "Brand setup is still processing. Refresh to check again.",
-        );
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    open,
-    packId,
-    pack?.onboarding_completed_at,
-    pack?.onboarding_background_completed_at,
-    saving,
-  ]);
 
   const handleChoice = async (value: string) => {
     setError("");
@@ -362,18 +317,6 @@ export function Day0Modal({
               { suppressPackRefresh: true },
             );
           }
-          setOnboardingProgress("Queued. Preparing your brand setup...");
-          const res = await packs.completeOnboarding(packId);
-          let completedPack: Pack | null = null;
-          if ("status" in res && res.status === "processing" && res.pack_id) {
-            completedPack = await pollPackUntilOnboardingReady(res.pack_id, {
-              onProgress: (_status, message) => setOnboardingProgress(message),
-            });
-          } else if ("pack" in res && res.pack) {
-            completedPack = res.pack;
-          }
-          if (completedPack) setPack(completedPack);
-          setOnboardingProgress("");
           dispatchPackRefresh({
             packId,
             scopes: [
@@ -386,11 +329,10 @@ export function Day0Modal({
           });
           if (!onGoToNextStep) onComplete?.();
         } catch (completeErr) {
-          setOnboardingProgress("");
           setError(
             completeErr instanceof Error
               ? completeErr.message
-              : "Step 0 saved but generating Brand OS failed. Try again from the pack."
+              : "Step 0 saved, but finishing the sprint step failed. Try again from the pack."
           );
           return;
         }
@@ -463,34 +405,22 @@ export function Day0Modal({
                   {error}
                 </p>
               </div>
-            ) : onboardingAlreadyComplete ? (
+            ) : step0AlreadyComplete ? (
               <div className="mt-6 space-y-4">
-                <div
-                  className={`flex items-center gap-2 ${
-                    onboardingBackgroundReady
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-foreground"
-                  }`}
-                >
-                  {onboardingBackgroundReady ? (
-                    <Check className="h-5 w-5 shrink-0" />
-                  ) : (
-                    <Spinner className="h-5 w-5 shrink-0" />
-                  )}
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <Check className="h-5 w-5 shrink-0" />
                   <span className="text-sm font-medium">
-                    {onboardingBackgroundReady ? "Step 0 complete" : "Generating Brand OS"}
+                    Step 0 complete
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {onboardingBackgroundReady
-                    ? "Brand OS is ready. You can move straight into Step 1."
-                    : onboardingProgress || "Finalizing your brand setup..."}
+                  Your brand basics are saved. You can move straight into Step 1.
                 </p>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Button type="button" variant="outline" onClick={onClose} size="md">
                     Close
                   </Button>
-                  {onboardingBackgroundReady && onGoToNextStep && (
+                  {onGoToNextStep && (
                     <Button type="button" onClick={onGoToNextStep} size="md">
                       Go to next step
                     </Button>
@@ -682,11 +612,6 @@ export function Day0Modal({
                     role="alert"
                   >
                     {error}
-                  </p>
-                )}
-                {onboardingProgress && (
-                  <p className="mt-4 text-sm text-muted-foreground">
-                    {onboardingProgress}
                   </p>
                 )}
               </>

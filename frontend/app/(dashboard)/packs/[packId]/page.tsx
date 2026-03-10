@@ -334,12 +334,21 @@ export default function PackOverviewPage() {
 
   const stepFromUrl = searchParams.get("step") ?? searchParams.get("day");
   useEffect(() => {
-    if (stepFromUrl == null) return;
+    if (stepFromUrl == null || !summary) return;
     const parsed = Number.parseInt(stepFromUrl, 10);
     if (Number.isInteger(parsed) && parsed >= 0 && parsed <= 14) {
-      setDayModalOpen(parsed);
+      const lockedStep3 =
+        parsed === 3 && !summary.pack.onboarding_completed_at;
+      const nextStep = lockedStep3 ? 2 : parsed;
+      setDayModalOpen(nextStep);
+      if (lockedStep3) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("step", String(nextStep));
+        params.delete("day");
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      }
     }
-  }, [stepFromUrl]);
+  }, [pathname, router, searchParams, stepFromUrl, summary]);
 
   async function handleArchive(id: string) {
     await packsApi.archive(id);
@@ -359,13 +368,15 @@ export default function PackOverviewPage() {
   const openDayModal = useCallback(
     (dayNumber: number) => {
       if (dayNumber < 0 || dayNumber > 14) return;
-      setDayModalOpen(dayNumber);
+      const nextDayNumber =
+        dayNumber === 3 && !summary?.pack.onboarding_completed_at ? 2 : dayNumber;
+      setDayModalOpen(nextDayNumber);
       const params = new URLSearchParams(searchParams.toString());
-      params.set("step", String(dayNumber));
+      params.set("step", String(nextDayNumber));
       params.delete("day");
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },
-    [pathname, router, searchParams],
+    [pathname, router, searchParams, summary],
   );
 
   const closeDayModal = useCallback(() => {

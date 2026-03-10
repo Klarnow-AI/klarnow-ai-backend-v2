@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Sparkles, X } from "@/components/icons";
+import { Check, Loader2, Sparkles, X } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { packs } from "@/api_requests/packs";
 import { sprintApi } from "@/api_requests/sprint";
+import { dispatchPackRefresh } from "@/lib/pack-refresh-events";
 import type { Pack } from "@/types/api-types";
 
 export function Day2Modal({
@@ -35,12 +36,20 @@ export function Day2Modal({
   const [refiningPain, setRefiningPain] = useState(false);
   const [refiningOutcome, setRefiningOutcome] = useState(false);
   const [suggestingInitial, setSuggestingInitial] = useState(false);
+  const [step2Saved, setStep2Saved] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [finalizationComplete, setFinalizationComplete] = useState(false);
+  const [finalizationError, setFinalizationError] = useState("");
 
   useEffect(() => {
     if (!open || !packId) return;
     setError("");
     setLoading(true);
     setSuggestingInitial(false);
+    setStep2Saved(false);
+    setFinalizing(false);
+    setFinalizationComplete(false);
+    setFinalizationError("");
     Promise.all([packs.get(packId), sprintApi.getSprint(packId)])
       .then(([p, s]) => {
         setPack(p ?? null);
@@ -52,6 +61,8 @@ export function Day2Modal({
         const outcome = (p?.primary_outcome ?? "").trim();
         setPrimaryPain(pain);
         setPrimaryOutcome(outcome);
+        setStep2Saved(Boolean(pain && outcome));
+        setFinalizationComplete(!!p?.onboarding_completed_at);
         if ((!pain || !outcome) && s?.id) {
           setSuggestingInitial(true);
           sprintApi
@@ -110,6 +121,37 @@ export function Day2Modal({
     }
   }
 
+  async function finalizeAndCompleteStep2(markDayComplete: boolean) {
+    setFinalizing(true);
+    setFinalizationError("");
+    setError("");
+    try {
+      const response = await packs.completeOnboarding(packId);
+      setPack(response.pack);
+      if (markDayComplete && sprintId && !dayComplete) {
+        await sprintApi.completeDay(packId, sprintId, 2, {
+          primary_pain: primaryPain.trim(),
+          primary_outcome: primaryOutcome.trim(),
+        });
+        setDayComplete(true);
+      }
+      setFinalizationComplete(true);
+      dispatchPackRefresh({
+        packId,
+        scopes: ["summary", "today-tasks", "next-action", "gates", "sprint"],
+      });
+      onComplete?.();
+    } catch (err) {
+      setFinalizationError(
+        err instanceof Error
+          ? err.message
+          : "Step 2 was saved, but Brand OS generation failed. Please retry."
+      );
+    } finally {
+      setFinalizing(false);
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const pain = primaryPain.trim();
@@ -121,13 +163,15 @@ export function Day2Modal({
     }
     setSaving(true);
     setError("");
+    setFinalizationError("");
     try {
-      await sprintApi.completeDay(packId, sprintId, 2, {
+      const updatedPack = await packs.patch(packId, {
         primary_pain: pain,
         primary_outcome: outcome,
       });
-      setDayComplete(true);
-      onComplete?.();
+      setPack(updatedPack);
+      setStep2Saved(true);
+      await finalizeAndCompleteStep2(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to complete Step 2");
     } finally {
@@ -136,6 +180,10 @@ export function Day2Modal({
   };
 
   const isValid = primaryPain.trim().length > 0 && primaryOutcome.trim().length > 0;
+  const isExistingBrand = pack?.onboarding_answers?.has_existing_brand === "yes";
+  const generationMessage = isExistingBrand
+    ? "Generating your Brand OS from the onboarding steps you completed."
+    : "Generating your Brand OS and creating your starter brand assets.";
 
   if (!open) return null;
 
@@ -143,7 +191,7 @@ export function Day2Modal({
     <AnimatePresence>
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-        onClick={onClose}
+        onClick={finalizing ? undefined : onClose}
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.96 }}
@@ -160,6 +208,7 @@ export function Day2Modal({
             <button
               type="button"
               onClick={onClose}
+              disabled={finalizing}
               className="absolute right-4 top-4 p-1.5 rounded-lg text-muted-foreground hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors"
               aria-label="Close"
             >
@@ -184,6 +233,36 @@ export function Day2Modal({
                 <p className="text-sm text-amber-600 dark:text-amber-400">
                   No active sprint. Go to Overview and start a sprint first.
                 </p>
+              </div>
+            ) : finalizing ? (
+              <div className="mt-6 min-h-[220px] flex flex-col items-center justify-center text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-foreground" />
+                <p className="mt-4 text-base font-medium text-foreground">
+                  Building your Brand OS
+                </p>
+                <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                  {generationMessage}
+                </p>
+              </div>
+            ) : finalizationComplete && dayComplete ? (
+              <div className="mt-6 space-y-4">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <Check className="h-5 w-5 shrink-0" />
+                  <span className="text-sm font-medium">Brand OS ready</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Step 2 is complete and your Brand OS has been saved.
+                </p>
+                <div className="flex gap-2 pt-2">
+                  <Button type="button" variant="outline" onClick={onClose}>
+                    Close
+                  </Button>
+                  {onGoToNextStep && (
+                    <Button type="button" onClick={onGoToNextStep}>
+                      Next step
+                    </Button>
+                  )}
+                </div>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -266,20 +345,42 @@ export function Day2Modal({
                     {error}
                   </p>
                 )}
+                {finalizationError && (
+                  <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                    {finalizationError}
+                  </p>
+                )}
+                {step2Saved && !finalizationComplete && !finalizationError && (
+                  <p className="text-sm text-muted-foreground">
+                    Step 2 is saved. Generate your Brand OS to unlock Step 3.
+                  </p>
+                )}
+                {step2Saved && finalizationComplete && !dayComplete && (
+                  <p className="text-sm text-muted-foreground">
+                    Brand OS is ready. Finish Step 2 to unlock Step 3.
+                  </p>
+                )}
                 <div className="flex gap-2 pt-2">
                   <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={!isValid || saving || dayComplete}>
-                    {saving ? "Saving…" : dayComplete ? "Step 2 complete" : "Complete Step 2"}
-                  </Button>
-                  {dayComplete && (
+                  {!step2Saved ? (
+                    <Button type="submit" disabled={!isValid || saving}>
+                      {saving ? "Saving…" : "Complete Step 2"}
+                    </Button>
+                  ) : (
                     <Button
                       type="button"
-                      onClick={onGoToNextStep}
-                      disabled={saving || !onGoToNextStep}
+                      onClick={() => {
+                        void finalizeAndCompleteStep2(!dayComplete);
+                      }}
+                      disabled={saving || finalizing}
                     >
-                      Go to next step
+                      {finalizationComplete && !dayComplete
+                        ? "Finish Step 2"
+                        : finalizing
+                          ? "Generating…"
+                          : "Retry Brand OS generation"}
                     </Button>
                   )}
                 </div>

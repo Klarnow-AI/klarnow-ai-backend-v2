@@ -5,7 +5,6 @@ import type {
   PackSummaryResponse,
   PackGatesResponse,
   OnboardingCompleteResponse,
-  OnboardingCompleteAccepted,
   OnboardingJobStatus,
   ExtractBrandBody,
   ExtractBrandResponse,
@@ -161,7 +160,12 @@ export const packs = {
       usp_locked_line?: string | null;
       proof_types?: string[] | null;
       proof_text?: string | null;
-      onboarding_answers?: Record<string, string>;
+      offer_one_liner?: string | null;
+      target_audience?: string | null;
+      primary_pain?: string | null;
+      primary_outcome?: string | null;
+      hero_angle?: string | null;
+      onboarding_answers?: Record<string, unknown>;
     }
   ) =>
     api<Pack>(`${PACKS_PREFIX}/${id}`, {
@@ -185,9 +189,8 @@ export const packs = {
       method: "POST",
       body: JSON.stringify({ answers }),
     }),
-  /** Returns 200 with pack + is_existing_brand, or 202 with { status, pack_id }. For 202, use pollPackUntilOnboardingReady(pack_id) then use the pack. */
   completeOnboarding: (packId: string) =>
-    api<OnboardingCompleteResponse | OnboardingCompleteAccepted>(
+    api<OnboardingCompleteResponse>(
       `${PACKS_PREFIX}/${packId}/onboarding/complete`,
       { method: "POST" }
     ),

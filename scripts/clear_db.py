@@ -18,23 +18,10 @@ from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.core.db.base import Base
+from app.core.db.model_registry import load_model_metadata
 from app.core.db.session import engine
 
-# Import all model modules so Base.metadata is fully populated
-from app.modules.agents import models as agents_models  # noqa: F401
-from app.modules.brand_os import models as brand_os_models  # noqa: F401
-from app.modules.builder import models as builder_models  # noqa: F401
-from app.modules.campaign import models as campaign_models  # noqa: F401
-from app.modules.chat import models as chat_models  # noqa: F401
-from app.modules.clients import models as clients_models  # noqa: F401
-from app.modules.creative import models as creative_models  # noqa: F401
-from app.modules.packs import models as packs_models  # noqa: F401
-from app.modules.proof_vault import models as proof_vault_models  # noqa: F401
-from app.modules.revenue import models as revenue_models  # noqa: F401
-from app.modules.response_rules import models as response_rules_models  # noqa: F401
-from app.modules.sprint import models as sprint_models  # noqa: F401
-from app.modules.subscription import models as subscription_models  # noqa: F401
-from app.modules.tasks import models as tasks_models  # noqa: F401
+load_model_metadata()
 
 
 def clear_database() -> int:

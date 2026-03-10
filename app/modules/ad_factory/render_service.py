@@ -14,7 +14,7 @@ from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.core.db.session import SessionLocal
-from app.core.storage import get_asset_url, upload_file
+from app.core.storage import upload_file
 from app.modules.ad_factory.kling_client import download_video, submit_text_to_video, wait_for_video
 from app.modules.ad_factory.models import (
     AdFactoryRender,
@@ -24,8 +24,8 @@ from app.modules.ad_factory.models import (
 )
 from app.modules.ad_factory.services import get_render
 from app.modules.creative.models import Asset
+from app.modules.creative.serializers import serialize_asset
 
-ASSET_URL_TTL_SECONDS = 86400
 VIDEO_CACHE_CONTROL = "public, max-age=31536000, immutable"
 POSTER_CACHE_CONTROL = "public, max-age=86400, stale-while-revalidate=604800"
 
@@ -33,32 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 def _serialize_rendered_asset(asset: Asset) -> dict[str, Any]:
-    output_key = asset.output_key
-    return {
-        "id": str(asset.id),
-        "pack_id": str(asset.pack_id),
-        "type": asset.type,
-        "version": asset.version,
-        "name": asset.name,
-        "template_id": asset.template_id,
-        "source_code": asset.source_code,
-        "output_key": output_key,
-        "output_url": (
-            get_asset_url(output_key, expires_in=ASSET_URL_TTL_SECONDS)
-            if output_key
-            else asset.preview_url
-        ),
-        "poster_url": (
-            get_asset_url(asset.preview_image_key, expires_in=ASSET_URL_TTL_SECONDS)
-            if asset.preview_image_key
-            else None
-        ),
-        "script": asset.script,
-        "srt_key": asset.srt_key,
-        "sprint_day": asset.sprint_day,
-        "chat_messages": asset.chat_messages,
-        "created_at": asset.created_at.isoformat(),
-    }
+    return serialize_asset(asset).model_dump(mode="json")
 
 
 def _extract_preview_image(video_bytes: bytes) -> bytes | None:

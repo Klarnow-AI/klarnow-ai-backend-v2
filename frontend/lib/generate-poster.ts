@@ -28,7 +28,7 @@ type PosterGenerationRequest = {
   messages: { role: string; content: string }[];
   brandContext?: BrandContext | null;
   referenceImages?: PosterReferenceImage[];
-  packId?: string;
+  packId: string;
   generationMode?: PosterGenerationMode;
   authToken?: string | null;
 };
@@ -60,6 +60,9 @@ export async function streamPosterGeneration(
   const token = authToken ?? getToken();
   if (token) {
     headers.Authorization = `Bearer ${token}`;
+  }
+  if (!packId) {
+    throw new Error("Missing pack ID for poster generation.");
   }
 
   let res: Response;
@@ -133,6 +136,10 @@ export async function generatePosters(
   packId?: string,
   authToken?: string | null,
 ): Promise<Record<string, string>> {
+  if (!packId) {
+    throw new Error("Missing pack ID for poster generation.");
+  }
+
   const parsed = await streamPosterGeneration({
     apiRoute,
     messages: [{ role: "user", content: userContent }],

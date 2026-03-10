@@ -1,17 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Bot, ChevronRight } from "@/components/icons";
 import { Spinner } from "@/components/ui/page-loader";
-import { BrandPreview } from "@/components/ui/brand-preview";
 import { BrandPreviewModal } from "@/components/brand-preview-modal";
-import { CoreConceptLockModal } from "@/components/core-concept-lock-modal";
-import {
-  packs as packsApi,
-  pollPackUntilOnboardingReady,
-} from "@/api_requests/packs";
+import { packs as packsApi } from "@/api_requests/packs";
 import { me as meApi } from "@/api_requests/me";
 import {
   FIRST_MESSAGE,
@@ -77,13 +72,10 @@ export type OnboardingChatState = {
   ) => void;
   handlePreviewModalClose: () => void;
   handlePackTypeChoice: (packType: string) => Promise<void>;
-  handleCoreConceptConfirm: (coreConcept: string) => Promise<void>;
   botMessageTimesRef: React.MutableRefObject<Record<number, string>>;
   packId: string | null;
   extractedBrandData: import("@/types/api-types").ExtractBrandResponse | null;
   showPreviewModal: boolean;
-  showCoreConceptModal: boolean;
-  completedPack: import("@/types/api-types").Pack | null;
   onboardingProgress: string;
   retryFailedStep: (() => Promise<void>) | null;
 };
@@ -108,10 +100,6 @@ export function useOnboardingChat(options: {
     import("@/types/api-types").ExtractBrandResponse | null
   >(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [showCoreConceptModal, setShowCoreConceptModal] = useState(false);
-  const [completedPack, setCompletedPack] = useState<
-    import("@/types/api-types").Pack | null
-  >(null);
   const [selectedPackType, setSelectedPackType] = useState<string | null>(null);
   const [onboardingProgress, setOnboardingProgress] = useState("");
   const [retryFailedStep, setRetryFailedStep] = useState<
@@ -325,22 +313,18 @@ export function useOnboardingChat(options: {
       const id = packId!;
       const nextAnswers = { ...answers, pack_type: packType };
       await packsApi.submitOnboarding(id, nextAnswers);
-      const res = await packsApi.completeOnboarding(id);
-      if ("pack" in res && res.pack) {
-        setCompletedPack(res.pack);
-      } else if (
-        "status" in res &&
-        res.status === "processing" &&
-        res.pack_id
-      ) {
-        setOnboardingProgress("Queued. Preparing your brand setup...");
-        const pack = await pollPackUntilOnboardingReady(res.pack_id, {
-          onProgress: (_status, message) => setOnboardingProgress(message),
+      const brandName =
+        answers.brand_name?.trim() ||
+        extractedBrandData?.brand_name?.trim() ||
+        "";
+      if (packType || brandName) {
+        await packsApi.patch(id, {
+          pack_type: packType,
+          brand_name: brandName || undefined,
         });
-        setCompletedPack(pack);
       }
-      setOnboardingProgress("");
-      setShowCoreConceptModal(true);
+      if (options.onComplete) options.onComplete(id);
+      else router.push(`/packs/${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setRetryFailedStep(() => () => handlePackTypeChoice(packType));
@@ -349,25 +333,6 @@ export function useOnboardingChat(options: {
       packTypeSubmittingRef.current = false;
       setLoading(false);
       setSelectedPackType(null);
-    }
-  };
-
-  const handleCoreConceptConfirm = async (coreConcept: string) => {
-    if (!completedPack) return;
-    setError("");
-    setLoading(true);
-    try {
-      await packsApi.patch(completedPack.id, {
-        core_concept: coreConcept.trim() || null,
-      });
-      setShowCoreConceptModal(false);
-      setCompletedPack(null);
-      if (options.onComplete) options.onComplete(completedPack.id);
-      else router.push(`/chat?pack=${completedPack.id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -407,13 +372,10 @@ export function useOnboardingChat(options: {
     handleBrandPreviewConfirm,
     handlePreviewModalClose,
     handlePackTypeChoice,
-    handleCoreConceptConfirm,
     botMessageTimesRef,
     packId,
     extractedBrandData,
     showPreviewModal,
-    showCoreConceptModal,
-    completedPack,
   };
 }
 
@@ -1094,14 +1056,6 @@ export function OnboardingChat({
                 packsApi.uploadLogo(state.packId!, file).then((r) => r.logo_url)
             : undefined
         }
-        loading={state.loading}
-      />
-
-      <CoreConceptLockModal
-        open={state.showCoreConceptModal}
-        packId={state.completedPack?.id ?? null}
-        initialCoreConcept={state.completedPack?.core_concept ?? null}
-        onConfirm={state.handleCoreConceptConfirm}
         loading={state.loading}
       />
     </>

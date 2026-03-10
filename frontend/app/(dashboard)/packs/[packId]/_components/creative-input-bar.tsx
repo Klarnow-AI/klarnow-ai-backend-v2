@@ -167,6 +167,13 @@ export function CreativeInputBar({
       messagesForRequest: PosterConversationMessage[],
       images: PosterReferenceImage[],
     ) => {
+      if (!packId) {
+        toast.error("Generation failed", {
+          description: "Missing pack ID for this creative request.",
+        });
+        return;
+      }
+
       setIsStreaming(true);
       onGeneratingChange?.(true, buildPromptGenerationDisplay(userContent));
 

@@ -1,10 +1,14 @@
 """Pydantic schemas for packs."""
 
+import json
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
+
+from app.core.storage import resolve_asset_reference
+from app.modules.brand_os.schemas import BrandOSRead
 
 
 PACK_TYPES = ("enquiries", "quotes", "sales")
@@ -40,11 +44,45 @@ class PackRead(PackBase):
     proof_text: str | None = None
     day_0_completed_at: datetime | None = None
     offer_one_liner: str | None = None
+    target_audience: str | None = None
     primary_pain: str | None = None
     primary_outcome: str | None = None
     hero_angle: str | None = None
 
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="after")
+    def normalize_onboarding_asset_urls(self):
+        answers = self.onboarding_answers
+        if not isinstance(answers, dict):
+            return self
+
+        normalized = dict(answers)
+        for key in ("wordmark_svg_or_url", "wordmark_result"):
+            value = normalized.get(key)
+            if isinstance(value, str):
+                normalized_value = resolve_asset_reference(value, expires_in=86400 * 7)
+                if normalized_value:
+                    normalized[key] = normalized_value
+
+        raw_suggested = normalized.get("suggested_logos")
+        if isinstance(raw_suggested, str):
+            try:
+                suggested = json.loads(raw_suggested)
+            except (json.JSONDecodeError, TypeError):
+                suggested = None
+            if isinstance(suggested, list):
+                normalized["suggested_logos"] = json.dumps(
+                    [
+                        resolve_asset_reference(item, expires_in=86400 * 7) or item
+                        if isinstance(item, str)
+                        else item
+                        for item in suggested
+                    ]
+                )
+
+        self.onboarding_answers = normalized
+        return self
 
 
 class PackPatch(BaseModel):
@@ -204,10 +242,13 @@ class OnboardingComplete(BaseModel):
 
 
 class OnboardingCompleteResponse(BaseModel):
-    """Response from onboarding/complete: pack plus whether the brand is existing."""
+    """Response from onboarding/complete finalization."""
 
     pack: PackRead
     is_existing_brand: bool
+    brand_os: BrandOSRead | None = None
+    starter_brand: GenerateStarterBrandResponse | None = None
+    logo: GenerateLogoResponse | None = None
 
 
 class OnboardingCompleteAccepted(BaseModel):

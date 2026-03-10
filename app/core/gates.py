@@ -115,4 +115,7 @@ def can_complete_day(db: Session, day_card, day_number: int, pack: Pack) -> tupl
     if day_number == 8:
         return can_pass_day8_gate(db, pack)
 
+    if day_number == 3 and pack.onboarding_completed_at is None:
+        return False, "Complete Step 2 and generate your Brand OS before Step 3."
+
     return True, ""

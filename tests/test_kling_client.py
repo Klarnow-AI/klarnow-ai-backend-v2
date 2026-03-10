@@ -41,7 +41,7 @@ class SubmitTextToVideoTests(unittest.TestCase):
                 "prompt": "portrait launch video",
                 "duration": "10",
                 "aspect_ratio": "9:16",
-                "sound": "off",
+                "sound": "on",
             },
         )
 

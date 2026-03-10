@@ -9,11 +9,11 @@ from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
 from app.core.errors import BadRequestError, NotFoundError, ServiceUnavailableError
 from app.core.gates import can_generate_assets
-from app.core.storage import get_asset_url
 from app.modules.creative.generation import (
     create_poster_generation_stream,
     normalize_reference_images,
 )
+from app.modules.creative.serializers import serialize_asset
 from app.modules.creative.schemas import (
     AssetCreate,
     AssetList,
@@ -32,7 +32,6 @@ from app.modules.packs.services import get_pack_for_user
 from app.shared.services.generation_context import load_generation_brand_context
 
 router = APIRouter()
-ASSET_URL_TTL_SECONDS = 86400
 
 
 def _ensure_pack_access(db, pack_id: UUID, user_id: UUID) -> None:
@@ -41,18 +40,7 @@ def _ensure_pack_access(db, pack_id: UUID, user_id: UUID) -> None:
 
 
 def _serialize_asset(asset) -> AssetRead:
-    payload = AssetRead.model_validate(asset).model_dump()
-    payload["output_url"] = (
-        get_asset_url(asset.output_key, expires_in=ASSET_URL_TTL_SECONDS)
-        if asset.output_key
-        else asset.preview_url
-    )
-    payload["poster_url"] = (
-        get_asset_url(asset.preview_image_key, expires_in=ASSET_URL_TTL_SECONDS)
-        if asset.preview_image_key
-        else None
-    )
-    return AssetRead.model_validate(payload)
+    return serialize_asset(asset)
 
 
 @router.post("/assets", response_model=AssetRead)

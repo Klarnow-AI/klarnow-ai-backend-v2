@@ -97,6 +97,8 @@ def get_next_action(
     # --- 1. Hard blockers (pack gate, day 7, day 8) ---
     active_sprint = get_active_sprint_for_pack(db, pack.id)
     current_day = active_sprint.current_day if active_sprint else 0
+    if active_sprint and current_day >= 3 and pack.onboarding_completed_at is None:
+        current_day = 2
 
     can_pack, pack_msg = can_pass_pack_gate(pack)
     if not can_pack:
@@ -156,7 +158,7 @@ def get_next_action(
     # --- 3. Today's sprint requirements ---
     if active_sprint and active_sprint.current_day <= 14:
         sprint = active_sprint
-        day_num = sprint.current_day
+        day_num = current_day
         card = get_day_card(db, sprint.id, day_num)
         sprint_path = pack_path
         day_path = overview_day(day_num)

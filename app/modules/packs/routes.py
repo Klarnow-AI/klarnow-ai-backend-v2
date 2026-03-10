@@ -1,16 +1,18 @@
 """Packs API routes."""
-
-import json
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
-from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
 from app.core.errors import BadRequestError, NotFoundError
+from app.modules.brand_os.schemas import brand_os_read_from_orm
+from app.modules.brand_os.services import get_by_id_and_pack as get_brand_os_by_id_and_pack
+from app.modules.brand_os.services import get_by_source_job_id as get_brand_os_by_source_job_id
+from app.modules.brand_os.services import get_summary_fields as get_brand_os_summary_fields
+from app.modules.brand_os.tools import generate_brand_os
 from app.modules.packs.models import Pack, User
 from app.core.storage import upload_file as storage_upload_file, get_asset_url
 from app.modules.packs.schemas import (
@@ -33,7 +35,6 @@ from app.modules.packs.schemas import (
     InvoicesSummary,
     OnboardingSubmit,
     OnboardingCompleteResponse,
-    OnboardingCompleteAccepted,
     OnboardingJobStatusResponse,
     ExtractBrandBody,
     ExtractBrandResponse,
@@ -50,24 +51,30 @@ from app.modules.packs.schemas import (
 from app.modules.packs.services import (
     archive_pack,
     append_suggested_logo,
+    build_onboarding_context,
+    build_step_2_finalization_payload,
     complete_onboarding,
     create_pack,
     delete_pack,
+    extract_palette_from_answers,
+    fingerprint_payload,
     get_pack_for_user,
+    get_step_2_finalization_cache,
     list_packs_for_user,
     merge_onboarding_answers,
+    resolve_pack_vibe_chips,
     restore_pack,
+    set_step_2_finalization_cache,
     submit_onboarding,
+    sync_pack_target_audience,
 )
 from app.modules.packs.onboarding_services import extract_brand, generate_starter_brand
 from app.modules.packs.logo_generation import generate_logo
 from app.modules.packs.brand_identity_suggestions import suggest_typography, suggest_palette
 from app.modules.packs.onboarding_jobs import (
-    onboarding_job_matches_current_inputs,
-    dispatch_onboarding_job_from_api,
-    enqueue_onboarding_job,
     get_onboarding_job_status,
 )
+from app.modules.sprint.day_readiness import get_day_readiness_state, is_day_ready_to_complete
 
 router = APIRouter()
 
@@ -498,65 +505,178 @@ def _run_onboarding_background(pack_id: UUID) -> None:
     )
 
 
+def _require_step_2_finalization_ready(db: Session, pack: Pack) -> None:
+    answers = pack.onboarding_answers or {}
+    if answers.get("has_existing_brand") not in {"yes", "no"}:
+        raise BadRequestError(
+            "Please complete Step 0 and indicate whether this is an existing brand."
+        )
+    for day in (0, 1, 2):
+        readiness = get_day_readiness_state(db, pack.id, day)
+        if readiness.get("ready"):
+            continue
+        message = readiness.get("reason") or f"Step {day} is not ready to complete."
+        raise BadRequestError(message)
+
+
+def _build_brand_os_summary_text(brand_os_row) -> str:
+    mission, vision, _has_positioning = get_brand_os_summary_fields(brand_os_row)
+    foundation = brand_os_row.foundation if isinstance(brand_os_row.foundation, dict) else {}
+    summary_parts: list[str] = []
+    brand_name = foundation.get("brand_name")
+    one_line_offer = foundation.get("one_line_offer")
+    brand_industry = foundation.get("brand_industry")
+    main_audience = foundation.get("main_audience")
+
+    if brand_name:
+        summary_parts.append(f"Brand: {brand_name}")
+    if mission:
+        summary_parts.append(f"Mission: {mission}")
+    if vision:
+        summary_parts.append(f"Vision: {vision}")
+    if one_line_offer:
+        summary_parts.append(f"Offer: {one_line_offer}")
+    if brand_industry:
+        summary_parts.append(f"Industry: {brand_industry}")
+    if isinstance(main_audience, list) and main_audience:
+        audience_text = ", ".join(str(item).strip() for item in main_audience if str(item).strip())
+        if audience_text:
+            summary_parts.append(f"Audience: {audience_text}")
+    return ". ".join(summary_parts)
+
+
 @router.post(
     "/{pack_id}/onboarding/complete",
     response_model=OnboardingCompleteResponse,
-    responses={202: {"model": OnboardingCompleteAccepted, "description": "Processing in background; poll GET pack until onboarding_background_completed_at is set."}},
 )
 def complete_onboarding_route(
     pack_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Mark onboarding complete and trigger Orchestrator to generate Brand OS (in background).
-    Returns 202 immediately; long-running work runs in background. Poll GET pack until onboarding_background_completed_at is set."""
-    from app.core.errors import AppError
+    """Finalize onboarding after Step 2 and generate Brand OS synchronously."""
     pack = get_pack_for_user(db, pack_id, current_user.id)
     if not pack:
         raise NotFoundError("Pack not found")
+    _require_step_2_finalization_ready(db, pack)
+
+    sync_pack_target_audience(pack)
+    finalization_payload = build_step_2_finalization_payload(pack)
+    fingerprint = fingerprint_payload(finalization_payload)
     answers = pack.onboarding_answers or {}
-    if "has_existing_brand" not in answers:
-        raise AppError(
-            "Please complete the brand step and indicate whether you have an existing brand (yes/no).",
-            status_code=400,
+    is_existing_brand = answers.get("has_existing_brand") == "yes"
+
+    cached = get_step_2_finalization_cache(pack) or {}
+    if cached.get("fingerprint") != fingerprint:
+        cached = {"fingerprint": fingerprint}
+
+    brand_os_row = None
+    cached_brand_os_id = cached.get("brand_os_id")
+    if isinstance(cached_brand_os_id, str):
+        try:
+            brand_os_row = get_brand_os_by_id_and_pack(db, UUID(cached_brand_os_id), pack_id)
+        except ValueError:
+            brand_os_row = None
+    if brand_os_row is None:
+        brand_os_row = get_brand_os_by_source_job_id(db, pack_id, fingerprint)
+    if brand_os_row is None:
+        generated_brand_os = generate_brand_os(
+            db,
+            pack_id,
+            source_job_id=fingerprint,
+            allow_without_onboarding_complete=True,
         )
-    job_status = get_onboarding_job_status(pack)
-    job_matches_current_inputs = onboarding_job_matches_current_inputs(pack)
-    if job_status["status"] in {"queued", "running"} and job_matches_current_inputs:
-        if job_status["status"] == "queued" and job_status.get("job_id"):
-            try:
-                dispatch_onboarding_job_from_api(pack_id, str(job_status["job_id"]))
-            except Exception as exc:
-                raise AppError(
-                    f"Onboarding worker queue is unavailable: {exc}",
-                    status_code=503,
-                ) from exc
-        return JSONResponse(
-            status_code=status.HTTP_202_ACCEPTED,
-            content={
-                "status": "processing",
-                "pack_id": str(pack_id),
-                "job_id": job_status.get("job_id"),
-            },
-        )
-    if job_status["status"] == "completed" and job_matches_current_inputs:
-        return OnboardingCompleteResponse(
-            pack=PackRead.model_validate(pack),
-            is_existing_brand=answers.get("has_existing_brand") == "yes",
-        )
-    pack = complete_onboarding(db, pack, answers=answers, commit=False)
-    job = enqueue_onboarding_job(db, pack_id)
+        brand_os_row = get_brand_os_by_id_and_pack(db, generated_brand_os.id, pack_id)
+    if brand_os_row is None:
+        raise BadRequestError("Brand OS generation failed. Please retry.")
+
+    cached["brand_os_id"] = str(brand_os_row.id)
+    cached["brand_os_version"] = brand_os_row.version
+    set_step_2_finalization_cache(pack, cached)
     db.commit()
-    try:
-        dispatch_onboarding_job_from_api(pack_id, str(job.get("job_id")))
-    except Exception as exc:
-        raise AppError(
-            f"Onboarding worker queue is unavailable: {exc}",
-            status_code=503,
-        ) from exc
-    return JSONResponse(
-        status_code=status.HTTP_202_ACCEPTED,
-        content={"status": "processing", "pack_id": str(pack_id), "job_id": job.get("job_id")},
+    db.refresh(pack)
+
+    starter_brand_response: GenerateStarterBrandResponse | None = None
+    logo_response: GenerateLogoResponse | None = None
+
+    if not is_existing_brand:
+        cached_starter_brand = cached.get("starter_brand")
+        if isinstance(cached_starter_brand, dict):
+            try:
+                starter_brand_response = GenerateStarterBrandResponse.model_validate(cached_starter_brand)
+            except Exception:
+                starter_brand_response = None
+        if starter_brand_response is None:
+            starter_brand_result = generate_starter_brand(
+                brand_name=(pack.brand_name or pack.name or "My Brand"),
+                vibe_chips=resolve_pack_vibe_chips(pack),
+                onboarding_context=build_onboarding_context(pack),
+                pack_id=str(pack_id),
+            )
+            wordmark = starter_brand_result["wordmark_svg_or_url"]
+            pack = append_suggested_logo(db, pack, wordmark, commit=False)
+            pack = merge_onboarding_answers(
+                db,
+                pack,
+                {
+                    "wordmark_svg_or_url": wordmark,
+                    "palette": starter_brand_result["palette"],
+                },
+                commit=False,
+            )
+            starter_brand_response = GenerateStarterBrandResponse(
+                wordmark_svg_or_url=wordmark,
+                palette=starter_brand_result["palette"],
+            )
+            cached["starter_brand"] = starter_brand_response.model_dump()
+            set_step_2_finalization_cache(pack, cached)
+            db.commit()
+            db.refresh(pack)
+
+        cached_logo = cached.get("logo")
+        if isinstance(cached_logo, dict):
+            try:
+                logo_response = GenerateLogoResponse.model_validate(cached_logo)
+            except Exception:
+                logo_response = None
+        if logo_response is None:
+            palette = starter_brand_response.palette if starter_brand_response else None
+            if not isinstance(palette, dict) or not palette:
+                palette = extract_palette_from_answers(pack.onboarding_answers or {})
+            logo_result = generate_logo(
+                brand_name=(pack.brand_name or pack.name or "My Brand"),
+                prompt="distinctive, creative logo, professional and memorable, not generic",
+                pack_id=str(pack_id),
+                color_scheme="use the provided palette",
+                brand_os_summary=_build_brand_os_summary_text(brand_os_row),
+                color_palette=palette,
+            )
+            logo_url = logo_result.get("logo_url") or logo_result.get("wordmark_svg_or_url") or ""
+            pack = append_suggested_logo(db, pack, logo_url, commit=False)
+            logo_response = GenerateLogoResponse(
+                logo_url=logo_url,
+                wordmark_svg_or_url=logo_result.get("wordmark_svg_or_url"),
+            )
+            cached["logo"] = logo_response.model_dump()
+            set_step_2_finalization_cache(pack, cached)
+            db.commit()
+            db.refresh(pack)
+
+    answers = pack.onboarding_answers or {}
+    pack = complete_onboarding(db, pack, answers=answers, commit=False)
+    cached["completed_at"] = (
+        pack.onboarding_completed_at.isoformat() if pack.onboarding_completed_at else None
+    )
+    set_step_2_finalization_cache(pack, cached)
+    db.commit()
+    db.refresh(pack)
+
+    return OnboardingCompleteResponse(
+        pack=PackRead.model_validate(pack),
+        is_existing_brand=is_existing_brand,
+        brand_os=brand_os_read_from_orm(brand_os_row),
+        starter_brand=starter_brand_response,
+        logo=logo_response,
     )
 
 

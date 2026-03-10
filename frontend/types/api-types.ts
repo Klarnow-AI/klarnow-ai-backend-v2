@@ -118,7 +118,7 @@ export type Pack = {
   pack_type?: string;
   /** Whether the pack's campaign is active (list responses only). null = no campaign. */
   campaign_is_active?: boolean | null;
-  onboarding_answers?: Record<string, string>;
+  onboarding_answers?: Record<string, unknown>;
   onboarding_completed_at?: string | null;
   /** Set when async onboarding (brand/orchestrator) has finished; poll GET pack until this is set after 202 from complete. */
   onboarding_background_completed_at?: string | null;
@@ -137,6 +137,7 @@ export type Pack = {
   proof_text?: string | null;
   day_0_completed_at?: string | null;
   offer_one_liner?: string | null;
+  target_audience?: string | null;
   primary_pain?: string | null;
   primary_outcome?: string | null;
   hero_angle?: string | null;
@@ -146,6 +147,9 @@ export type Pack = {
 export type OnboardingCompleteResponse = {
   pack: Pack;
   is_existing_brand: boolean;
+  brand_os?: BrandOS | null;
+  starter_brand?: GenerateStarterBrandResponse | null;
+  logo?: GenerateLogoResponse | null;
 };
 
 /** Response from POST .../onboarding/complete (202). Poll GET pack until onboarding_background_completed_at is set. */

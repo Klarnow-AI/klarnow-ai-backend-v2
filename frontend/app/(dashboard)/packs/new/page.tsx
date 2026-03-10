@@ -16,7 +16,7 @@ export default function NewPackPage() {
 
   function handleComplete(packId: string) {
     dispatchPacksUpdated();
-    router.push(`/chat?pack=${packId}`);
+    router.push(`/packs/${packId}`);
   }
 
   const state = useOnboardingChat({

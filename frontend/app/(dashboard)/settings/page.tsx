@@ -23,7 +23,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -39,13 +39,14 @@ import { useTheme, type Theme } from "@/contexts/theme-context";
 import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
 import { auth } from "@/api_requests/auth";
+import { brandOs } from "@/api_requests/brand-os";
 import { me } from "@/api_requests/me";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { PackDeleteModal } from "@/components/pack-delete-modal";
 import { packs as packsApi } from "@/api_requests/packs";
 import { useGet } from "@/hooks/use-get";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import type { Pack } from "@/types/api-types";
+import type { BrandOS, Pack } from "@/types/api-types";
 
 const themeOptions: { value: Theme; icon: typeof Sun; label: string }[] = [
   { value: "light", icon: Sun, label: "Light" },
@@ -88,6 +89,10 @@ export default function SettingsPage() {
   const [section, setSection] = useState<Section>("account");
 
   const [deleteModalPack, setDeleteModalPack] = useState<Pack | null>(null);
+  const [brandPreviewPack, setBrandPreviewPack] = useState<Pack | null>(null);
+  const [brandPreview, setBrandPreview] = useState<BrandOS | null>(null);
+  const [brandPreviewLoading, setBrandPreviewLoading] = useState(false);
+  const [brandPreviewError, setBrandPreviewError] = useState<string | null>(null);
 
   const packsFetcher = useCallback(() => packsApi.list(true), []);
   const {
@@ -173,6 +178,23 @@ export default function SettingsPage() {
     ];
 
   const isDesktop = useMediaQuery("(min-width: 1024px)");
+
+  const openBrandPreview = useCallback(async (pack: Pack) => {
+    setBrandPreviewPack(pack);
+    setBrandPreview(null);
+    setBrandPreviewError(null);
+    setBrandPreviewLoading(true);
+    try {
+      const active = await brandOs.getActive(pack.id);
+      setBrandPreview(active);
+    } catch (e) {
+      setBrandPreviewError(
+        e instanceof Error ? e.message : "Failed to load Brand OS preview",
+      );
+    } finally {
+      setBrandPreviewLoading(false);
+    }
+  }, []);
 
   const NavButton = ({
     item,
@@ -553,7 +575,7 @@ export default function SettingsPage() {
                       >
                         <div className="min-w-0 flex-1 flex items-center gap-3">
                           <Link
-                            href={`/chat?pack=${pack.id}`}
+                            href={`/packs/${pack.id}`}
                             className="text-sm font-medium text-foreground hover:underline truncate"
                           >
                             {pack.name}
@@ -569,17 +591,28 @@ export default function SettingsPage() {
                             {pack.status === "archived" ? "Archived" : "Active"}
                           </span>
                         </div>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="shrink-0 bg-red-600 hover:bg-red-700 text-white dark:text-white border-red-600 dark:border-red-600"
-                          onClick={() => {
-                            setDeleteModalPack(pack);
-                          }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Delete
-                        </Button>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              void openBrandPreview(pack);
+                            }}
+                          >
+                            Preview Brand OS
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="bg-red-600 hover:bg-red-700 text-white dark:text-white border-red-600 dark:border-red-600"
+                            onClick={() => {
+                              setDeleteModalPack(pack);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </Button>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -605,6 +638,115 @@ export default function SettingsPage() {
           setDeleteModalPack(null);
         }}
       />
+
+      <Dialog
+        open={!!brandPreviewPack}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBrandPreviewPack(null);
+            setBrandPreview(null);
+            setBrandPreviewError(null);
+            setBrandPreviewLoading(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {brandPreviewPack ? `${brandPreviewPack.name} Brand OS` : "Brand OS"}
+            </DialogTitle>
+            <DialogDescription>
+              Preview the active Brand OS for this pack.
+            </DialogDescription>
+            <DialogClose
+              onClose={() => {
+                setBrandPreviewPack(null);
+                setBrandPreview(null);
+                setBrandPreviewError(null);
+                setBrandPreviewLoading(false);
+              }}
+            />
+          </DialogHeader>
+          <DialogBody>
+            {brandPreviewLoading ? (
+              <p className="text-sm text-muted-foreground">Loading Brand OS…</p>
+            ) : brandPreviewError ? (
+              <div className="space-y-4">
+                <p className="text-sm text-destructive">{brandPreviewError}</p>
+                {brandPreviewPack && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      void openBrandPreview(brandPreviewPack);
+                    }}
+                  >
+                    Retry
+                  </Button>
+                )}
+              </div>
+            ) : !brandPreview ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  No Brand OS has been generated for this pack yet.
+                </p>
+                {brandPreviewPack && (
+                  <Link
+                    href={`/packs/${brandPreviewPack.id}`}
+                    className={buttonVariants({ size: "lg" })}
+                  >
+                    Open pack
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">
+                    {brandPreview.foundation.brand_name || brandPreviewPack?.name}
+                  </span>
+                  <span className="inline-flex rounded-full border border-border px-2.5 py-0.5 text-xs text-muted-foreground">
+                    Version {brandPreview.version}
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Mission</Label>
+                    <p className="mt-1 text-sm text-foreground">
+                      {brandPreview.brand_strategy.mission_vision.mission || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Vision</Label>
+                    <p className="mt-1 text-sm text-foreground">
+                      {brandPreview.brand_strategy.mission_vision.vision || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Promise</Label>
+                    <p className="mt-1 text-sm text-foreground">
+                      {brandPreview.brand_strategy.mission_vision.promise || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Positioning</Label>
+                    <p className="mt-1 text-sm text-foreground">
+                      {brandPreview.brand_strategy.positioning_differentiation.statement || "—"}
+                    </p>
+                  </div>
+                </div>
+                {brandPreviewPack && (
+                  <Link
+                    href={`/packs/${brandPreviewPack.id}/brand-os`}
+                    className={buttonVariants({ size: "lg" })}
+                  >
+                    Open full Brand OS
+                  </Link>
+                )}
+              </div>
+            )}
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete confirmation dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
