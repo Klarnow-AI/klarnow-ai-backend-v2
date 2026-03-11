@@ -175,14 +175,15 @@ function buildBrandContext(pack: Pack, brand: BrandOS | null): BrandContext {
   }
 
   let logoUrl: string | undefined;
+  let logoMarkup: string | undefined;
   const rawLogo =
     onboarding?.wordmark_svg_or_url ?? onboarding?.wordmark_result;
-  if (
-    rawLogo &&
-    typeof rawLogo === "string" &&
-    !rawLogo.trimStart().startsWith("<")
-  ) {
-    logoUrl = rawLogo;
+  if (rawLogo && typeof rawLogo === "string") {
+    if (rawLogo.trimStart().startsWith("<")) {
+      logoMarkup = rawLogo;
+    } else {
+      logoUrl = rawLogo;
+    }
   }
 
   const bs = brand?.brand_strategy;
@@ -199,6 +200,7 @@ function buildBrandContext(pack: Pack, brand: BrandOS | null): BrandContext {
     uspStatement: pack.usp_statement ?? undefined,
     uspProof: pack.usp_proof ?? undefined,
     logoUrl,
+    logoMarkup,
     colorPalette:
       palette.primary || palette.secondary || palette.accent
         ? palette

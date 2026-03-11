@@ -35,6 +35,7 @@ class GenerationBrandContext(BaseModel):
     usp_statement: str | None = None
     usp_proof: str | None = None
     logo_url: str | None = None
+    logo_markup: str | None = None
     color_palette: GenerationColorPalette | None = None
     fonts: list[str] | None = None
     mission: str | None = None

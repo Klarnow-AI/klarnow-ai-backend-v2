@@ -8,6 +8,7 @@ export type BrandContext = {
   uspStatement?: string;
   uspProof?: string;
   logoUrl?: string;
+  logoMarkup?: string;
   colorPalette?: { primary?: string; secondary?: string; accent?: string };
   fonts?: string[];
   mission?: string;

@@ -142,6 +142,7 @@ async def generate_posters(
     try:
         stream = await create_poster_generation_stream(
             messages=body.messages,
+            pack=pack,
             brand_context=brand_context,
             reference_images=reference_images,
             generation_mode=body.generation_mode,

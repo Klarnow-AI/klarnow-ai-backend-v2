@@ -73,8 +73,13 @@ def build_generation_brand_context(pack: Pack, brand_os=None) -> GenerationBrand
 
     logo_raw = onboarding.get("wordmark_svg_or_url") or onboarding.get("wordmark_result")
     logo_url: str | None = None
-    if isinstance(logo_raw, str) and logo_raw.strip() and not logo_raw.lstrip().startswith("<"):
-        logo_url = logo_raw.strip()
+    logo_markup: str | None = None
+    if isinstance(logo_raw, str) and logo_raw.strip():
+        cleaned_logo = logo_raw.strip()
+        if cleaned_logo.lstrip().startswith("<"):
+            logo_markup = cleaned_logo
+        else:
+            logo_url = cleaned_logo
 
     audience_personas_raw = strategy.get("audience_personas")
     audience_personas: list[GenerationAudiencePersona] = []
@@ -128,6 +133,7 @@ def build_generation_brand_context(pack: Pack, brand_os=None) -> GenerationBrand
         usp_statement=pack.usp_statement,
         usp_proof=pack.usp_proof,
         logo_url=logo_url,
+        logo_markup=logo_markup,
         color_palette=color_palette,
         fonts=fonts or None,
         mission=mission_vision.get("mission"),

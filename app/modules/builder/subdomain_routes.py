@@ -17,7 +17,10 @@ from app.modules.builder.services import (
     publish_project_artifacts,
 )
 from app.modules.clients.services import create_lead
-from app.modules.public_site.schemas import PublicLeadCaptureBody, PublicLeadCaptureResponse
+from app.modules.builder.public_site_schemas import (
+    PublicLeadCaptureBody,
+    PublicLeadCaptureResponse,
+)
 
 router = APIRouter()
 

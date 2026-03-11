@@ -12,7 +12,10 @@ from app.core.gates import can_generate_website
 from app.modules.packs.models import User
 from app.modules.packs.services import get_pack_for_user
 from app.modules.clients.services import create_lead
-from app.modules.public_site.schemas import PublicLeadCaptureBody, PublicLeadCaptureResponse
+from app.modules.builder.public_site_schemas import (
+    PublicLeadCaptureBody,
+    PublicLeadCaptureResponse,
+)
 from app.modules.builder.schemas import (
     BuilderGenerateRequest,
     BuilderProjectCreate,

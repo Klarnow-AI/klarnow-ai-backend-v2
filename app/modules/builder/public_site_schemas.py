@@ -1,4 +1,4 @@
-"""Public site schemas: lead capture."""
+"""Public lead-capture schemas for published builder sites."""
 
 from pydantic import BaseModel
 
