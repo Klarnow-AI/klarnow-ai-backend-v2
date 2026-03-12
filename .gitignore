@@ -21,7 +21,7 @@ wheels/
 .claude/
 
 # Docs
-docs/
+/docs/
 
 # Node / Next.js
 node_modules
