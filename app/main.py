@@ -33,6 +33,7 @@ from app.modules.revenue.routes import router as revenue_router
 from app.modules.proof_vault.routes import router as proof_vault_router
 from app.modules.chat.routes import router as chat_router
 from app.modules.creative.routes import router as creative_router
+from app.modules.docs.routes import router as docs_router
 from app.modules.landing.routes import router as landing_router
 from app.modules.agents.routes import router as agents_router
 from app.modules.tasks.routes import router as tasks_router
@@ -169,6 +170,7 @@ app.include_router(revenue_router, prefix="/api/v1/revenue", tags=["revenue"])
 app.include_router(proof_vault_router, prefix="/api/v1", tags=["proof-vault"])
 app.include_router(chat_router, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(creative_router, prefix="/api/v1/creative", tags=["creative"])
+app.include_router(docs_router, prefix="/api/v1/packs/{pack_id}/docs", tags=["docs"])
 app.include_router(landing_router, prefix="/api/v1/me", tags=["me"])
 app.include_router(agents_router, prefix="/api/v1/agents", tags=["agents"])
 app.include_router(tasks_router, tags=["tasks"])

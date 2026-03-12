@@ -10,7 +10,7 @@ export default function PackInvoiceRedirectPage() {
 
   useEffect(() => {
     if (packId) {
-      router.replace(`/invoices?pack=${packId}`);
+      router.replace(`/packs/${packId}/docs?type=invoice`);
     }
   }, [packId, router]);
 

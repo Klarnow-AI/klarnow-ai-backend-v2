@@ -14,9 +14,9 @@ from app.core.gates import (
 from app.modules.clients.models import LEAD_STATUS_NEW
 from app.modules.clients.services import list_leads_for_pack
 from app.modules.builder.services import get_published_for_pack
+from app.modules.docs.models import Document
 from app.modules.landing.schemas import NextActionChip
 from app.modules.packs.services import get_pack_for_user, list_packs_for_user
-from app.modules.revenue.services import list_proposals_for_pack, list_invoices_for_pack
 from app.modules.sprint.services import (
     get_active_sprint_for_pack,
     get_day_card,
@@ -192,10 +192,18 @@ def get_next_action(
     # --- 4. Lead/proposal/invoice (revenue actions) ---
     leads = list_leads_for_pack(db, pack.id)
     new_leads = [l for l in leads if l.status == LEAD_STATUS_NEW]
-    proposals = list_proposals_for_pack(db, pack.id)
-    invoices = list_invoices_for_pack(db, pack.id)
-    has_proposal_pending = any(p.status in ("sent", "opened") for p in proposals)
-    has_invoice_pending = any(i.status in ("sent", "overdue") for i in invoices)
+    proposals = (
+        db.query(Document)
+        .filter(Document.pack_id == pack.id, Document.type == "proposal")
+        .all()
+    )
+    invoices = (
+        db.query(Document)
+        .filter(Document.pack_id == pack.id, Document.type == "invoice")
+        .all()
+    )
+    has_proposal_pending = any(p.status in ("sent", "accepted") for p in proposals)
+    has_invoice_pending = any(i.status in ("sent", "ready_to_send") for i in invoices)
 
     if new_leads:
         return {
@@ -211,7 +219,7 @@ def get_next_action(
     if has_proposal_pending:
         return {
             "action_text": "Proposal pending",
-            "action_chips": [_chip("Proposals", f"{pack_path}/proposal"), _chip("Leads", f"{pack_path}/leads")],
+            "action_chips": [_chip("Docs", f"{pack_path}/docs?type=proposal"), _chip("Leads", f"{pack_path}/leads")],
             "stage": "leads",
             "can_proceed": True,
             "blocker_message": None,
@@ -222,7 +230,7 @@ def get_next_action(
     if has_invoice_pending:
         return {
             "action_text": "Invoice pending",
-            "action_chips": [_chip("Invoices", f"{pack_path}/invoice"), _chip("Leads", f"{pack_path}/leads")],
+            "action_chips": [_chip("Docs", f"{pack_path}/docs?type=invoice"), _chip("Leads", f"{pack_path}/leads")],
             "stage": "leads",
             "can_proceed": True,
             "blocker_message": None,

@@ -419,6 +419,158 @@ export type InvoicePublishResponse = {
   stripe_invoice_id: string;
 };
 
+export type DocsDocumentType =
+  | "proposal"
+  | "invoice"
+  | "company_profile"
+  | "meeting_summary"
+  | "follow_up_summary"
+  | "employment_letter"
+  | "sponsorship_letter";
+
+export type DocsDocumentStatus =
+  | "draft"
+  | "generated"
+  | "in_review"
+  | "ready_to_send"
+  | "sent"
+  | "accepted"
+  | "paid"
+  | "archived";
+
+export type DocsStartMode = "suggested" | "template" | "notes";
+export type DocsTonePreset =
+  | "formal"
+  | "professional"
+  | "persuasive"
+  | "concise"
+  | "warm";
+
+export type DocsTemplateField = {
+  key: string;
+  label: string;
+  input_type: string;
+  required: boolean;
+  description?: string | null;
+  options: string[];
+};
+
+export type DocsTemplateSection = {
+  key: string;
+  label: string;
+  description?: string | null;
+};
+
+export type DocsTemplate = {
+  type: DocsDocumentType;
+  label: string;
+  category: string;
+  purpose: string;
+  use_cases: string[];
+  required_fields: DocsTemplateField[];
+  optional_fields: DocsTemplateField[];
+  section_blueprint: DocsTemplateSection[];
+  tone_presets: DocsTonePreset[];
+  formatting_rules: string[];
+  export_defaults: Record<string, string>;
+  validation_rules: string[];
+  suggestion_rules: string[];
+};
+
+export type DocsCompanyData = {
+  id: string;
+  pack_id: string;
+  business_name?: string | null;
+  tagline?: string | null;
+  description?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  services?: unknown[] | null;
+  team_members?: unknown[] | null;
+  packages?: unknown[] | null;
+  standard_signatory?: Record<string, unknown> | null;
+  standard_footer?: string | null;
+  logo_url?: string | null;
+  logo_markup?: string | null;
+  brand_voice?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DocsSection = {
+  id: string;
+  document_id: string;
+  section_key: string;
+  section_label: string;
+  content: string;
+  order_index: number;
+  metadata_json?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DocsDocumentListItem = {
+  id: string;
+  pack_id: string;
+  created_by_user_id: string;
+  linked_document_id?: string | null;
+  type: DocsDocumentType;
+  status: DocsDocumentStatus;
+  title: string;
+  tone_preset: DocsTonePreset;
+  start_mode: DocsStartMode;
+  inputs_json?: Record<string, unknown> | null;
+  source_context_json?: Record<string, unknown> | null;
+  export_meta_json?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DocsDocument = DocsDocumentListItem & {
+  sections: DocsSection[];
+};
+
+export type DocsListResponse = {
+  items: DocsDocumentListItem[];
+  total: number;
+};
+
+export type DocsSuggestion = {
+  type: DocsDocumentType;
+  label: string;
+  reason: string;
+  href: string;
+  priority: number;
+};
+
+export type DocsHomeResponse = {
+  suggestions: DocsSuggestion[];
+  recent_documents: DocsDocumentListItem[];
+  templates: DocsTemplate[];
+  company_data: DocsCompanyData;
+  document_counts: Record<string, number>;
+};
+
+export type DocsCreateBody = {
+  type: DocsDocumentType;
+  title?: string | null;
+  tone_preset?: DocsTonePreset;
+  start_mode?: DocsStartMode;
+  inputs_json?: Record<string, unknown>;
+  linked_document_id?: string | null;
+};
+
+export type DocsUpdateBody = {
+  title?: string | null;
+  status?: DocsDocumentStatus;
+  tone_preset?: DocsTonePreset;
+  start_mode?: DocsStartMode;
+  inputs_json?: Record<string, unknown> | null;
+  sections?: Array<{ id: string; content: string }> | null;
+};
+
 export type PackSummaryResponse = {
   pack: Pack;
   brand_os: BrandOSSummary | null;

@@ -149,7 +149,7 @@ def get_pack_summary(
     from app.modules.builder.services import get_published_for_pack as get_published_site
     from app.modules.sprint.services import get_active_sprint_for_pack
     from app.modules.clients.models import LEAD_STATUS_QUALIFIED, Lead
-    from app.modules.revenue.models import Invoice, Proposal
+    from app.modules.docs.models import Document
     from app.modules.proof_vault.models import Proof
     from app.modules.creative.models import Asset
 
@@ -174,36 +174,60 @@ def get_pack_summary(
                 )
                 .scalar_subquery()
                 .label("leads_qualified"),
-                select(func.count(Proposal.id))
-                .where(Proposal.pack_id == pack_id)
+                select(func.count(Document.id))
+                .where(Document.pack_id == pack_id, Document.type == "proposal")
                 .scalar_subquery()
                 .label("proposals_total"),
-                select(func.count(Proposal.id))
-                .where(Proposal.pack_id == pack_id, Proposal.status == "sent")
+                select(func.count(Document.id))
+                .where(
+                    Document.pack_id == pack_id,
+                    Document.type == "proposal",
+                    Document.status == "sent",
+                )
                 .scalar_subquery()
                 .label("proposals_sent"),
-                select(func.count(Proposal.id))
-                .where(Proposal.pack_id == pack_id, Proposal.status == "accepted")
+                select(func.count(Document.id))
+                .where(
+                    Document.pack_id == pack_id,
+                    Document.type == "proposal",
+                    Document.status == "accepted",
+                )
                 .scalar_subquery()
                 .label("proposals_accepted"),
-                select(func.count(Proposal.id))
-                .where(Proposal.pack_id == pack_id, Proposal.status == "declined")
+                select(func.count(Document.id))
+                .where(
+                    Document.pack_id == pack_id,
+                    Document.type == "proposal",
+                    Document.status == "__declined__",
+                )
                 .scalar_subquery()
                 .label("proposals_declined"),
-                select(func.count(Invoice.id))
-                .where(Invoice.pack_id == pack_id)
+                select(func.count(Document.id))
+                .where(Document.pack_id == pack_id, Document.type == "invoice")
                 .scalar_subquery()
                 .label("invoices_total"),
-                select(func.count(Invoice.id))
-                .where(Invoice.pack_id == pack_id, Invoice.status == "sent")
+                select(func.count(Document.id))
+                .where(
+                    Document.pack_id == pack_id,
+                    Document.type == "invoice",
+                    Document.status == "sent",
+                )
                 .scalar_subquery()
                 .label("invoices_sent"),
-                select(func.count(Invoice.id))
-                .where(Invoice.pack_id == pack_id, Invoice.status == "paid")
+                select(func.count(Document.id))
+                .where(
+                    Document.pack_id == pack_id,
+                    Document.type == "invoice",
+                    Document.status == "paid",
+                )
                 .scalar_subquery()
                 .label("invoices_paid"),
-                select(func.count(Invoice.id))
-                .where(Invoice.pack_id == pack_id, Invoice.status == "overdue")
+                select(func.count(Document.id))
+                .where(
+                    Document.pack_id == pack_id,
+                    Document.type == "invoice",
+                    Document.status == "__overdue__",
+                )
                 .scalar_subquery()
                 .label("invoices_overdue"),
                 select(func.count(Proof.id))

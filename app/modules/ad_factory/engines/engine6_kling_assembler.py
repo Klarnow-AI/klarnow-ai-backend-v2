@@ -1,83 +1,78 @@
-"""Engine 6 — Kling Assembler."""
+"""Engine 6 — Render Assembler producing provider-neutral intents."""
 
 from app.modules.ad_factory.schemas import (
     BrandBrief,
     Engine2VariationControllerOutput,
     Engine4ScriptConverterOutput,
     Engine5VisualDirectorOutput,
-    Engine6KlingAssemblerOutput,
-    KlingPrompt,
-    VariantKlingPrompts,
+    Engine6RenderAssemblerOutput,
+    ProviderNeutralRenderIntent,
+    RenderAnchorFrame,
+    VariantRenderIntents,
 )
-
-
-INTENT_DIRECTIONS = {
-    "emotion_led": "emotion-led, human, relatable, high-empathy",
-    "logic_led": "logic-led, clear, credible, proof-forward",
-    "offer_led": "offer-led, urgent, conversion-focused, direct-response",
-}
-
-TREATMENT_DIRECTIONS = {
-    "talking_head_authority": "founder-to-camera delivery with authority and trust",
-    "cinematic_process": "show the process in polished but believable real-world scenes",
-    "ugc_customer_story": "UGC-style customer story with authentic handheld energy",
-    "offer_smash": "direct-response ad pacing with bold offer framing",
-}
 
 
 def _clip(text: str | None, limit: int) -> str:
     return " ".join((text or "").split())[:limit]
 
 
-def _build_spoken_narration(script, max_chars: int = 420) -> str:
-    beats = getattr(script, "beats", []) or []
-    spoken_lines = [
-        _clip(getattr(beat, "text", None), 140)
-        for beat in beats
-        if _clip(getattr(beat, "text", None), 140)
-    ]
-    return _clip(" ".join(spoken_lines), max_chars)
+def _spoken_narration(script, max_chars: int) -> str:
+    lines = [_clip(beat.text, 140) for beat in script.beats if _clip(beat.text, 140)]
+    return _clip(" ".join(lines), max_chars)
 
 
-def _build_kling_prompt(
+def _render_intent(
+    *,
     brand_brief: BrandBrief,
-    variant_plan,
+    treatment: str,
     scripts,
     shot_plan,
+    duration_seconds: int,
     shot_count: int,
-    duration_hint: str,
-    spoken_narration: str,
-) -> str:
-    selected_shots = shot_plan.shots[:shot_count]
-    visual_sequence = "; ".join(_clip(shot.description, 180) for shot in selected_shots if shot.description)
-    caption_lines = " | ".join(_clip(shot.on_screen_text, 60) for shot in selected_shots if shot.on_screen_text)
-    proof_label = (
+) -> ProviderNeutralRenderIntent:
+    selected_shots = shot_plan.anchor_shot_plan[:shot_count]
+    proof_line = (
         brand_brief.proof_assets[0].label
         if brand_brief.proof_assets
-        else "real customer proof"
+        else "specific customer proof"
     )
-
-    parts = [
-        f"Create a vertical 9:16 short-form video ad for {brand_brief.business_name}.",
-        f"Promote {brand_brief.offer} to {brand_brief.audience}.",
-        f"Variant {variant_plan.slot}: {INTENT_DIRECTIONS.get(variant_plan.intent, variant_plan.intent)}.",
-        f"Treatment: {TREATMENT_DIRECTIONS.get(variant_plan.treatment, variant_plan.treatment)}.",
-        f"Open with the spoken hook: '{scripts.hook_line}'.",
-        f"Keep the concept centered on {scripts.core_concept}.",
-        f"Visual sequence: {visual_sequence}.",
-        "Enable native audio with clear English narration that stays tightly synced to the edit.",
-        f"Narration should say exactly: {spoken_narration}.",
-        f"On-screen text should use lines like: {caption_lines}.",
-        f"Land proof around {proof_label} and the outcome {brand_brief.primary_outcome}.",
-        f"End with CTA text: '{scripts.cta.end_line}'.",
-        duration_hint,
-        (
-            "Use real people, believable environments, natural motion, social-ad pacing, and conversion-focused framing. "
-            "Avoid factories, industrial machines, engineering diagrams, gears, robotics, or abstract mechanical visuals "
-            "unless the offer genuinely requires them."
+    return ProviderNeutralRenderIntent(
+        duration_seconds=duration_seconds,  # type: ignore[arg-type]
+        aspect_ratio="9:16",
+        treatment=treatment,
+        pacing_mode="stretch_compress_anchors",
+        captions_on=True,
+        fast_cuts=True,
+        cta_mid_and_end=True,
+        anchor_frames=[
+            RenderAnchorFrame(
+                index=shot.index,
+                shot_type=shot.shot_type,
+                description=shot.description,
+                on_screen_text=shot.on_screen_text,
+            )
+            for shot in selected_shots
+        ],
+        continuity_requirements={
+            "anchor_frames_present": True,
+            "continuity_required": True,
+        },
+        voiceover_mode="native_audio",
+        provider_target="kling",
+        spoken_narration=_spoken_narration(
+            scripts.script_15s if duration_seconds == 15 else scripts.script_30s,
+            420 if duration_seconds == 15 else 900,
         ),
-    ]
-    return _clip(" ".join(part for part in parts if part), 4000)
+        caption_lines=[shot.on_screen_text for shot in selected_shots],
+        hook_line=scripts.hook_line,
+        core_concept=scripts.core_concept,
+        cta_line=scripts.cta.end_line,
+        business_name=brand_brief.business_name,
+        offer=brand_brief.offer,
+        audience=brand_brief.audience,
+        primary_outcome=brand_brief.primary_outcome,
+        proof_line=proof_line,
+    )
 
 
 def run(
@@ -85,46 +80,40 @@ def run(
     engine2_output: Engine2VariationControllerOutput,
     engine4_output: Engine4ScriptConverterOutput,
     engine5_output: Engine5VisualDirectorOutput,
-) -> Engine6KlingAssemblerOutput:
-    kling_prompts_list: list[VariantKlingPrompts] = []
+) -> Engine6RenderAssemblerOutput:
+    render_intents: list[VariantRenderIntents] = []
 
-    for index, sp in enumerate(engine5_output.shot_plans):
+    for index, shot_plan in enumerate(engine5_output.shot_plans):
         scripts = engine4_output.scripts[index]
         variant_plan = engine2_output.variant_plans[index]
-        narration_30s = _build_spoken_narration(scripts.script_30s)
-        narration_15s = _build_spoken_narration(scripts.script_15s)
-        full_prompt_30s = _build_kling_prompt(
-            brand_brief,
-            variant_plan,
-            scripts,
-            sp,
-            shot_count=len(sp.shots),
-            duration_hint="Build enough visual coverage for a full 30-second social ad with distinct beats.",
-            spoken_narration=narration_30s,
-        )
-        full_prompt_15s = _build_kling_prompt(
-            brand_brief,
-            variant_plan,
-            scripts,
-            sp,
-            shot_count=5,
-            duration_hint="Keep the pacing punchy so it can compress into a high-conviction 10 to 15 second cut.",
-            spoken_narration=narration_15s,
-        )
-
-        kling_prompts_list.append(
-            VariantKlingPrompts(
-                slot=sp.slot,
-                kling_15s=KlingPrompt(prompt=full_prompt_15s[:4000], duration_seconds=15),
-                kling_30s=KlingPrompt(prompt=full_prompt_30s[:4000], duration_seconds=30),
+        render_intents.append(
+            VariantRenderIntents(
+                slot=shot_plan.slot,
+                render_intent_15s=_render_intent(
+                    brand_brief=brand_brief,
+                    treatment=variant_plan.treatment,
+                    scripts=scripts,
+                    shot_plan=shot_plan,
+                    duration_seconds=15,
+                    shot_count=5,
+                ),
+                render_intent_30s=_render_intent(
+                    brand_brief=brand_brief,
+                    treatment=variant_plan.treatment,
+                    scripts=scripts,
+                    shot_plan=shot_plan,
+                    duration_seconds=30,
+                    shot_count=len(shot_plan.anchor_shot_plan),
+                ),
                 render_requirements={
                     "aspect_ratio": "9:16",
                     "captions_on": True,
                     "fast_cuts": True,
                     "cta_mid_and_end": True,
-                    "nanobanana_anchors": True,
+                    "anchor_frames_present": True,
+                    "continuity_required": True,
                 },
             )
         )
 
-    return Engine6KlingAssemblerOutput(kling_prompts=kling_prompts_list)
+    return Engine6RenderAssemblerOutput(render_intents=render_intents)

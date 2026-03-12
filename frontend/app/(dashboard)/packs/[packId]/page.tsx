@@ -133,8 +133,8 @@ const PACK_OVERVIEW_MODULES: Record<
   },
   proposals: {
     title: "Proposals",
-    hrefSuffix: "/proposal",
-    getHref: (packId) => `/proposals?pack=${packId}`,
+    hrefSuffix: "/docs",
+    getHref: (packId) => `/packs/${packId}/docs?type=proposal`,
     icon: FileCheck,
     emptyMessage: "No proposals yet.",
     getContent: (s) =>
@@ -150,8 +150,8 @@ const PACK_OVERVIEW_MODULES: Record<
   },
   invoices: {
     title: "Invoices",
-    hrefSuffix: "/invoice",
-    getHref: (packId) => `/invoices?pack=${packId}`,
+    hrefSuffix: "/docs",
+    getHref: (packId) => `/packs/${packId}/docs?type=invoice`,
     icon: Receipt,
     emptyMessage: "No invoices yet.",
     getContent: (s) =>

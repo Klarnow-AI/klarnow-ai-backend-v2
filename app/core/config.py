@@ -122,6 +122,9 @@ class Settings(BaseSettings):
     kling_access_key: str = ""
     kling_secret_key: str = ""
     kling_api_base_url: str = "https://api-singapore.klingai.com"
+    ad_factory_billing_enabled: bool = False
+    ad_factory_default_credit_balance: int = 0
+    ad_factory_credit_reservation_minutes: int = 30
 
     # Optional: Stripe (Connect + Invoicing)
     stripe_secret_key: str = ""

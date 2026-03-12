@@ -10,7 +10,7 @@ export default function PackProposalRedirectPage() {
 
   useEffect(() => {
     if (packId) {
-      router.replace(`/proposals?pack=${packId}`);
+      router.replace(`/packs/${packId}/docs?type=proposal`);
     }
   }, [packId, router]);
 

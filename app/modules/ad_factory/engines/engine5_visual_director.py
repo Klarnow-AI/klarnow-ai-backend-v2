@@ -1,17 +1,28 @@
 """Engine 5 — Visual Director."""
 
+from __future__ import annotations
+
+from app.modules.ad_factory.registry.data import ENGINE_LOGIC_VERSION, REGISTRY_VERSION
 from app.modules.ad_factory.schemas import (
+    AnchorShot,
     BrandBrief,
-    Engine2VariationControllerOutput,
+    Engine3PatternAssemblerOutput,
     Engine4ScriptConverterOutput,
     Engine5VisualDirectorOutput,
-    Shot,
+    Lineage,
+    LineageTextItem,
     VariantShotPlan,
 )
 
 SHOT_TYPES = [
-    "pattern_interrupt", "establishing", "mechanism_1", "mechanism_2",
-    "proof_overlay", "human_moment", "result_reveal", "cta_frame",
+    "pattern_interrupt",
+    "establishing",
+    "mechanism_1",
+    "mechanism_2",
+    "proof_overlay",
+    "human_moment",
+    "result_reveal",
+    "cta_frame",
 ]
 
 
@@ -20,92 +31,134 @@ def _clip(text: str | None, limit: int, fallback: str) -> str:
     return (normalized or fallback)[:limit]
 
 
+def _lineage(source_registry_item_id: str, fill_variables: dict[str, str]) -> Lineage:
+    return Lineage(
+        source_registry_item_id=source_registry_item_id,
+        source_registry_item_type="pattern",
+        template_id=source_registry_item_id,
+        fill_variables=fill_variables,
+        registry_version=REGISTRY_VERSION,
+        engine_logic_version=ENGINE_LOGIC_VERSION,
+        generator_stage="engine5_visual_director",
+    )
+
+
+def _on_screen_copy(*parts: str) -> str:
+    words = " ".join(" ".join(part.split()) for part in parts if part).split()
+    return " ".join(words[:7])[:60] or "Watch this now"
+
+
 def run(
     brand_brief: BrandBrief,
-    engine2_output: Engine2VariationControllerOutput,
+    engine3_output: Engine3PatternAssemblerOutput,
     engine4_output: Engine4ScriptConverterOutput,
 ) -> Engine5VisualDirectorOutput:
     shot_plans: list[VariantShotPlan] = []
     proof_label = (
         brand_brief.proof_assets[0].label
         if brand_brief.proof_assets
-        else "real customer proof"
+        else "specific customer proof"
     )
 
-    for i, variant_plan in enumerate(engine2_output.variant_plans):
-        scripts = engine4_output.scripts[i]
+    for index, scripts in enumerate(engine4_output.scripts):
+        selection = engine3_output.selections[index]
         beat_lookup = {beat.beat_name: beat.text for beat in scripts.script_30s.beats}
+        fill_variables = {
+            "business_name": brand_brief.business_name,
+            "offer": brand_brief.offer,
+            "audience": brand_brief.audience,
+            "primary_outcome": brand_brief.primary_outcome,
+            "proof_label": proof_label,
+        }
         shot_descriptions = {
             "pattern_interrupt": (
-                f"Open on a real person delivering the hook '{scripts.hook_line}' directly to camera "
-                f"for {brand_brief.audience}."
+                (
+                    f"Open on a believable human moment delivering '{scripts.hook_line}' directly to camera "
+                    f"for {brand_brief.audience}."
+                    if brand_brief.face_on_camera
+                    else f"Open on a believable environment cue that sets up '{scripts.hook_line}' for {brand_brief.audience}."
+                )
             ),
             "establishing": (
                 f"Show {brand_brief.audience} dealing with {beat_lookup.get('problem', brand_brief.offer)} "
-                f"before discovering {brand_brief.business_name}."
+                f"in a real environment."
             ),
             "mechanism_1": (
-                f"Demonstrate {brand_brief.offer} in action so the viewer instantly understands "
-                f"the core idea '{scripts.core_concept}'."
+                f"Show how {brand_brief.offer} begins so the system feels concrete and premium."
             ),
             "mechanism_2": (
-                f"Show the key transformation step that moves someone from "
-                f"{beat_lookup.get('problem', 'the old way')} toward {brand_brief.primary_outcome}."
+                f"Continue the transformation step that turns {brand_brief.offer} into "
+                f"{brand_brief.primary_outcome}."
             ),
             "proof_overlay": (
-                f"Layer in believable proof like {proof_label} while reinforcing "
-                f"'{beat_lookup.get('proof', brand_brief.primary_outcome)}'."
+                f"Layer in proof using {proof_label} while reinforcing {beat_lookup.get('proof', brand_brief.primary_outcome)}."
             ),
             "human_moment": (
-                f"Capture a genuine human reaction of confidence, relief, or delight after using "
-                f"{brand_brief.offer}."
+                "Capture relief, confidence, and visible momentum in a grounded human reaction."
             ),
             "result_reveal": (
-                f"Reveal the outcome clearly: {brand_brief.primary_outcome} for {brand_brief.audience}."
+                f"Reveal the outcome clearly for {brand_brief.audience}: {brand_brief.primary_outcome}."
             ),
             "cta_frame": (
-                f"Close with a direct CTA from {brand_brief.business_name}: '{scripts.cta.end_line}'."
+                f"Close with {brand_brief.business_name} delivering the end CTA '{scripts.cta.end_line}'."
             ),
         }
-        shots: list[Shot] = []
-        on_screen_texts = [
-            _clip(scripts.hook_line, 60, "Watch this"),
-            _clip(beat_lookup.get("problem"), 60, "The problem"),
-            _clip(beat_lookup.get("mechanism"), 60, "How we help"),
-            _clip(scripts.core_concept, 60, "Our process"),
-            _clip(beat_lookup.get("proof"), 60, "Proof"),
-            _clip(brand_brief.business_name, 60, "Human moment"),
-            _clip(brand_brief.primary_outcome, 60, "Results"),
-            _clip(scripts.cta.end_line or scripts.cta.mid_line, 60, "Act now"),
-        ]
-        for j, st in enumerate(SHOT_TYPES):
-            ost = on_screen_texts[j] if j < len(on_screen_texts) else "Next"
-            description = _clip(shot_descriptions.get(st), 200, f"Show {brand_brief.offer} in a real-world scene.")
-            nano = _clip(
+        anchor_shots: list[AnchorShot] = []
+        on_screen_text_items: list[LineageTextItem] = []
+        nanobanana_items: list[LineageTextItem] = []
+
+        for shot_index, shot_type in enumerate(SHOT_TYPES, start=1):
+            lineage = _lineage(selection.pattern_id, fill_variables)
+            on_screen_text = _on_screen_copy(
+                scripts.hook_line if shot_type == "pattern_interrupt" else "",
+                brand_brief.primary_outcome if shot_type == "result_reveal" else "",
+                scripts.cta.end_line if shot_type == "cta_frame" else "",
+                proof_label if shot_type == "proof_overlay" else "",
+                scripts.core_concept if shot_type in {"mechanism_1", "mechanism_2"} else "",
+            )
+            description = _clip(
+                shot_descriptions[shot_type],
+                200,
+                f"Show {brand_brief.offer} in a believable scene.",
+            )
+            nanobanana_prompt = _clip(
                 (
-                    f"Vertical 9:16 short-form ad for {brand_brief.business_name}. {description} "
-                    f"Real people relevant to {brand_brief.audience}, natural light, authentic expression, "
-                    "mobile-first framing, premium commercial quality. Avoid factories, industrial machinery, "
-                    "engineering diagrams, and abstract mechanical visuals unless the offer requires them."
+                    f"Vertical 9:16 social ad for {brand_brief.business_name}. {description} "
+                    f"Use real people relevant to {brand_brief.audience}, natural light, premium ad direction, "
+                    "captions enabled, continuity between anchor shots, and mobile-first framing. "
+                    "Avoid factories, industrial machinery, engineering diagrams, and abstract mechanical visuals."
                 ),
                 800,
-                "Vertical 9:16 short-form ad with real people and natural light.",
+                "Vertical 9:16 social ad with real people and captions.",
             )
-            shots.append(
-                Shot(
-                    index=j + 1,
-                    shot_type=st,
+            anchor_shots.append(
+                AnchorShot(
+                    index=shot_index,
+                    shot_type=shot_type,  # type: ignore[arg-type]
                     description=description,
-                    on_screen_text=ost,
-                    nanobanana_prompt=nano,
+                    on_screen_text=on_screen_text,
+                    nanobanana_prompt=nanobanana_prompt,
+                    lineage=lineage,
                     caption_overlay={"enabled": True},
                 )
             )
+            on_screen_text_items.append(LineageTextItem(text=on_screen_text, lineage=lineage))
+            nanobanana_items.append(LineageTextItem(text=nanobanana_prompt, lineage=lineage))
+
         shot_plans.append(
             VariantShotPlan(
-                slot=variant_plan.slot,
-                shots=shots,
-                pacing={"avg_shot_seconds_min": 1.2, "avg_shot_seconds_max": 1.6},
+                slot=scripts.slot,
+                anchor_shot_plan=anchor_shots,
+                pacing={
+                    "mode": "stretch_compress_anchors",
+                    "anchor_count": 8,
+                    "duration_profiles": {
+                        "15": {"avg_shot_seconds_min": 1.2, "avg_shot_seconds_max": 2.0},
+                        "30": {"avg_shot_seconds_min": 2.6, "avg_shot_seconds_max": 4.2},
+                    },
+                },
+                on_screen_text=on_screen_text_items,
+                nanobanana_prompts=nanobanana_items,
             )
         )
 

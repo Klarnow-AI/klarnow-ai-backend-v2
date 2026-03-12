@@ -349,6 +349,7 @@ def build_shared_creative_prompt_block(
     brief: PosterPromptBrief,
     slot_config: PosterSlotConfig,
 ) -> str:
+    
     template_instruction = TEMPLATE_PROMPTS[slot_config.template_key]
     variant_instruction = VARIANT_INSTRUCTIONS[slot_config.variant_key]
 

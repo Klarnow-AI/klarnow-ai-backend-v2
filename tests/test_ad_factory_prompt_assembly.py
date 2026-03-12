@@ -2,22 +2,18 @@ from __future__ import annotations
 
 import unittest
 
+from app.modules.ad_factory.engines.engine0_pack_context import run as run_engine0
+from app.modules.ad_factory.engines.engine1_context_builder import run as run_engine1
+from app.modules.ad_factory.engines.engine2_variation_controller import run as run_engine2
+from app.modules.ad_factory.engines.engine3_pattern_assembler import run as run_engine3
+from app.modules.ad_factory.engines.engine4_script_converter import run as run_engine4
 from app.modules.ad_factory.engines.engine5_visual_director import run as run_engine5
 from app.modules.ad_factory.engines.engine6_kling_assembler import run as run_engine6
-from app.modules.ad_factory.schemas import (
-    BrandBrief,
-    CTADestination,
-    Engine2VariationControllerOutput,
-    Engine4ScriptConverterOutput,
-    ProofAsset,
-    Script,
-    ScriptBeat,
-    VariantPlan,
-    VariantScripts,
-)
+from app.modules.ad_factory.kling_adapter import build_kling_prompt, build_kling_request
+from app.modules.ad_factory.schemas import BrandBrief, CTADestination, PackSnapshot, ProofAsset
 
 
-def _build_brand_brief() -> BrandBrief:
+def _brand_brief() -> BrandBrief:
     return BrandBrief(
         business_name="Glow Clinic",
         offer="professional teeth whitening",
@@ -38,128 +34,69 @@ def _build_brand_brief() -> BrandBrief:
     )
 
 
-def _build_engine2_output() -> Engine2VariationControllerOutput:
-    return Engine2VariationControllerOutput(
-        variant_plans=[
-            VariantPlan(
-                slot="A",
-                intent="emotion_led",
-                path="transformation",
-                treatment="talking_head_authority",
-                hook_type="question",
-            ),
-            VariantPlan(
-                slot="B",
-                intent="logic_led",
-                path="trust_safety",
-                treatment="cinematic_process",
-                hook_type="contrarian_truth",
-            ),
-            VariantPlan(
-                slot="C",
-                intent="offer_led",
-                path="convenience",
-                treatment="offer_smash",
-                hook_type="stop_doing_this",
-            ),
-        ]
-    )
-
-
-def _build_script(slot: str, hook_line: str, concept: str, cta_line: str) -> VariantScripts:
-    beats = [
-        ScriptBeat(beat_name="hook", text=hook_line),
-        ScriptBeat(
-            beat_name="problem",
-            text="Coffee, wine, and camera flash make your smile look dull.",
-        ),
-        ScriptBeat(
-            beat_name="mechanism",
-            text="A dentist-led whitening session lifts stains safely in one visit.",
-        ),
-        ScriptBeat(
-            beat_name="proof",
-            text="Backed by 5-star reviews and visible before-and-after results.",
-        ),
-        ScriptBeat(
-            beat_name="offer",
-            text="Book a whitening appointment this week and leave with a brighter smile.",
-        ),
-        ScriptBeat(beat_name="cta", text=cta_line),
-    ]
-    script = Script(beats=beats, timing_rules_satisfied=True)
-    return VariantScripts(
-        slot=slot,
-        core_concept=concept,
-        hook_line=hook_line,
-        script_15s=script,
-        script_30s=script,
-        cta={
-            "cta_action": "book",
-            "destination_type": "landing_page",
-            "destination_value": "https://example.com/book",
-            "mid_line": "Book now.",
-            "end_line": cta_line,
-        },
-    )
-
-
-def _build_engine4_output() -> Engine4ScriptConverterOutput:
-    return Engine4ScriptConverterOutput(
-        scripts=[
-            _build_script(
-                "A",
-                "Still hiding your smile in photos?",
-                "Smile reset",
-                "Book your whitening session below.",
-            ),
-            _build_script(
-                "B",
-                "Most whitening ads skip the dentist part.",
-                "Dentist-led precision",
-                "Tap below to book your appointment.",
-            ),
-            _build_script(
-                "C",
-                "Stop paying for whitening that barely shows.",
-                "Visible result in one visit",
-                "Claim your slot from the link below.",
-            ),
-        ]
+def _pack_snapshot() -> PackSnapshot:
+    return PackSnapshot(
+        pack_id="pack-123",
+        pack_name="Glow Clinic",
+        sprint_id="sprint-123",
+        day=4,
+        stage="setup",
+        traffic_source="unknown",
     )
 
 
 class AdFactoryPromptAssemblyTests(unittest.TestCase):
-    def test_engine5_builds_variant_specific_visual_descriptions(self) -> None:
-        brand_brief = _build_brand_brief()
-        engine5 = run_engine5(brand_brief, _build_engine2_output(), _build_engine4_output())
+    def test_visual_director_builds_eight_anchor_shots_with_lineage(self) -> None:
+        brand_brief = _brand_brief()
+        engine0 = run_engine0(_pack_snapshot(), brand_brief)
+        engine1 = run_engine1(brand_brief, engine0, "seed-1234567890abcdef")
+        engine2 = run_engine2(brand_brief, engine1, "seed-1234567890abcdef")
+        engine3 = run_engine3(
+            brand_brief,
+            engine0,
+            engine2,
+            engine1.proof_strategy_candidate.strategy_id,
+            "seed-1234567890abcdef",
+        )
+        engine4 = run_engine4(brand_brief, engine2, engine3)
+        engine5 = run_engine5(brand_brief, engine3, engine4)
 
-        first_variant_shots = engine5.shot_plans[0].shots
+        first_variant_shots = engine5.shot_plans[0].anchor_shot_plan
 
-        self.assertIn("Still hiding your smile in photos?", first_variant_shots[0].description)
-        self.assertIn("professional teeth whitening", first_variant_shots[2].description)
+        self.assertEqual(len(first_variant_shots), 8)
         self.assertIn("Glow Clinic", first_variant_shots[7].description)
+        self.assertTrue(all(shot.caption_overlay["enabled"] for shot in first_variant_shots))
+        self.assertTrue(all(shot.lineage.source_registry_item_id.startswith("pattern_") for shot in first_variant_shots))
         self.assertIn("Avoid factories", first_variant_shots[0].nanobanana_prompt)
-        self.assertNotIn("Pattern Interrupt", first_variant_shots[0].description)
 
-    def test_engine6_kling_prompt_uses_brand_and_variant_content(self) -> None:
-        brand_brief = _build_brand_brief()
-        engine2 = _build_engine2_output()
-        engine4 = _build_engine4_output()
-        engine5 = run_engine5(brand_brief, engine2, engine4)
-
+    def test_render_intent_stays_provider_neutral_until_adapter(self) -> None:
+        brand_brief = _brand_brief()
+        engine0 = run_engine0(_pack_snapshot(), brand_brief)
+        engine1 = run_engine1(brand_brief, engine0, "seed-1234567890abcdef")
+        engine2 = run_engine2(brand_brief, engine1, "seed-1234567890abcdef")
+        engine3 = run_engine3(
+            brand_brief,
+            engine0,
+            engine2,
+            engine1.proof_strategy_candidate.strategy_id,
+            "seed-1234567890abcdef",
+        )
+        engine4 = run_engine4(brand_brief, engine2, engine3)
+        engine5 = run_engine5(brand_brief, engine3, engine4)
         engine6 = run_engine6(brand_brief, engine2, engine4, engine5)
-        prompt = engine6.kling_prompts[0].kling_15s.prompt
 
+        intent = engine6.render_intents[0].render_intent_15s
+        prompt = build_kling_prompt(intent)
+        request = build_kling_request(intent)
+
+        self.assertEqual(intent.provider_target, "kling")
+        self.assertEqual(intent.aspect_ratio, "9:16")
+        self.assertEqual(len(intent.anchor_frames), 5)
         self.assertIn("Glow Clinic", prompt)
         self.assertIn("professional teeth whitening", prompt)
-        self.assertIn("Still hiding your smile in photos?", prompt)
-        self.assertIn("emotion-led", prompt)
-        self.assertIn("Enable native audio", prompt)
         self.assertIn("Narration should say exactly", prompt)
-        self.assertIn("Avoid factories", prompt)
-        self.assertNotIn("Pattern Interrupt", prompt)
-        self.assertNotIn("Mechanism 1", prompt)
+        self.assertEqual(request["aspect_ratio"], "9:16")
+        self.assertEqual(request["duration"], 10)
 
 
 if __name__ == "__main__":

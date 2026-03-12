@@ -7,8 +7,7 @@ import {
   Image as ImageIcon,
   Film,
   Users,
-  FileCheck,
-  Receipt,
+  FileText,
   Settings,
 } from "@/components/icons";
 
@@ -71,20 +70,12 @@ export const buildItems: NavItem[] = [
 export const resultItems: NavItem[] = [
   { key: "leads", href: "/leads", label: "Leads", icon: Users, pathMatch: "/leads", packScoped: true },
   {
-    key: "proposals",
-    href: "/proposals",
-    label: "Proposals",
-    icon: FileCheck,
-    pathMatch: "/proposals",
-    packScoped: false,
-  },
-  {
-    key: "invoices",
-    href: "/invoices",
-    label: "Invoices",
-    icon: Receipt,
-    pathMatch: "/invoices",
-    packScoped: false,
+    key: "docs",
+    href: "/docs",
+    label: "Docs",
+    icon: FileText,
+    pathMatch: "/docs",
+    packScoped: true,
   },
 ];
 
