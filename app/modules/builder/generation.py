@@ -7,6 +7,7 @@ from app.shared.services.llm_streaming import create_text_stream_with_fallback
 
 
 _DEFAULT_APP_MARKER = "Describe your website to get started"
+_MIN_COMPLETION_TOKENS = 2048
 _DESIGN_SYSTEM_TOKENS = {
     "minimal": """
 - Background: white with light gray sections
@@ -59,6 +60,18 @@ def is_default_files(files: dict[str, str]) -> bool:
         return False
     content = files.get("/App.tsx") or files.get("App.tsx") or ""
     return _DEFAULT_APP_MARKER in content
+
+
+def _resolve_thinking_budget(max_tokens: int, requested_budget: int | None) -> int | None:
+    if requested_budget is None or requested_budget <= 0:
+        return None
+
+    max_budget = max_tokens - _MIN_COMPLETION_TOKENS
+    if max_budget <= 0:
+        max_budget = max_tokens - 1
+    if max_budget <= 0:
+        return None
+    return min(requested_budget, max_budget)
 
 
 def _brand_section(brand: GenerationBrandContext | None) -> str:
@@ -287,7 +300,10 @@ async def create_website_generation_stream(
     )
     max_tokens = 8192
     anthropic_model = "claude-opus-4-6" if generation_mode else "claude-sonnet-4-6"
-    thinking_budget = 10000 if generation_mode else 6000
+    thinking_budget = _resolve_thinking_budget(
+        max_tokens,
+        10000 if generation_mode else 6000,
+    )
 
     simple_messages = [
         {"role": message.role, "content": message.content}

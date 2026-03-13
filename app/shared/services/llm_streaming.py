@@ -16,6 +16,102 @@ _ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 _ANTHROPIC_VERSION = "2023-06-01"
 
 
+def _normalize_anthropic_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for message in messages:
+        normalized_message = dict(message)
+        if normalized_message.get("role") == "system":
+            # Anthropic accepts top-level `system`, but not `system` inside `messages`.
+            normalized_message["role"] = "assistant"
+        normalized.append(normalized_message)
+    return normalized
+
+
+def _sanitize_anthropic_thinking_budget(
+    *,
+    max_tokens: int,
+    thinking_budget: int | None,
+) -> int | None:
+    if thinking_budget is None:
+        return None
+    if thinking_budget <= 0:
+        logger.warning(
+            "Skipping Anthropic thinking budget because it is non-positive: %s",
+            thinking_budget,
+        )
+        return None
+
+    max_budget = max_tokens - 1
+    if max_budget <= 0:
+        logger.warning(
+            "Skipping Anthropic thinking budget because max_tokens=%s leaves no room for output",
+            max_tokens,
+        )
+        return None
+
+    if thinking_budget > max_budget:
+        logger.warning(
+            "Clamping Anthropic thinking budget from %s to %s to stay below max_tokens=%s",
+            thinking_budget,
+            max_budget,
+            max_tokens,
+        )
+        return max_budget
+    return thinking_budget
+
+
+def _build_anthropic_payload(
+    *,
+    system_prompt: str,
+    messages: list[dict[str, Any]],
+    model: str,
+    max_tokens: int,
+    thinking_budget: int | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "system": system_prompt,
+        "messages": _normalize_anthropic_messages(messages),
+        "stream": True,
+    }
+    sanitized_thinking_budget = _sanitize_anthropic_thinking_budget(
+        max_tokens=max_tokens,
+        thinking_budget=thinking_budget,
+    )
+    if sanitized_thinking_budget is not None:
+        payload["thinking"] = {
+            "type": "enabled",
+            "budget_tokens": sanitized_thinking_budget,
+        }
+    return payload
+
+
+def _extract_anthropic_http_error_message(body: bytes) -> str | None:
+    if not body:
+        return None
+
+    text = body.decode("utf-8", errors="replace").strip()
+    if not text:
+        return None
+
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return text
+
+    if isinstance(payload, dict):
+        error = payload.get("error")
+        if isinstance(error, dict):
+            message = error.get("message")
+            if isinstance(message, str) and message.strip():
+                return message.strip()
+        message = payload.get("message")
+        if isinstance(message, str) and message.strip():
+            return message.strip()
+    return text
+
+
 async def _openai_text_stream(
     *,
     api_key: str,
@@ -74,15 +170,13 @@ async def _anthropic_text_stream(
     max_tokens: int,
     thinking_budget: int | None = None,
 ) -> AsyncIterator[str]:
-    payload: dict[str, Any] = {
-        "model": model,
-        "max_tokens": max_tokens,
-        "system": system_prompt,
-        "messages": messages,
-        "stream": True,
-    }
-    if thinking_budget is not None:
-        payload["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget}
+    payload = _build_anthropic_payload(
+        system_prompt=system_prompt,
+        messages=messages,
+        model=model,
+        max_tokens=max_tokens,
+        thinking_budget=thinking_budget,
+    )
 
     headers = {
         "x-api-key": api_key,
@@ -93,7 +187,13 @@ async def _anthropic_text_stream(
 
     async with httpx.AsyncClient(timeout=timeout) as client:
         async with client.stream("POST", _ANTHROPIC_API_URL, headers=headers, json=payload) as response:
-            response.raise_for_status()
+            if response.is_error:
+                body = await response.aread()
+                detail = _extract_anthropic_http_error_message(body)
+                message = f"Anthropic request failed with status {response.status_code}"
+                if detail:
+                    message += f": {detail}"
+                raise RuntimeError(message)
             buffer = ""
             async for chunk in response.aiter_text():
                 buffer += chunk
