@@ -30,12 +30,20 @@ def _merge_signup_details(
     db: Session,
     signup: WaitlistSignup,
     *,
-    name: str | None,
+    first_name: str | None,
+    role: str | None,
+    goal: str | None,
     source: str | None,
 ) -> WaitlistSignup:
     changed = False
-    if name and signup.name != name:
-        signup.name = name
+    if first_name and signup.first_name != first_name:
+        signup.first_name = first_name
+        changed = True
+    if role and signup.role != role:
+        signup.role = role
+        changed = True
+    if goal and signup.goal != goal:
+        signup.goal = goal
         changed = True
     if source and signup.source != source:
         signup.source = source
@@ -51,11 +59,15 @@ def subscribe(
     db: Session,
     *,
     email: str,
-    name: str | None = None,
+    first_name: str | None = None,
+    role: str | None = None,
+    goal: str | None = None,
     source: str | None = None,
 ) -> WaitlistSubscribeResult:
     normalized_email = _normalize_email(email)
-    cleaned_name = _clean_optional_text(name)
+    cleaned_first_name = _clean_optional_text(first_name)
+    cleaned_role = _clean_optional_text(role)
+    cleaned_goal = _clean_optional_text(goal)
     cleaned_source = _clean_optional_text(source)
 
     existing = (
@@ -67,14 +79,18 @@ def subscribe(
         signup = _merge_signup_details(
             db,
             existing,
-            name=cleaned_name,
+            first_name=cleaned_first_name,
+            role=cleaned_role,
+            goal=cleaned_goal,
             source=cleaned_source,
         )
         return WaitlistSubscribeResult(signup=signup, already_subscribed=True)
 
     signup = WaitlistSignup(
         email=normalized_email,
-        name=cleaned_name,
+        first_name=cleaned_first_name,
+        role=cleaned_role,
+        goal=cleaned_goal,
         source=cleaned_source,
     )
     db.add(signup)
@@ -92,7 +108,9 @@ def subscribe(
         signup = _merge_signup_details(
             db,
             existing,
-            name=cleaned_name,
+            first_name=cleaned_first_name,
+            role=cleaned_role,
+            goal=cleaned_goal,
             source=cleaned_source,
         )
         return WaitlistSubscribeResult(signup=signup, already_subscribed=True)

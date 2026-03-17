@@ -41,9 +41,12 @@ class WaitlistRouteTests(unittest.TestCase):
             response = client.post(
                 "/api/v1/waitlist/subscribe",
                 json={
-                    "email": "Founder@Example.com",
-                    "name": "Ada Founder",
-                    "source": "landing-page",
+                    "firstName": "Ada",
+                    "email": "Ada@business.com",
+                    "role": "Consultant or agency",
+                    "goal": "Generate better campaigns, improve follow-up, and turn more interest into customers.",
+                    "source": "landing-page-beta",
+                    "website": "",
                 },
             )
 
@@ -58,22 +61,37 @@ class WaitlistRouteTests(unittest.TestCase):
 
         signups = self._all_signups()
         self.assertEqual(len(signups), 1)
-        self.assertEqual(signups[0].email, "founder@example.com")
-        self.assertEqual(signups[0].name, "Ada Founder")
-        self.assertEqual(signups[0].source, "landing-page")
+        self.assertEqual(signups[0].email, "ada@business.com")
+        self.assertEqual(signups[0].first_name, "Ada")
+        self.assertEqual(signups[0].role, "Consultant or agency")
+        self.assertEqual(
+            signups[0].goal,
+            "Generate better campaigns, improve follow-up, and turn more interest into customers.",
+        )
+        self.assertEqual(signups[0].source, "landing-page-beta")
 
     def test_subscribe_is_idempotent_for_existing_email(self) -> None:
         with TestClient(main_module.app, raise_server_exceptions=False) as client:
             first = client.post(
                 "/api/v1/waitlist/subscribe",
-                json={"email": "founder@example.com", "name": "Ada"},
+                json={
+                    "firstName": "Ada",
+                    "email": "founder@example.com",
+                    "role": "Consultant or agency",
+                    "goal": "Get more leads",
+                    "source": "landing-page-beta",
+                    "website": "",
+                },
             )
             second = client.post(
                 "/api/v1/waitlist/subscribe",
                 json={
+                    "firstName": "Ada Lovelace",
                     "email": "FOUNDER@example.com",
-                    "name": "Ada Lovelace",
+                    "role": "In-house marketer",
+                    "goal": "Turn more interest into customers.",
                     "source": "homepage-hero",
+                    "website": "",
                 },
             )
 
@@ -90,7 +108,9 @@ class WaitlistRouteTests(unittest.TestCase):
         signups = self._all_signups()
         self.assertEqual(len(signups), 1)
         self.assertEqual(signups[0].email, "founder@example.com")
-        self.assertEqual(signups[0].name, "Ada Lovelace")
+        self.assertEqual(signups[0].first_name, "Ada Lovelace")
+        self.assertEqual(signups[0].role, "In-house marketer")
+        self.assertEqual(signups[0].goal, "Turn more interest into customers.")
         self.assertEqual(signups[0].source, "homepage-hero")
 
     def test_subscribe_rejects_honeypot_submissions(self) -> None:
@@ -98,7 +118,11 @@ class WaitlistRouteTests(unittest.TestCase):
             response = client.post(
                 "/api/v1/waitlist/subscribe",
                 json={
+                    "firstName": "Ada",
                     "email": "founder@example.com",
+                    "role": "Consultant or agency",
+                    "goal": "Get more leads",
+                    "source": "landing-page-beta",
                     "website": "https://spam.example",
                 },
             )

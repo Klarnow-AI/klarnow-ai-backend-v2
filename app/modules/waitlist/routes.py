@@ -27,7 +27,9 @@ def subscribe_to_waitlist(
     result = subscribe(
         db,
         email=str(body.email),
-        name=body.name,
+        first_name=body.first_name,
+        role=body.role,
+        goal=body.goal,
         source=body.source,
     )
     response.status_code = (
