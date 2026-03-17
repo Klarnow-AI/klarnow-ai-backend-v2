@@ -57,8 +57,10 @@ API: `http://localhost:8000`. Docs: `http://localhost:8000/docs`. Health: `http:
 
 ## Environment variables
 
-See [.env.example](.env.example). Required: `DATABASE_URL`, `SECRET_KEY`, and `REDIS_URL` for background onboarding. Optional: Resend, S3, OpenAI, and Google sign-in.
+See [.env.example](.env.example). Required: `DATABASE_URL`, `SECRET_KEY`, and `REDIS_URL` for background onboarding. Optional: Resend, S3, Gemini, OpenAI, and Google sign-in.
 `CORS_ALLOW_ORIGINS` accepts a JSON list (recommended), comma-separated values, and bracketed forms that are normalized.
+
+Logo generation uses Gemini when `AI_LOGO_GENERATION_ENABLED=true` and `GEMINI_API_KEY` is set. `GOOGLE_API_KEY` is accepted as an alias for `GEMINI_API_KEY`.
 
 ### Staging/production API + CORS checklist
 

@@ -5,8 +5,12 @@ from __future__ import annotations
 import html
 import json
 import re
+import threading
+import time
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from http import HTTPStatus
 from typing import Any
 from urllib.parse import parse_qs
@@ -43,6 +47,17 @@ SENSITIVE_KEY_MARKERS = (
 FREEFORM_SENSITIVE_PATTERN = re.compile(
     r"(?i)\b(password|token|secret|api[_-]?key|authorization|cookie)\b(\s*[:=]\s*)(\"[^\"]*\"|'[^']*'|[^&,\s]+)"
 )
+FAILURE_ALERT_RATE_LIMIT_WINDOW_SECONDS = 1.0
+FAILURE_ALERT_MAX_SENDS_PER_WINDOW = 4
+FAILURE_ALERT_MAX_RETRY_ATTEMPTS = 3
+FAILURE_ALERT_DEFAULT_RETRY_AFTER_SECONDS = 1.0
+FAILURE_ALERT_MAX_RETRY_AFTER_SECONDS = 30.0
+
+_FAILURE_ALERT_RATE_LIMIT_LOCK = threading.Lock()
+_FAILURE_ALERT_SCHEDULED_SEND_TIMES: deque[float] = deque(
+    maxlen=FAILURE_ALERT_MAX_SENDS_PER_WINDOW
+)
+_FAILURE_ALERT_PROVIDER_COOLDOWN_UNTIL = 0.0
 
 
 @dataclass(frozen=True)
@@ -189,18 +204,6 @@ def send_failure_alert_email(alert: FailureAlert) -> bool:
 
     try:
         import resend
-
-        resend.api_key = settings.resend_api_key
-        resend.Emails.send(
-            {
-                "from": settings.resend_from_email or "onboarding@resend.dev",
-                "to": to_email,
-                "subject": alert.subject,
-                "text": alert.text,
-                "html": alert.html,
-            }
-        )
-        return True
     except Exception as exc:
         logger.warning(
             "Failure alert email send failed request_id=%s status_code=%s error=%s",
@@ -209,6 +212,166 @@ def send_failure_alert_email(alert: FailureAlert) -> bool:
             exc,
         )
         return False
+
+    resend.api_key = settings.resend_api_key
+    payload = {
+        "from": settings.resend_from_email or "onboarding@resend.dev",
+        "to": to_email,
+        "subject": alert.subject,
+        "text": alert.text,
+        "html": alert.html,
+    }
+
+    for attempt in range(1, FAILURE_ALERT_MAX_RETRY_ATTEMPTS + 1):
+        _wait_for_failure_alert_send_slot()
+        try:
+            resend.Emails.send(payload)
+            return True
+        except Exception as exc:
+            if _is_failure_alert_rate_limit_error(exc) and attempt < FAILURE_ALERT_MAX_RETRY_ATTEMPTS:
+                retry_after_seconds = _resolve_failure_alert_retry_after_seconds(exc)
+                _set_failure_alert_provider_cooldown(retry_after_seconds)
+                logger.warning(
+                    "Failure alert email rate limited request_id=%s status_code=%s attempt=%s retry_in_seconds=%.2f error=%s",
+                    request_id,
+                    status_code,
+                    attempt,
+                    retry_after_seconds,
+                    exc,
+                )
+                continue
+            logger.warning(
+                "Failure alert email send failed request_id=%s status_code=%s attempt=%s error=%s",
+                request_id,
+                status_code,
+                attempt,
+                exc,
+            )
+            return False
+    return False
+
+
+def _wait_for_failure_alert_send_slot() -> None:
+    delay_seconds = _reserve_failure_alert_send_delay()
+    if delay_seconds > 0:
+        time.sleep(delay_seconds)
+
+
+def _reserve_failure_alert_send_delay() -> float:
+    now = time.monotonic()
+    with _FAILURE_ALERT_RATE_LIMIT_LOCK:
+        scheduled_at = max(now, _FAILURE_ALERT_PROVIDER_COOLDOWN_UNTIL)
+        if len(_FAILURE_ALERT_SCHEDULED_SEND_TIMES) >= FAILURE_ALERT_MAX_SENDS_PER_WINDOW:
+            scheduled_at = max(
+                scheduled_at,
+                _FAILURE_ALERT_SCHEDULED_SEND_TIMES[0] + FAILURE_ALERT_RATE_LIMIT_WINDOW_SECONDS,
+            )
+        _FAILURE_ALERT_SCHEDULED_SEND_TIMES.append(scheduled_at)
+    return max(0.0, scheduled_at - now)
+
+
+def _set_failure_alert_provider_cooldown(retry_after_seconds: float) -> None:
+    bounded_retry_after_seconds = max(
+        FAILURE_ALERT_DEFAULT_RETRY_AFTER_SECONDS,
+        min(retry_after_seconds, FAILURE_ALERT_MAX_RETRY_AFTER_SECONDS),
+    )
+    with _FAILURE_ALERT_RATE_LIMIT_LOCK:
+        global _FAILURE_ALERT_PROVIDER_COOLDOWN_UNTIL
+        _FAILURE_ALERT_PROVIDER_COOLDOWN_UNTIL = max(
+            _FAILURE_ALERT_PROVIDER_COOLDOWN_UNTIL,
+            time.monotonic() + bounded_retry_after_seconds,
+        )
+
+
+def _is_failure_alert_rate_limit_error(exc: Exception) -> bool:
+    provider_status_code = _extract_failure_alert_provider_status_code(exc)
+    if provider_status_code == 429:
+        return True
+    message = str(exc).lower()
+    return "too many requests" in message or "rate limit" in message
+
+
+def _resolve_failure_alert_retry_after_seconds(exc: Exception) -> float:
+    candidates = [
+        getattr(exc, "retry_after", None),
+        getattr(exc, "retry_after_seconds", None),
+    ]
+    for header_name in ("retry-after", "ratelimit-reset", "x-ratelimit-reset"):
+        header_value = _extract_failure_alert_exception_header(exc, header_name)
+        if header_value is not None:
+            candidates.append(header_value)
+
+    for candidate in candidates:
+        retry_after_seconds = _parse_failure_alert_retry_after_seconds(candidate)
+        if retry_after_seconds is not None:
+            return retry_after_seconds
+    return FAILURE_ALERT_DEFAULT_RETRY_AFTER_SECONDS
+
+
+def _extract_failure_alert_provider_status_code(exc: Exception) -> int | None:
+    candidates = [
+        getattr(exc, "status_code", None),
+        getattr(exc, "http_status", None),
+    ]
+    response = getattr(exc, "response", None)
+    if response is not None:
+        candidates.append(getattr(response, "status_code", None))
+
+    for candidate in candidates:
+        try:
+            if candidate is not None:
+                return int(candidate)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _extract_failure_alert_exception_header(exc: Exception, header_name: str) -> Any | None:
+    header_sources = [
+        getattr(exc, "headers", None),
+        getattr(getattr(exc, "response", None), "headers", None),
+    ]
+    for header_source in header_sources:
+        if header_source is None or not hasattr(header_source, "get"):
+            continue
+        header_value = header_source.get(header_name)
+        if header_value is None:
+            header_value = header_source.get(header_name.title())
+        if header_value is not None:
+            return header_value
+    return None
+
+
+def _parse_failure_alert_retry_after_seconds(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return max(0.0, float(value))
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    try:
+        return max(0.0, float(text))
+    except ValueError:
+        pass
+
+    try:
+        retry_after_at = parsedate_to_datetime(text)
+    except (TypeError, ValueError, IndexError):
+        return None
+
+    if retry_after_at.tzinfo is None:
+        retry_after_at = retry_after_at.replace(tzinfo=timezone.utc)
+    return max(0.0, (retry_after_at - datetime.now(timezone.utc)).total_seconds())
+
+
+def _reset_failure_alert_rate_limit_state() -> None:
+    with _FAILURE_ALERT_RATE_LIMIT_LOCK:
+        _FAILURE_ALERT_SCHEDULED_SEND_TIMES.clear()
+        global _FAILURE_ALERT_PROVIDER_COOLDOWN_UNTIL
+        _FAILURE_ALERT_PROVIDER_COOLDOWN_UNTIL = 0.0
 
 
 def _append_background_task(response: Response, func, *args) -> None:

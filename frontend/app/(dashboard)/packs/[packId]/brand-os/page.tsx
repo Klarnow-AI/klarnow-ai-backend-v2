@@ -1087,13 +1087,13 @@ export default function BrandOSPage() {
                 animate={{ x: 0 }}
                 exit={{ x: "100%" }}
                 transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
-                className="pointer-events-auto w-full max-w-[400px] rounded-2xl border-0 bg-border/40 backdrop-blur-2xl shadow shadow-black/5 dark:shadow-black/15 flex flex-col overflow-hidden"
+                className="pointer-events-auto flex h-full w-full max-w-[400px] flex-col overflow-hidden border-l border-border/60 bg-card shadow-2xl shadow-black/15 dark:shadow-black/30"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="edit-drawer-title"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex items-center justify-between gap-2 bg-border/30 px-4 py-3 shrink-0">
+                <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-card px-4 py-3">
                   <h2
                     id="edit-drawer-title"
                     className="font-semibold text-lg text-foreground truncate"

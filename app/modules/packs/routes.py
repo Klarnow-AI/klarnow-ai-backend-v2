@@ -839,17 +839,20 @@ def generate_logo_route(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Generate a logo image with OpenAI DALL-E 3 and append it to suggested_logos."""
+    """Generate a logo image with the configured provider and append it to suggested_logos."""
     pack = get_pack_for_user(db, pack_id, current_user.id)
     if not pack:
         raise NotFoundError("Pack not found")
+    color_palette = body.color_palette
+    if not isinstance(color_palette, dict) or not color_palette:
+        color_palette = extract_palette_from_answers(pack.onboarding_answers or {})
     result = generate_logo(
         brand_name=body.brand_name,
         prompt=body.prompt,
         pack_id=str(pack_id),
         color_scheme=body.color_scheme,
         brand_os_summary=body.brand_os_summary,
-        color_palette=body.color_palette,
+        color_palette=color_palette,
     )
     logo_url = result.get("logo_url") or result.get("wordmark_svg_or_url") or ""
     pack = append_suggested_logo(db, pack, logo_url, commit=False)

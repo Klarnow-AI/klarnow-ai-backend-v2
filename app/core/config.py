@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlparse
 
-from pydantic import field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -76,7 +76,12 @@ class Settings(BaseSettings):
     storage_secret_access_key: str = ""
     storage_cdn_url: str = ""
 
-    # Optional: OpenAI
+    # Optional: AI providers
+    gemini_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("GEMINI_API_KEY", "GOOGLE_API_KEY"),
+    )
+    gemini_logo_model: str = "gemini-2.5-flash-image"
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     poster_max_output_tokens: int = 16384

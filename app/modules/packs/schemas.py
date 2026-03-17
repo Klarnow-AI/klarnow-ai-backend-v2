@@ -183,7 +183,7 @@ class GenerateStarterBrandResponse(BaseModel):
 
 
 class GenerateLogoBody(BaseModel):
-    """Body for generate-logo (OpenAI image generation). Prompt template: Create a [image type] for [brand]. The design should be [style], with a [color scheme]."""
+    """Body for generate-logo using the configured logo image provider."""
 
     brand_name: str
     prompt: str | None = None  # style description

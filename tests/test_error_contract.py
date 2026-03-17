@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import main as main_module
+from app.core import failure_alerts as failure_alerts_module
 from app.core.errors import (
     AppError,
     NotFoundError,
@@ -43,6 +44,22 @@ def _make_request(request_id: str = "req-123") -> Request:
 
 def _decode(response) -> dict:
     return json.loads(response.body.decode("utf-8"))
+
+
+def _make_failure_alert(
+    *,
+    status_code: int = 500,
+    request_id: str = "req-123",
+) -> failure_alerts_module.FailureAlert:
+    return failure_alerts_module.FailureAlert(
+        subject="[Klarnow Failure Alert] test",
+        text="failure alert body",
+        html="<html><body>failure alert body</body></html>",
+        details={
+            "status_code": status_code,
+            "location": {"request_id": request_id},
+        },
+    )
 
 
 class _FailureAlertValidationBody(BaseModel):
@@ -207,6 +224,9 @@ class ErrorContractTests(unittest.TestCase):
 
 
 class FailureAlertTests(unittest.TestCase):
+    def setUp(self) -> None:
+        failure_alerts_module._reset_failure_alert_rate_limit_state()
+
     @patch("app.core.failure_alerts.send_failure_alert_email")
     def test_not_found_response_queues_alert_with_status_location_trigger_and_solution(
         self,
@@ -338,6 +358,72 @@ class FailureAlertTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["message"], "Pack not found")
         fake_resend.Emails.send.assert_called_once()
+
+    @patch("app.core.failure_alerts.get_settings")
+    @patch("app.core.failure_alerts.time.sleep")
+    @patch("app.core.failure_alerts.time.monotonic", return_value=100.0)
+    def test_failure_alert_sender_paces_bursts_to_stay_below_resend_limit(
+        self,
+        _mock_monotonic: Mock,
+        mock_sleep: Mock,
+        mock_get_settings: Mock,
+    ) -> None:
+        send_mock = Mock(return_value={"id": "email_123"})
+        fake_resend = SimpleNamespace(
+            api_key="",
+            Emails=SimpleNamespace(send=send_mock),
+        )
+        mock_get_settings.return_value = SimpleNamespace(
+            failure_alert_to_email="alerts@example.com",
+            support_email="support@example.com",
+            resend_api_key="re_test",
+            resend_from_email="noreply@example.com",
+        )
+
+        with patch.dict(sys.modules, {"resend": fake_resend}):
+            results = [
+                failure_alerts_module.send_failure_alert_email(_make_failure_alert())
+                for _ in range(5)
+            ]
+
+        self.assertEqual(results, [True, True, True, True, True])
+        self.assertEqual(send_mock.call_count, 5)
+        self.assertEqual(mock_sleep.call_count, 1)
+        self.assertAlmostEqual(mock_sleep.call_args.args[0], 1.0)
+
+    @patch("app.core.failure_alerts.get_settings")
+    @patch("app.core.failure_alerts.time.sleep")
+    @patch("app.core.failure_alerts.time.monotonic", return_value=200.0)
+    def test_failure_alert_sender_retries_when_resend_rate_limits(
+        self,
+        _mock_monotonic: Mock,
+        mock_sleep: Mock,
+        mock_get_settings: Mock,
+    ) -> None:
+        send_mock = Mock(
+            side_effect=[
+                RuntimeError("Too many requests. You can only make 5 requests per second."),
+                {"id": "email_123"},
+            ]
+        )
+        fake_resend = SimpleNamespace(
+            api_key="",
+            Emails=SimpleNamespace(send=send_mock),
+        )
+        mock_get_settings.return_value = SimpleNamespace(
+            failure_alert_to_email="alerts@example.com",
+            support_email="support@example.com",
+            resend_api_key="re_test",
+            resend_from_email="noreply@example.com",
+        )
+
+        with patch.dict(sys.modules, {"resend": fake_resend}):
+            result = failure_alerts_module.send_failure_alert_email(_make_failure_alert())
+
+        self.assertTrue(result)
+        self.assertEqual(send_mock.call_count, 2)
+        self.assertEqual(mock_sleep.call_count, 1)
+        self.assertAlmostEqual(mock_sleep.call_args.args[0], 1.0)
 
 
 if __name__ == "__main__":
