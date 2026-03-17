@@ -108,7 +108,6 @@ def _task_payload(task, lead_name: str | None = None) -> dict:
         "status": task.status,
         "due_date": _iso(task.due_date),
         "urgency": urgency,
-        "channel": task.channel,
         "template_key": task.template_key,
         "message_template": task.message_template,
     }
@@ -143,6 +142,7 @@ def _pack_routes(pack_id: UUID) -> dict[str, str]:
         "pack": base,
         "follow_up_queue": f"{base}?step=9",
         "leads": f"{base}/leads",
+        "operations": f"{base}/operations",
         "proposals": f"{base}/proposal",
         "invoices": f"{base}/invoice",
         "website": f"{base}/website",

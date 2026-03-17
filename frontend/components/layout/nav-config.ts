@@ -9,6 +9,7 @@ import {
   Users,
   FileText,
   Settings,
+  Shield,
 } from "@/components/icons";
 
 export type NavItem = {
@@ -70,6 +71,14 @@ export const buildItems: NavItem[] = [
 export const resultItems: NavItem[] = [
   { key: "leads", href: "/leads", label: "Leads", icon: Users, pathMatch: "/leads", packScoped: true },
   {
+    key: "operations",
+    href: "/operations",
+    label: "Operations",
+    icon: Shield,
+    pathMatch: "/operations",
+    packScoped: true,
+  },
+  {
     key: "docs",
     href: "/docs",
     label: "Docs",
@@ -89,6 +98,7 @@ export const navToSection: Record<string, string> = {
   "/posters": "posters",
   "/ad-factory": "ad_factory",
   "/leads": "leads",
+  "/operations": "operations",
 };
 
 /** All nav items (build + result + footer) for use in More popover */

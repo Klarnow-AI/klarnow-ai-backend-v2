@@ -12,6 +12,7 @@ _MODEL_MODULES = (
     "app.modules.clients.models",
     "app.modules.creative.models",
     "app.modules.docs.models",
+    "app.modules.operations.models",
     "app.modules.packs.models",
     "app.modules.proof_vault.models",
     "app.modules.response_rules.models",

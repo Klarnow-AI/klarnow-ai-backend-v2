@@ -1,6 +1,13 @@
 """Waitlist API schemas."""
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    model_validator,
+)
 
 
 class WaitlistSubscribeBody(BaseModel):
@@ -12,7 +19,6 @@ class WaitlistSubscribeBody(BaseModel):
         validation_alias=AliasChoices("firstName", "first_name", "name"),
     )
     role: str | None = Field(default=None, max_length=255)
-    goal: str | None = Field(default=None, max_length=4000)
     source: str | None = Field(default=None, max_length=512)
     website: str | None = Field(default=None, max_length=255)
 
@@ -20,6 +26,15 @@ class WaitlistSubscribeBody(BaseModel):
         extra="forbid",
         populate_by_name=True,
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def drop_legacy_goal(cls, data):
+        if isinstance(data, dict) and "goal" in data:
+            cleaned = dict(data)
+            cleaned.pop("goal", None)
+            return cleaned
+        return data
 
 
 class WaitlistSubscribeResponse(BaseModel):

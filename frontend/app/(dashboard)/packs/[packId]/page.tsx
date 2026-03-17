@@ -19,6 +19,7 @@ import {
   Film,
   Check,
   Lock,
+  Shield,
 } from "@/components/icons";
 import { Spinner } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,7 @@ import { useDelayedNextActionToast } from "@/hooks/use-delayed-next-action-toast
 import { usePackRefreshListener } from "@/lib/pack-refresh-events";
 
 /** Fixed pack summary cards — no add/remove. */
-const PACK_SUMMARY_CARDS: string[] = ["brand_os"];
+const PACK_SUMMARY_CARDS: string[] = ["brand_os", "operations"];
 
 const PACK_OVERVIEW_MODULES: Record<
   string,
@@ -177,6 +178,22 @@ const PACK_OVERVIEW_MODULES: Record<
           posters).
         </p>
       ) : null,
+  },
+  operations: {
+    title: "Operations",
+    hrefSuffix: "/operations",
+    icon: Shield,
+    emptyMessage:
+      "Review approvals, activity, business memory, and action logs in Operations.",
+    getContent: () => (
+      <>
+        <p>Business-aware activity, approvals, and audit logs now live here.</p>
+        <p className="text-muted-foreground">
+          Use it to configure context, intake activity, and review sensitive
+          decisions before they move forward.
+        </p>
+      </>
+    ),
   },
 };
 

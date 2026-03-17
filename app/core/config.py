@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     resend_from_email: str = ""
     support_email: str = "sooreoluwaa@gmail.com"
     failure_alert_to_email: str = ""
+    waitlist_notification_to_email: str = "team@klarnow.co.uk"
 
     # Optional: Storage (S3)
     storage_provider: str = "s3"

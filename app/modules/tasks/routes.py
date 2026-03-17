@@ -28,7 +28,6 @@ class FollowUpTaskRead(BaseModel):
     status: str
     message_template: str
     template_key: str | None = None
-    channel: str | None = None
     lead_name: str | None = None
     last_interaction_summary: str | None = None
     created_at: datetime
@@ -48,7 +47,6 @@ def _task_to_read(task: FollowUpTask, lead_name: str | None = None, last_interac
         status=task.status,
         message_template=task.message_template,
         template_key=getattr(task, "template_key", None),
-        channel=getattr(task, "channel", None),
         lead_name=lead_name,
         last_interaction_summary=last_interaction_summary,
         created_at=task.created_at,

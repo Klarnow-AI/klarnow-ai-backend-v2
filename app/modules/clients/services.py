@@ -158,6 +158,13 @@ def create_lead(
     )
     db.add(lead)
     db.commit()
+    db.refresh(lead)
+    try:
+        from app.modules.operations.services import publish_new_lead_activity
+
+        publish_new_lead_activity(db, lead)
+    except Exception:
+        db.rollback()
     return lead
 
 

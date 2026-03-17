@@ -26,12 +26,7 @@ TEMPLATE_KEY_FOLLOWUP_72H = "followup_72h"
 TEMPLATE_KEY_PROPOSAL_FOLLOWUP = "proposal_followup"
 TEMPLATE_KEY_INVOICE_CHASE = "invoice_chase"
 
-# Channel per spec: dm | whatsapp | call | email
 CHANNEL_DM = "dm"
-CHANNEL_WHATSAPP = "whatsapp"
-CHANNEL_CALL = "call"
-CHANNEL_EMAIL = "email"
-CHANNELS = (CHANNEL_DM, CHANNEL_WHATSAPP, CHANNEL_CALL, CHANNEL_EMAIL)
 
 TASK_STATUS_PENDING = "pending"
 TASK_STATUS_COMPLETED = "completed"
@@ -60,6 +55,6 @@ class FollowUpTask(Base):
     )
     message_template: Mapped[str] = mapped_column(Text, nullable=False)
     template_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    channel: Mapped[str | None] = mapped_column(String(32), nullable=True)  # dm | whatsapp | call | email
+    channel: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

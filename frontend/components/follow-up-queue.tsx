@@ -101,61 +101,56 @@ export function FollowUpQueue({ packId, onTaskComplete }: FollowUpQueueProps) {
           const isDueToday =
             dueDate.toDateString() === new Date().toDateString();
           return (
-          <div key={task.id} className="rounded-lg border p-3 space-y-2">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                {task.lead_name && (
-                  <span className="text-sm font-medium">{task.lead_name}</span>
-                )}
-                <span className="text-xs font-medium text-muted-foreground uppercase">
-                  {task.task_type.replace(/_/g, " ")}
-                </span>
-                {task.channel && (
-                  <span className="text-xs text-muted-foreground">
-                    via {task.channel}
+            <div key={task.id} className="rounded-lg border p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  {task.lead_name && (
+                    <span className="text-sm font-medium">{task.lead_name}</span>
+                  )}
+                  <span className="text-xs font-medium text-muted-foreground uppercase">
+                    {task.task_type.replace(/_/g, " ")}
                   </span>
-                )}
+                </div>
+                <span
+                  className={`text-xs ${
+                    isOverdue ? "text-destructive font-medium" : "text-muted-foreground"
+                  }`}
+                >
+                  {isOverdue ? "Overdue" : isDueToday ? "Due today" : "Upcoming"} — {dueDate.toLocaleDateString()}
+                </span>
               </div>
-              <span
-                className={`text-xs ${
-                  isOverdue ? "text-destructive font-medium" : "text-muted-foreground"
-                }`}
-              >
-                {isOverdue ? "Overdue" : isDueToday ? "Due today" : "Upcoming"} — {dueDate.toLocaleDateString()}
-              </span>
+              {task.last_interaction_summary && (
+                <p className="text-xs text-muted-foreground line-clamp-1">
+                  {task.last_interaction_summary}
+                </p>
+              )}
+              <p className="text-sm line-clamp-2">{task.message_template}</p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleCopy(task)}
+                >
+                  {copiedId === task.id ? <Check className="h-4 w-4" /> : null}
+                  {copiedId === task.id ? "Copied" : "Copy message"}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => handleComplete(task.id)}
+                  disabled={completingId === task.id}
+                >
+                  {completingId === task.id ? "…" : "Mark done"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleSkip(task.id)}
+                  disabled={skippingId === task.id}
+                >
+                  {skippingId === task.id ? "…" : "Skip"}
+                </Button>
+              </div>
             </div>
-            {task.last_interaction_summary && (
-              <p className="text-xs text-muted-foreground line-clamp-1">
-                {task.last_interaction_summary}
-              </p>
-            )}
-            <p className="text-sm line-clamp-2">{task.message_template}</p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleCopy(task)}
-              >
-                {copiedId === task.id ? <Check className="h-4 w-4" /> : null}
-                {copiedId === task.id ? "Copied" : "Copy message"}
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => handleComplete(task.id)}
-                disabled={completingId === task.id}
-              >
-                {completingId === task.id ? "…" : "Mark done"}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => handleSkip(task.id)}
-                disabled={skippingId === task.id}
-              >
-                {skippingId === task.id ? "…" : "Skip"}
-              </Button>
-            </div>
-          </div>
           );
         })}
       </CardContent>
