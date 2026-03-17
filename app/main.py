@@ -42,6 +42,7 @@ from app.modules.builder.routes import router as builder_router, public_router a
 from app.modules.builder.subdomain_routes import router as builder_subdomain_router
 from app.modules.feedback.routes import router as feedback_router
 from app.modules.ad_factory.routes import router as ad_factory_router
+from app.modules.waitlist.routes import router as waitlist_router
 
 GENERIC_SERVER_ERROR_MESSAGE = "Something went wrong on our side. Please try again."
 
@@ -179,5 +180,6 @@ app.include_router(builder_router, prefix="/api/v1/builder", tags=["builder"])
 app.include_router(builder_public_router, prefix="/p", tags=["sites"])
 app.include_router(feedback_router, tags=["feedback"])
 app.include_router(ad_factory_router, prefix="/api/v1/ad-factory", tags=["ad-factory"])
+app.include_router(waitlist_router)
 # Subdomain site serving: GET / and POST /lead when Host is *.sites_domain
 app.include_router(builder_subdomain_router, prefix="", tags=["sites-subdomain"])

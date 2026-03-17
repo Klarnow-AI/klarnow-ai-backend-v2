@@ -18,6 +18,7 @@ _MODEL_MODULES = (
     "app.modules.revenue.models",
     "app.modules.sprint.models",
     "app.modules.tasks.models",
+    "app.modules.waitlist.models",
 )
 
 _models_loaded = False
