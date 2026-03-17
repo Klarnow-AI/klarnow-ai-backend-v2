@@ -39,3 +39,8 @@ dependencies = [
     "reportlab>=4.4.10",
     "stripe>=14.4.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]
