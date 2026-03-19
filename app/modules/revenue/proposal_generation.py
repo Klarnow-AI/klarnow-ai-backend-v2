@@ -4,16 +4,19 @@ import json
 from datetime import date, timedelta
 from typing import Any, TypedDict
 
-from openai import OpenAI
 from sqlalchemy.orm import Session
 
-from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.modules.brand_os.services import get_active_for_pack, get_context_strings
 from app.modules.clients.models import Client, Lead
 from app.modules.clients.services import get_lead_by_pack_and_client
 from app.modules.packs.models import Pack
 from app.shared.services.reference_kb import get_reference_kb
+from app.shared.services.openai_compatible import (
+    create_sync_openai_client,
+    get_default_model,
+    has_openai_compatible_provider,
+)
 
 logger = get_logger("klarnow.revenue.proposal_generation")
 
@@ -210,7 +213,7 @@ def _stub_result(
     """Return a stub when API key is missing or generation fails."""
     return ProposalGenerateResult(
         content=ProposalGeneratedContent(
-            description="Proposal content could not be generated. Configure OpenAI API key or add content manually.",
+            description="Proposal content could not be generated. Configure OPENROUTER_API_KEY or add content manually.",
             line_items=[],
             terms="",
             notes="",
@@ -238,11 +241,10 @@ def generate_proposal_draft(
 
     Returns:
         ProposalGenerateResult with content (description, line_items, terms, notes),
-        suggested_amount, and suggested_due_date. Stub returned if OpenAI not configured.
+        suggested_amount, and suggested_due_date. Stub returned if AI is not configured.
     """
-    settings = get_settings()
-    if not settings.openai_api_key:
-        logger.warning("OpenAI API key not configured; returning stub proposal draft")
+    if not has_openai_compatible_provider():
+        logger.warning("OPENROUTER_API_KEY not configured; returning stub proposal draft")
         return _stub_result()
 
     brand_os = get_active_for_pack(db, pack.id)
@@ -265,14 +267,16 @@ def generate_proposal_draft(
         default_due = lead_ctx["lead_due_date"]
 
     try:
-        client_openai = OpenAI(api_key=settings.openai_api_key)
+        client_openai = create_sync_openai_client()
+        if not client_openai:
+            return _stub_result(references=references)
         prompt = _build_prompt(
             pack_ctx,
             lead_ctx,
             reference_context=reference_context,
         )
         response = client_openai.chat.completions.create(
-            model="gpt-4o",
+            model=get_default_model(),
             messages=[
                 {
                     "role": "system",

@@ -569,6 +569,21 @@ def _build_brand_os_summary_text(brand_os_row) -> str:
     return ". ".join(summary_parts)
 
 
+def _resolve_brand_os_id(value) -> UUID | None:
+    """Accept tool payloads or ORM-like rows and normalize to a Brand OS UUID."""
+    raw_id = None
+    if isinstance(value, dict):
+        raw_id = value.get("brand_os_id") or value.get("id")
+    else:
+        raw_id = getattr(value, "id", None)
+    if raw_id is None:
+        return None
+    try:
+        return UUID(str(raw_id))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
 @router.post(
     "/{pack_id}/onboarding/complete",
     response_model=OnboardingCompleteResponse,
@@ -610,7 +625,11 @@ def complete_onboarding_route(
             source_job_id=fingerprint,
             allow_without_onboarding_complete=True,
         )
-        brand_os_row = get_brand_os_by_id_and_pack(db, generated_brand_os.id, pack_id)
+        generated_brand_os_id = _resolve_brand_os_id(generated_brand_os)
+        if generated_brand_os_id is not None:
+            brand_os_row = get_brand_os_by_id_and_pack(db, generated_brand_os_id, pack_id)
+        if brand_os_row is None:
+            brand_os_row = get_brand_os_by_source_job_id(db, pack_id, fingerprint)
     if brand_os_row is None:
         raise BadRequestError("Brand OS generation failed. Please retry.")
 

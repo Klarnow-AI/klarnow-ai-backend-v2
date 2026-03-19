@@ -3,6 +3,7 @@
 from typing import Any, Dict, Optional
 from app.modules.packs.extraction.schemas import RawBrandProfile
 from app.shared.services.llm import OpenAILLM
+from app.shared.services.openai_compatible import get_extraction_model
 
 
 class WebsiteExtractorService:
@@ -96,7 +97,7 @@ class WebsiteExtractorService:
 def get_brand_extractor_service(
     llm: OpenAILLM,
     *,
-    model: Optional[str] = "gpt-4o-mini",
+    model: Optional[str] = None,
     temperature: float = 0.0,
 ) -> WebsiteExtractorService:
     """
@@ -104,10 +105,14 @@ def get_brand_extractor_service(
 
     Args:
         llm: OpenAI LLM instance
-        model: Model to use (defaults to gpt-4o-mini for this factual extraction task)
+        model: Model to use (defaults to the centralized extraction model)
         temperature: Temperature for generation (0.0 for fully deterministic extraction)
 
     Returns:
         WebsiteExtractorService instance
     """
-    return WebsiteExtractorService(llm=llm, model=model, temperature=temperature)
+    return WebsiteExtractorService(
+        llm=llm,
+        model=model or get_extraction_model(),
+        temperature=temperature,
+    )

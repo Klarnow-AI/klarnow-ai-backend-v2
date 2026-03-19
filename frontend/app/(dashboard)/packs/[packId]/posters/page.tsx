@@ -321,7 +321,7 @@ export default function PostersPage() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
   }, [packId]);
 
-  const handleFileGenerated = useCallback(
+  const saveGeneratedFile = useCallback(
     async (
       name: string,
       code: string,
@@ -363,13 +363,26 @@ export default function PostersPage() {
               }
             : prev,
         );
+        return nextAsset;
       } catch (e) {
         toast.error("Poster couldn't be saved. Try again.", {
           description: e instanceof Error ? e.message : String(e),
         });
+        return null;
       }
     },
     [packId],
+  );
+
+  const handleFileGenerated = useCallback(
+    async (
+      name: string,
+      code: string,
+      messages: PosterConversationMessage[],
+    ) => {
+      await saveGeneratedFile(name, code, messages);
+    },
+    [saveGeneratedFile],
   );
 
   useEffect(() => {
@@ -460,6 +473,24 @@ poster-v4-4x5.tsx, poster-v4-9x16.tsx, poster-v4-16x9.tsx, poster-v4-1x1.tsx.
     [packId],
   );
 
+  const handleCanvasSaveAsset = useCallback(
+    async (asset: CreativeTemplateCardAsset, code: string) => {
+      const messages: PosterConversationMessage[] = [
+        { role: "user", content: `Canvas edit: ${asset.name}` },
+        { role: "assistant", content: "Poster updated on canvas." },
+      ];
+      const saved = await saveGeneratedFile(asset.name, code, messages);
+      if (saved) {
+        setSelectedAsset({
+          id: saved.id,
+          name: saved.name,
+          code: saved.code,
+        });
+      }
+    },
+    [saveGeneratedFile],
+  );
+
   if (!packId) return null;
 
   if (loading) {
@@ -498,6 +529,7 @@ poster-v4-4x5.tsx, poster-v4-9x16.tsx, poster-v4-16x9.tsx, poster-v4-1x1.tsx.
           onFileGenerated={handleFileGenerated}
           onGeneratingChange={handleGeneratingChange}
           onDeleteAsset={handleDeleteAsset}
+          onCanvasSaveAsset={handleCanvasSaveAsset}
         />
       </div>
     </div>

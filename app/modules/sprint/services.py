@@ -14,6 +14,11 @@ from app.modules.sprint.models import Sprint, DayCard, SPRINT_STATUS_ACTIVE, SPR
 from app.modules.sprint.mode_detection import detect_sprint_mode
 from app.modules.sprint.day_definitions import get_day_content, get_day_definition
 from app.modules.packs.models import Pack
+from app.shared.services.openai_compatible import (
+    create_sync_openai_client,
+    get_fast_model,
+    has_openai_compatible_provider,
+)
 
 logger = get_logger()
 
@@ -183,7 +188,7 @@ def _generate_today_task_labels_with_llm(
     pack_context: str,
 ) -> list[str] | None:
     settings = get_settings()
-    if not settings.openai_api_key or not settings.ai_sprint_today_tasks_enabled:
+    if not has_openai_compatible_provider() or not settings.ai_sprint_today_tasks_enabled:
         return None
 
     prompt = (
@@ -204,11 +209,11 @@ def _generate_today_task_labels_with_llm(
     )
 
     try:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=settings.openai_api_key)
+        client = create_sync_openai_client()
+        if not client:
+            return None
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=get_fast_model(),
             messages=[
                 {
                     "role": "system",

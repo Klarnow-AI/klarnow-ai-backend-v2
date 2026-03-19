@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlparse
 
-from pydantic import AliasChoices, Field, field_validator, model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -78,14 +78,18 @@ class Settings(BaseSettings):
     storage_cdn_url: str = ""
 
     # Optional: AI providers
-    gemini_api_key: str = Field(
-        default="",
-        validation_alias=AliasChoices("GEMINI_API_KEY", "GOOGLE_API_KEY"),
-    )
-    gemini_logo_model: str = "gemini-2.5-flash-image"
-    openai_api_key: str = ""
-    anthropic_api_key: str = ""
+    openrouter_api_key: str = ""
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    ai_default_model: str = "openai/gpt-4o"
+    ai_fast_model: str = "openai/gpt-4o-mini"
+    ai_reasoning_model: str = "anthropic/claude-sonnet-4.6"
+    ai_builder_model: str = "anthropic/claude-opus-4.6"
+    ai_extraction_model: str = "openai/gpt-4o-mini"
+    ai_embedding_model: str = "openai/text-embedding-3-small"
+    ai_logo_model: str = "google/gemini-2.5-flash-image-preview"
+    ai_poster_flyer_model: str = "anthropic/claude-sonnet-4.6"
     poster_max_output_tokens: int = 16384
+    
     # Cost guards: keep non-essential AI features opt-in.
     ai_chat_prompt_suggestions_enabled: bool = False
     ai_sprint_today_tasks_enabled: bool = False
@@ -116,7 +120,6 @@ class Settings(BaseSettings):
     # Optional: Global reference markdown KB (RAG-lite for chat/proposals)
     reference_doc_enabled: bool = False
     reference_doc_path: str = "app/core/reference/100M-Leads.md"
-    reference_doc_embedding_model: str = "text-embedding-3-small"
     reference_doc_chunk_chars: int = 1200
     reference_doc_chunk_overlap_chars: int = 200
     reference_doc_top_k: int = 5

@@ -1,7 +1,8 @@
-"""Logo generation via Gemini image models."""
+"""Logo generation via OpenRouter image-capable models."""
 
 from __future__ import annotations
 
+import base64
 import json
 import threading
 import time
@@ -11,17 +12,14 @@ from app.core.config import get_settings
 from app.core.errors import BadRequestError
 from app.core.logging import get_logger, log_service_action
 from app.core.storage import get_asset_url, upload_file
+from app.shared.services.openai_compatible import (
+    create_sync_openai_client,
+    get_logo_model,
+    has_openai_compatible_provider,
+)
 
-try:
-    from google import genai
-    from google.genai import types as genai_types
-except ImportError:  # pragma: no cover - dependency is part of project deps.
-    genai = None
-    genai_types = None
-
-GEMINI_IMAGE_ASPECT_RATIO = "1:1"
-GEMINI_IMAGE_SIZE = "1K"
-DEFAULT_GEMINI_LOGO_MODEL = "gemini-2.5-flash-image"
+OPENROUTER_IMAGE_ASPECT_RATIO = "1:1"
+OPENROUTER_IMAGE_SIZE = "1K"
 LOGO_PROMPT_MAX_LENGTH = 1000
 PROVIDER_COOLDOWN_SECONDS = 600
 _IMAGE_EXTENSION_BY_MIME_TYPE = {
@@ -33,28 +31,28 @@ _IMAGE_EXTENSION_BY_MIME_TYPE = {
 }
 
 logger = get_logger("klarnow.services.logo_generation")
-_GEMINI_FAILURE_LOCK = threading.Lock()
-_GEMINI_FAILURE_STATE: dict[str, float | str] = {"until": 0.0, "reason": ""}
+_PROVIDER_FAILURE_LOCK = threading.Lock()
+_PROVIDER_FAILURE_STATE: dict[str, float | str] = {"until": 0.0, "reason": ""}
 
 
-def _set_gemini_cooldown(reason: str) -> None:
+def _set_provider_cooldown(reason: str) -> None:
     """Temporarily suppress provider calls after known auth/quota failures."""
-    with _GEMINI_FAILURE_LOCK:
-        _GEMINI_FAILURE_STATE["until"] = time.monotonic() + PROVIDER_COOLDOWN_SECONDS
-        _GEMINI_FAILURE_STATE["reason"] = reason
+    with _PROVIDER_FAILURE_LOCK:
+        _PROVIDER_FAILURE_STATE["until"] = time.monotonic() + PROVIDER_COOLDOWN_SECONDS
+        _PROVIDER_FAILURE_STATE["reason"] = reason
 
 
-def _get_gemini_cooldown_reason() -> str | None:
+def _get_provider_cooldown_reason() -> str | None:
     """Return active cooldown reason for provider, or None when provider is callable."""
-    with _GEMINI_FAILURE_LOCK:
-        until = float(_GEMINI_FAILURE_STATE["until"] or 0.0)
+    with _PROVIDER_FAILURE_LOCK:
+        until = float(_PROVIDER_FAILURE_STATE["until"] or 0.0)
         if until <= 0:
             return None
         if until <= time.monotonic():
-            _GEMINI_FAILURE_STATE["until"] = 0.0
-            _GEMINI_FAILURE_STATE["reason"] = ""
+            _PROVIDER_FAILURE_STATE["until"] = 0.0
+            _PROVIDER_FAILURE_STATE["reason"] = ""
             return None
-        reason = str(_GEMINI_FAILURE_STATE["reason"] or "").strip()
+        reason = str(_PROVIDER_FAILURE_STATE["reason"] or "").strip()
         return reason or "temporarily unavailable"
 
 
@@ -80,7 +78,7 @@ def _build_error_text(exc: Exception) -> str:
     return " ".join(parts).lower()
 
 
-def _is_gemini_auth_or_quota_error(exc: Exception) -> bool:
+def _is_provider_auth_or_quota_error(exc: Exception) -> bool:
     """True for auth and quota failures that are unlikely to self-resolve quickly."""
     text = _build_error_text(exc)
     auth_markers = (
@@ -97,6 +95,7 @@ def _is_gemini_auth_or_quota_error(exc: Exception) -> bool:
         "rate limit",
         "resource_exhausted",
         "too many requests",
+        "payment required",
     )
     if any(marker in text for marker in auth_markers + quota_markers):
         return True
@@ -104,19 +103,19 @@ def _is_gemini_auth_or_quota_error(exc: Exception) -> bool:
         code = int(getattr(exc, "code", 0) or 0)
     except (TypeError, ValueError):
         code = 0
-    return code in {401, 403, 429}
+    return code in {401, 402, 403, 429}
 
 
-def _build_gemini_failure_reason(exc: Exception) -> str:
+def _build_provider_failure_reason(exc: Exception) -> str:
     text = _build_error_text(exc)
     if any(
         marker in text
-        for marker in ("billing", "quota", "rate limit", "resource_exhausted", "too many requests")
+        for marker in ("billing", "quota", "rate limit", "resource_exhausted", "too many requests", "payment required")
     ):
-        return "Gemini image generation quota or rate limit reached. Check your Gemini API plan and quota."
+        return "OpenRouter image generation quota or billing limit reached. Check your OpenRouter credits and limits."
     return (
-        "Gemini image generation authentication failed. "
-        "Set GEMINI_API_KEY (or GOOGLE_API_KEY) with access to Gemini image generation."
+        "OpenRouter image generation authentication failed. "
+        "Set OPENROUTER_API_KEY with access to image-capable models."
     )
 
 
@@ -159,22 +158,56 @@ def _truncate_logo_prompt(prompt_text: str) -> str:
     if len(prompt_text) <= LOGO_PROMPT_MAX_LENGTH:
         return prompt_text
     logger.info(
-        "logo_generation: Gemini prompt truncated from %s to %s chars",
+        "logo_generation: OpenRouter prompt truncated from %s to %s chars",
         len(prompt_text),
         LOGO_PROMPT_MAX_LENGTH,
     )
     return prompt_text[:LOGO_PROMPT_MAX_LENGTH]
 
 
-def _extract_generated_image(response: object) -> tuple[bytes, str] | None:
-    parts = getattr(response, "parts", None) or []
-    for part in parts:
-        inline_data = getattr(part, "inline_data", None)
-        image_bytes = getattr(inline_data, "data", None)
-        mime_type = str(getattr(inline_data, "mime_type", "") or "").strip().lower()
-        if isinstance(image_bytes, bytes) and image_bytes and mime_type.startswith("image/"):
-            return image_bytes, mime_type
+def _get_attr_or_key(value: object, *names: str) -> object | None:
+    if value is None:
+        return None
+    for name in names:
+        if isinstance(value, dict) and name in value:
+            return value[name]
+        if hasattr(value, name):
+            return getattr(value, name)
+    model_extra = getattr(value, "model_extra", None)
+    if isinstance(model_extra, dict):
+        for name in names:
+            if name in model_extra:
+                return model_extra[name]
     return None
+
+
+def _extract_generated_image_data_url(response: object) -> str | None:
+    choices = _get_attr_or_key(response, "choices")
+    if not isinstance(choices, list):
+        return None
+    for choice in choices:
+        message = _get_attr_or_key(choice, "message")
+        images = _get_attr_or_key(message, "images")
+        if not isinstance(images, list):
+            continue
+        for image in images:
+            image_url = _get_attr_or_key(image, "image_url", "imageUrl")
+            url = _get_attr_or_key(image_url, "url")
+            if isinstance(url, str) and url.startswith("data:image/"):
+                return url
+    return None
+
+
+def _decode_data_url_image(data_url: str) -> tuple[bytes, str]:
+    header, _, data = data_url.partition(",")
+    if not header.startswith("data:image/") or ";base64" not in header or not data:
+        raise BadRequestError("Logo generation returned an unsupported image payload.")
+    mime_type = header[5:].split(";", 1)[0].strip().lower()
+    try:
+        image_bytes = base64.b64decode(data)
+    except Exception as exc:  # pragma: no cover - defensive
+        raise BadRequestError("Logo generation returned invalid base64 image data.") from exc
+    return image_bytes, mime_type
 
 
 def _extension_for_mime_type(mime_type: str) -> str:
@@ -182,75 +215,72 @@ def _extension_for_mime_type(mime_type: str) -> str:
     return _IMAGE_EXTENSION_BY_MIME_TYPE.get(normalized, "png")
 
 
-def generate_logo_with_gemini(
+def generate_logo_with_openrouter(
     prompt_text: str,
     pack_id: str,
 ) -> dict[str, str | None]:
     """
-    Generate a logo via Gemini image generation.
+    Generate a logo via OpenRouter image generation.
 
     Returns {"logo_url", "wordmark_svg_or_url"}.
     Raises BadRequestError on failure.
     """
     settings = get_settings()
-    api_key = (settings.gemini_api_key or "").strip()
-    if not api_key or not settings.ai_logo_generation_enabled:
+    if not has_openai_compatible_provider() or not settings.ai_logo_generation_enabled:
         raise BadRequestError(
             "Logo image generation is disabled. "
-            "Set GEMINI_API_KEY (or GOOGLE_API_KEY) and AI_LOGO_GENERATION_ENABLED=true to generate logos."
+            "Set OPENROUTER_API_KEY and AI_LOGO_GENERATION_ENABLED=true to generate logos."
         )
-    if genai is None or genai_types is None:
-        raise BadRequestError(
-            "Gemini logo generation is unavailable because the google-genai package is not installed."
-        )
-    cooldown_reason = _get_gemini_cooldown_reason()
+    cooldown_reason = _get_provider_cooldown_reason()
     if cooldown_reason:
         raise BadRequestError(cooldown_reason)
 
-    client = genai.Client(api_key=api_key)
-    prompt_for_gemini = _truncate_logo_prompt(prompt_text)
-    model_name = (settings.gemini_logo_model or "").strip() or DEFAULT_GEMINI_LOGO_MODEL
+    client = create_sync_openai_client()
+    if not client:
+        raise BadRequestError(
+            "Logo image generation is disabled. "
+            "Set OPENROUTER_API_KEY and AI_LOGO_GENERATION_ENABLED=true to generate logos."
+        )
+
+    model_name = get_logo_model()
+    prompt_for_model = _truncate_logo_prompt(prompt_text)
     try:
-        response = client.models.generate_content(
+        response = client.chat.completions.create(
             model=model_name,
-            contents=prompt_for_gemini,
-            config=genai_types.GenerateContentConfig(
-                responseModalities=["IMAGE"],
-                imageConfig=genai_types.ImageConfig(
-                    aspect_ratio=GEMINI_IMAGE_ASPECT_RATIO,
-                    image_size=GEMINI_IMAGE_SIZE,
-                ),
-            ),
+            messages=[{"role": "user", "content": prompt_for_model}],
+            extra_body={
+                "modalities": ["image", "text"],
+                "image_config": {
+                    "aspect_ratio": OPENROUTER_IMAGE_ASPECT_RATIO,
+                    "image_size": OPENROUTER_IMAGE_SIZE,
+                },
+            },
         )
     except Exception as exc:
-        if _is_gemini_auth_or_quota_error(exc):
-            reason = _build_gemini_failure_reason(exc)
-            _set_gemini_cooldown(reason)
+        if _is_provider_auth_or_quota_error(exc):
+            reason = _build_provider_failure_reason(exc)
+            _set_provider_cooldown(reason)
             logger.warning(
-                "logo_generation: %s Skipping Gemini for %ss.",
+                "logo_generation: %s Skipping image generation for %ss.",
                 reason,
                 PROVIDER_COOLDOWN_SECONDS,
             )
             raise BadRequestError(reason) from None
-        logger.warning("logo_generation: Gemini API call failed: %s", exc, exc_info=True)
+        logger.warning("logo_generation: OpenRouter image call failed: %s", exc, exc_info=True)
         raise BadRequestError(
             "Logo generation failed: "
-            f"{exc!s}. Check GEMINI_API_KEY (or GOOGLE_API_KEY) and that your account has access to Gemini image generation."
+            f"{exc!s}. Check OPENROUTER_API_KEY and that your selected model supports image generation."
         ) from exc
-    finally:
-        close_client = getattr(client, "close", None)
-        if callable(close_client):
-            close_client()
 
-    image_payload = _extract_generated_image(response)
-    if not image_payload:
-        logger.warning("logo_generation: Gemini response had no image parts")
+    data_url = _extract_generated_image_data_url(response)
+    if not data_url:
+        logger.warning("logo_generation: OpenRouter response had no image payload")
         raise BadRequestError("Logo generation did not return an image.")
 
-    image_bytes, mime_type = image_payload
+    image_bytes, mime_type = _decode_data_url_image(data_url)
     extension = _extension_for_mime_type(mime_type)
     logger.info(
-        "logo_generation: Gemini image decoded (%s bytes, %s), uploading to storage",
+        "logo_generation: OpenRouter image decoded (%s bytes, %s), uploading to storage",
         len(image_bytes),
         mime_type,
     )
@@ -274,7 +304,7 @@ def generate_logo(
     strict: bool = True,
 ) -> dict[str, str | None]:
     """
-    Generate a logo image using Gemini image generation.
+    Generate a logo image using OpenRouter image generation.
 
     On success returns {"logo_url": str, "wordmark_svg_or_url": str | None}.
     On failure raises BadRequestError with a clear message when strict=True.
@@ -286,18 +316,15 @@ def generate_logo(
     )
     no_logo_result: dict[str, str | None] = {"logo_url": None, "wordmark_svg_or_url": None}
 
-    if settings.gemini_api_key and settings.ai_logo_generation_enabled:
-        logger.info(
-            "logo_generation: using Gemini model %s",
-            (settings.gemini_logo_model or "").strip() or DEFAULT_GEMINI_LOGO_MODEL,
-        )
+    if has_openai_compatible_provider() and settings.ai_logo_generation_enabled:
+        logger.info("logo_generation: using OpenRouter model %s", get_logo_model())
         try:
-            return generate_logo_with_gemini(prompt_text, pack_id)
+            return generate_logo_with_openrouter(prompt_text, pack_id)
         except BadRequestError as exc:
             if strict:
                 raise
             logger.info(
-                "logo_generation: non-strict mode returning no logo after Gemini failure: %s",
+                "logo_generation: non-strict mode returning no logo after OpenRouter failure: %s",
                 exc,
             )
             return no_logo_result
@@ -305,7 +332,7 @@ def generate_logo(
     if strict:
         raise BadRequestError(
             "Logo image generation is disabled. "
-            "Set GEMINI_API_KEY (or GOOGLE_API_KEY) and AI_LOGO_GENERATION_ENABLED=true to generate logos."
+            "Set OPENROUTER_API_KEY and AI_LOGO_GENERATION_ENABLED=true to generate logos."
         )
     logger.info("logo_generation: non-strict mode returning no logo; provider not configured")
     return no_logo_result

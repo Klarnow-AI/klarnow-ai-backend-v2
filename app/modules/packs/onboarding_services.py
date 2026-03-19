@@ -2,11 +2,15 @@
 
 import json
 
-from app.core.config import get_settings
 from app.core.errors import BadRequestError
 from app.core.logging import log_service_action
 from app.modules.packs.extraction.website_scraper import extract_brand_from_website
 from app.shared.services.llm import get_llm
+from app.shared.services.openai_compatible import (
+    create_sync_openai_client,
+    get_fast_model,
+    has_openai_compatible_provider,
+)
 
 
 def _extract_offer_cues_from_profile(profile: dict) -> list[str]:
@@ -77,13 +81,11 @@ async def extract_brand(
     
     if input_type == "paste" and pasted_text:
         # For pasted text, use simple LLM extraction
-        from openai import OpenAI
-        
-        settings = get_settings()
-        if not settings.openai_api_key:
+        if not has_openai_compatible_provider():
             return {"brand_name": "My Brand", "offer_cues": [], "raw_extract": {}}
-        
-        client = OpenAI(api_key=settings.openai_api_key)
+        client = create_sync_openai_client()
+        if not client:
+            return {"brand_name": "My Brand", "offer_cues": [], "raw_extract": {}}
         sys = (
             "You extract brand name and offer cues (value props, differentiators) from the given content. "
             "Return only valid JSON with keys: brand_name (string), offer_cues (array of strings). "
@@ -91,7 +93,7 @@ async def extract_brand(
         )
         try:
             r = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=get_fast_model(),
                 messages=[
                     {"role": "system", "content": sys},
                     {"role": "user", "content": f"Pasted copy:\n\n{pasted_text[:8000]}"},
@@ -123,12 +125,11 @@ def _call_openai_palette(
     onboarding_context: dict | None = None,
 ) -> dict:
     """Generate a colour palette from brand name, vibe chips, and optional onboarding context."""
-    from openai import OpenAI
-
-    settings = get_settings()
-    if not settings.openai_api_key:
+    if not has_openai_compatible_provider():
         return {"primary": "#2563eb", "secondary": "#64748b", "accent": "#f59e0b"}
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = create_sync_openai_client()
+    if not client:
+        return {"primary": "#2563eb", "secondary": "#64748b", "accent": "#f59e0b"}
     chips = ", ".join(vibe_chips) if vibe_chips else "professional, modern"
     prompt = (
         f"Brand: {brand_name}. Vibe: {chips}. "
@@ -145,7 +146,7 @@ def _call_openai_palette(
             prompt += " Context: " + "; ".join(parts)
     try:
         r = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=get_fast_model(),
             messages=[{"role": "user", "content": prompt}],
             temperature=0.8,
         )

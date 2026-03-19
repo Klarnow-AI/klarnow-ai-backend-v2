@@ -3,21 +3,25 @@
 import json
 from uuid import UUID
 
-from openai import OpenAI
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.modules.brand_os.services import get_active_for_pack
 from app.modules.packs.models import Pack
+from app.shared.services.openai_compatible import (
+    create_sync_openai_client,
+    get_fast_model,
+    has_openai_compatible_provider,
+)
 
 logger = get_logger("klarnow.packs.brand_identity_suggestions")
 
 
 def _brand_identity_ai_unavailable_reason() -> str | None:
     settings = get_settings()
-    if not settings.openai_api_key:
-        return "Brand identity AI suggestions need OPENAI_API_KEY to be set."
+    if not has_openai_compatible_provider():
+        return "Brand identity AI suggestions need OPENROUTER_API_KEY to be set."
     if not settings.ai_brand_identity_suggestions_enabled:
         return (
             "Brand identity AI suggestions are disabled. Set "
@@ -107,10 +111,11 @@ Use only web-safe or Google Fonts that are free and widely available. No markdow
         }
 
     try:
-        settings = get_settings()
-        client = OpenAI(api_key=settings.openai_api_key)
+        client = create_sync_openai_client()
+        if not client:
+            raise RuntimeError("AI client not configured")
         r = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=get_fast_model(),
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=150,
@@ -192,10 +197,11 @@ Ensure colors work well together and are accessible. No markdown, no explanation
         return fallback_palette
 
     try:
-        settings = get_settings()
-        client = OpenAI(api_key=settings.openai_api_key)
+        client = create_sync_openai_client()
+        if not client:
+            raise RuntimeError("AI client not configured")
         r = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=get_fast_model(),
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=200,

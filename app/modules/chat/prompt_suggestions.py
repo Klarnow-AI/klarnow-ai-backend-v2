@@ -6,7 +6,6 @@ import json
 from typing import Any
 from uuid import UUID
 
-from openai import OpenAI
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -14,6 +13,11 @@ from app.core.logging import get_logger
 from app.modules.agents.orchestrator import assemble_context
 from app.modules.landing.next_action import get_next_action
 from app.modules.packs.services import get_pack_for_user
+from app.shared.services.openai_compatible import (
+    create_sync_openai_client,
+    get_fast_model,
+    has_openai_compatible_provider,
+)
 
 logger = get_logger("klarnow.chat.prompt_suggestions")
 
@@ -159,7 +163,7 @@ def suggest_pack_chat_prompts(
     fallback = _fallback_prompts(pack_context, next_action)
 
     settings = get_settings()
-    if not settings.openai_api_key or not settings.ai_chat_prompt_suggestions_enabled:
+    if not has_openai_compatible_provider() or not settings.ai_chat_prompt_suggestions_enabled:
         return fallback
 
     prompt_context = {
@@ -201,9 +205,11 @@ def suggest_pack_chat_prompts(
     )
 
     try:
-        client = OpenAI(api_key=settings.openai_api_key)
+        client = create_sync_openai_client()
+        if not client:
+            return fallback
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=get_fast_model(),
             messages=[
                 {
                     "role": "system",

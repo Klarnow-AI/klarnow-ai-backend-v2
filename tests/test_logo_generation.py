@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import unittest
+import base64
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
@@ -23,56 +24,55 @@ from app.modules.packs.onboarding_services import generate_starter_brand
 
 
 class SettingsAliasTests(unittest.TestCase):
-    def test_google_api_key_alias_populates_gemini_api_key(self) -> None:
+    def test_openrouter_api_key_is_loaded(self) -> None:
         with patch.dict(
             os.environ,
             {
                 "DATABASE_URL": "sqlite:///./settings-alias-test.db",
-                "GOOGLE_API_KEY": "alias-key",
+                "OPENROUTER_API_KEY": "router-key",
             },
             clear=True,
         ):
             settings = Settings(_env_file=None)
 
-        self.assertEqual(settings.gemini_api_key, "alias-key")
+        self.assertEqual(settings.openrouter_api_key, "router-key")
 
 
 class LogoGenerationServiceTests(unittest.TestCase):
     def setUp(self) -> None:
-        logo_generation._GEMINI_FAILURE_STATE["until"] = 0.0
-        logo_generation._GEMINI_FAILURE_STATE["reason"] = ""
+        logo_generation._PROVIDER_FAILURE_STATE["until"] = 0.0
+        logo_generation._PROVIDER_FAILURE_STATE["reason"] = ""
 
     def tearDown(self) -> None:
-        logo_generation._GEMINI_FAILURE_STATE["until"] = 0.0
-        logo_generation._GEMINI_FAILURE_STATE["reason"] = ""
+        logo_generation._PROVIDER_FAILURE_STATE["until"] = 0.0
+        logo_generation._PROVIDER_FAILURE_STATE["reason"] = ""
 
-    def test_generate_logo_with_gemini_uploads_image_and_uses_configured_model(self) -> None:
+    def test_generate_logo_with_openrouter_uploads_image_and_uses_configured_model(self) -> None:
+        encoded = "data:image/webp;base64," + base64.b64encode(b"webp-image").decode("ascii")
         fake_response = SimpleNamespace(
-            parts=[
+            choices=[
                 SimpleNamespace(
-                    inline_data=SimpleNamespace(
-                        data=b"webp-image",
-                        mime_type="image/webp",
+                    message=SimpleNamespace(
+                        images=[SimpleNamespace(image_url=SimpleNamespace(url=encoded))]
                     )
                 )
             ]
         )
         fake_client = SimpleNamespace(
-            models=SimpleNamespace(generate_content=MagicMock(return_value=fake_response)),
-            close=MagicMock(),
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(create=MagicMock(return_value=fake_response))
+            )
         )
 
         with (
             patch.object(
                 logo_generation,
                 "get_settings",
-                return_value=SimpleNamespace(
-                    gemini_api_key="gem-key",
-                    gemini_logo_model="gemini-custom-image",
-                    ai_logo_generation_enabled=True,
-                ),
+                return_value=SimpleNamespace(ai_logo_generation_enabled=True),
             ),
-            patch.object(logo_generation.genai, "Client", return_value=fake_client) as mock_client,
+            patch.object(logo_generation, "has_openai_compatible_provider", return_value=True),
+            patch.object(logo_generation, "create_sync_openai_client", return_value=fake_client),
+            patch.object(logo_generation, "get_logo_model", return_value="google/gemini-image-custom"),
             patch.object(logo_generation, "upload_file", return_value="stored-key") as mock_upload,
             patch.object(
                 logo_generation,
@@ -80,7 +80,7 @@ class LogoGenerationServiceTests(unittest.TestCase):
                 return_value="https://cdn.example.com/generated-logo.webp",
             ),
         ):
-            result = logo_generation.generate_logo_with_gemini("Make a bold logo", "pack-123")
+            result = logo_generation.generate_logo_with_openrouter("Make a bold logo", "pack-123")
 
         self.assertEqual(
             result,
@@ -89,49 +89,44 @@ class LogoGenerationServiceTests(unittest.TestCase):
                 "wordmark_svg_or_url": None,
             },
         )
-        mock_client.assert_called_once_with(api_key="gem-key")
-        generate_call = fake_client.models.generate_content.call_args.kwargs
-        self.assertEqual(generate_call["model"], "gemini-custom-image")
-        self.assertEqual(generate_call["contents"], "Make a bold logo")
-        self.assertEqual(generate_call["config"].response_modalities, ["IMAGE"])
-        self.assertEqual(generate_call["config"].image_config.aspect_ratio, "1:1")
-        self.assertEqual(generate_call["config"].image_config.image_size, "1K")
+        generate_call = fake_client.chat.completions.create.call_args.kwargs
+        self.assertEqual(generate_call["model"], "google/gemini-image-custom")
+        self.assertEqual(generate_call["messages"], [{"role": "user", "content": "Make a bold logo"}])
+        self.assertEqual(generate_call["extra_body"]["modalities"], ["image", "text"])
+        self.assertEqual(generate_call["extra_body"]["image_config"]["aspect_ratio"], "1:1")
+        self.assertEqual(generate_call["extra_body"]["image_config"]["image_size"], "1K")
         upload_call = mock_upload.call_args
         self.assertTrue(upload_call.args[0].startswith("logos/pack-123/"))
         self.assertTrue(upload_call.args[0].endswith(".webp"))
         self.assertEqual(upload_call.args[1], b"webp-image")
         self.assertEqual(upload_call.kwargs["content_type"], "image/webp")
-        fake_client.close.assert_called_once()
 
-    def test_generate_logo_with_gemini_rejects_missing_image_parts(self) -> None:
-        fake_response = SimpleNamespace(parts=[SimpleNamespace(text="No image", inline_data=None)])
+    def test_generate_logo_with_openrouter_rejects_missing_image_parts(self) -> None:
+        fake_response = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(images=[]))])
         fake_client = SimpleNamespace(
-            models=SimpleNamespace(generate_content=MagicMock(return_value=fake_response)),
-            close=MagicMock(),
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(create=MagicMock(return_value=fake_response))
+            )
         )
 
         with (
             patch.object(
                 logo_generation,
                 "get_settings",
-                return_value=SimpleNamespace(
-                    gemini_api_key="gem-key",
-                    gemini_logo_model="gemini-2.5-flash-image",
-                    ai_logo_generation_enabled=True,
-                ),
+                return_value=SimpleNamespace(ai_logo_generation_enabled=True),
             ),
-            patch.object(logo_generation.genai, "Client", return_value=fake_client),
+            patch.object(logo_generation, "has_openai_compatible_provider", return_value=True),
+            patch.object(logo_generation, "create_sync_openai_client", return_value=fake_client),
             patch.object(logo_generation, "upload_file") as mock_upload,
         ):
             with self.assertRaises(BadRequestError) as exc_info:
-                logo_generation.generate_logo_with_gemini("Make a logo", "pack-123")
+                logo_generation.generate_logo_with_openrouter("Make a logo", "pack-123")
 
         self.assertIn("did not return an image", str(exc_info.exception).lower())
         mock_upload.assert_not_called()
-        fake_client.close.assert_called_once()
 
-    def test_generate_logo_with_gemini_sets_cooldown_for_quota_errors(self) -> None:
-        class FakeGeminiQuotaError(Exception):
+    def test_generate_logo_with_openrouter_sets_cooldown_for_quota_errors(self) -> None:
+        class FakeQuotaError(Exception):
             def __init__(self) -> None:
                 super().__init__("quota exceeded")
                 self.code = 429
@@ -140,43 +135,37 @@ class LogoGenerationServiceTests(unittest.TestCase):
                 self.details = {"error": {"message": "Quota exceeded"}}
 
         fake_client = SimpleNamespace(
-            models=SimpleNamespace(generate_content=MagicMock(side_effect=FakeGeminiQuotaError())),
-            close=MagicMock(),
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(create=MagicMock(side_effect=FakeQuotaError()))
+            )
         )
 
         with (
             patch.object(
                 logo_generation,
                 "get_settings",
-                return_value=SimpleNamespace(
-                    gemini_api_key="gem-key",
-                    gemini_logo_model="gemini-2.5-flash-image",
-                    ai_logo_generation_enabled=True,
-                ),
+                return_value=SimpleNamespace(ai_logo_generation_enabled=True),
             ),
-            patch.object(logo_generation.genai, "Client", return_value=fake_client),
+            patch.object(logo_generation, "has_openai_compatible_provider", return_value=True),
+            patch.object(logo_generation, "create_sync_openai_client", return_value=fake_client),
         ):
             with self.assertRaises(BadRequestError) as exc_info:
-                logo_generation.generate_logo_with_gemini("Make a logo", "pack-123")
+                logo_generation.generate_logo_with_openrouter("Make a logo", "pack-123")
 
-        self.assertIn("quota or rate limit", str(exc_info.exception).lower())
-        self.assertIsNotNone(logo_generation._get_gemini_cooldown_reason())
-        fake_client.close.assert_called_once()
+        self.assertIn("quota or billing", str(exc_info.exception).lower())
+        self.assertIsNotNone(logo_generation._get_provider_cooldown_reason())
 
     def test_generate_logo_returns_empty_result_in_non_strict_mode_after_provider_error(self) -> None:
         with (
             patch.object(
                 logo_generation,
                 "get_settings",
-                return_value=SimpleNamespace(
-                    gemini_api_key="gem-key",
-                    gemini_logo_model="gemini-2.5-flash-image",
-                    ai_logo_generation_enabled=True,
-                ),
+                return_value=SimpleNamespace(ai_logo_generation_enabled=True),
             ),
+            patch.object(logo_generation, "has_openai_compatible_provider", return_value=True),
             patch.object(
                 logo_generation,
-                "generate_logo_with_gemini",
+                "generate_logo_with_openrouter",
                 side_effect=BadRequestError("provider failed"),
             ),
         ):

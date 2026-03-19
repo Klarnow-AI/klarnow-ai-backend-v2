@@ -6,12 +6,17 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.modules.packs.models import Pack
+from app.shared.services.openai_compatible import (
+    create_sync_openai_client,
+    get_fast_model,
+    has_openai_compatible_provider,
+)
 
 
 def _sprint_ai_unavailable_reason() -> str | None:
     settings = get_settings()
-    if not settings.openai_api_key:
-        return "Sprint AI suggestions need OPENAI_API_KEY to be set."
+    if not has_openai_compatible_provider():
+        return "Sprint AI suggestions need OPENROUTER_API_KEY to be set."
     if not settings.ai_sprint_field_suggestions_enabled:
         return (
             "Sprint AI suggestions are disabled. Set "
@@ -75,9 +80,14 @@ def suggest_day_fields(db: Session, pack_id: UUID, day_number: int) -> dict:
             reason=unavailable_reason,
         )
 
-    settings = get_settings()
-    from openai import OpenAI
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = create_sync_openai_client()
+    if not client:
+        return _fallback_day_response(
+            day_number,
+            pack,
+            source="fallback",
+            reason="Sprint AI suggestions need OPENROUTER_API_KEY to be set.",
+        )
 
     if day_number == 1:
         suggestion = _call_llm_single(
@@ -163,7 +173,7 @@ Respond with ONLY the suggested value. No explanation, no markdown, no quotes ar
 
     try:
         r = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=get_fast_model(),
             messages=[{"role": "user", "content": prompt}],
             temperature=0.6,
             max_tokens=500,
@@ -261,12 +271,11 @@ def suggest_day_field_chips(
 
     context = _pack_context_for_suggestions(pack)
     settings = get_settings()
-    if not settings.openai_api_key or not settings.ai_sprint_field_suggestions_enabled:
+    if not has_openai_compatible_provider() or not settings.ai_sprint_field_suggestions_enabled:
         return []
-
-    from openai import OpenAI
-
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = create_sync_openai_client()
+    if not client:
+        return []
 
     field_labels = {
         "brand_name": "brand name",
@@ -297,7 +306,7 @@ Make each suggestion concrete and specific to their brand."""
 
     try:
         r = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=get_fast_model(),
             messages=[{"role": "user", "content": prompt}],
             temperature=0.85,
             max_tokens=400,
@@ -346,9 +355,13 @@ def suggest_sprint_field(
             "reason": unavailable_reason,
         }
 
-    settings = get_settings()
-    from openai import OpenAI
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = create_sync_openai_client()
+    if not client:
+        return {
+            "suggestion": current,
+            "source": "fallback",
+            "reason": "Sprint AI suggestions need OPENROUTER_API_KEY to be set.",
+        }
 
     labels = {
         "offer_one_liner": "offer one-liner (one clear sentence: what you're selling)",

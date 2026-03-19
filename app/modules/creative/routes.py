@@ -139,6 +139,8 @@ async def generate_posters(
     except ValueError as exc:
         raise BadRequestError(str(exc)) from exc
 
+    existing_files = [file.model_dump() for file in body.existing_files]
+
     try:
         stream = await create_poster_generation_stream(
             messages=body.messages,
@@ -146,7 +148,11 @@ async def generate_posters(
             brand_context=brand_context,
             reference_images=reference_images,
             generation_mode=body.generation_mode,
+            edit_variant=body.edit_variant,
+            existing_files=existing_files,
         )
+    except ValueError as exc:
+        raise BadRequestError(str(exc)) from exc
     except RuntimeError as exc:
         message = str(exc)
         if "not configured" in message.lower():

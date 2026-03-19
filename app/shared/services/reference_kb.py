@@ -15,6 +15,10 @@ from openai import OpenAI
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.shared.services.openai_compatible import (
+    create_sync_openai_client,
+    get_embedding_model,
+)
 
 logger = get_logger("klarnow.reference_kb")
 ROOT_DIR = Path(__file__).resolve().parents[3]
@@ -36,14 +40,13 @@ class MarkdownReferenceKB:
         settings = get_settings()
         self.enabled = settings.reference_doc_enabled
         self.reference_doc_path = settings.reference_doc_path
-        self.embedding_model = settings.reference_doc_embedding_model
+        self.embedding_model = get_embedding_model()
         self.chunk_chars = settings.reference_doc_chunk_chars
         self.chunk_overlap_chars = settings.reference_doc_chunk_overlap_chars
         self.top_k = settings.reference_doc_top_k
         self.min_score = settings.reference_doc_min_score
         self.max_chars = settings.reference_doc_max_chars
         self.cache_ttl_seconds = settings.reference_doc_cache_ttl_seconds
-        self.openai_api_key = settings.openai_api_key
 
         self._client: OpenAI | None = None
         self._lock = threading.Lock()
@@ -227,10 +230,11 @@ class MarkdownReferenceKB:
     def _get_client(self) -> OpenAI | None:
         if self._client:
             return self._client
-        if not self.openai_api_key:
-            logger.warning("reference_kb_openai_key_missing")
+        client = create_sync_openai_client()
+        if not client:
+            logger.warning("reference_kb_ai_key_missing")
             return None
-        self._client = OpenAI(api_key=self.openai_api_key)
+        self._client = client
         return self._client
 
     def _embed_texts(self, texts: list[str]) -> list[list[float]]:

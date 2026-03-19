@@ -15,6 +15,11 @@ from app.core.storage import get_asset_url
 from app.modules.agents.orchestrator import assemble_context, CHAT_CONTEXT_LAST_N_MESSAGES
 from app.modules.agents.registry import REGISTRY, execute
 from app.modules.packs.services import get_pack_for_user
+from app.shared.services.openai_compatible import (
+    create_sync_openai_client,
+    get_default_model,
+    has_openai_compatible_provider,
+)
 from app.shared.services.reference_kb import get_reference_kb
 
 logger = get_logger("klarnow.chat.reference_kb")
@@ -626,12 +631,12 @@ def run_chat_turn(
         )
     )
 
-    if not settings.openai_api_key:
+    if not has_openai_compatible_provider():
         # Stub: no LLM
         stub_msg = Message(
             conversation_id=conversation_id,
             role="assistant",
-            content="OpenAI API key not configured; chat is disabled.",
+            content="OPENROUTER_API_KEY not configured; chat is disabled.",
         )
         db.add(stub_msg)
         db.commit()
@@ -643,12 +648,25 @@ def run_chat_turn(
             "preview": False,
         }
 
-    from openai import OpenAI
-
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = create_sync_openai_client()
+    if not client:
+        stub_msg = Message(
+            conversation_id=conversation_id,
+            role="assistant",
+            content="OPENROUTER_API_KEY not configured; chat is disabled.",
+        )
+        db.add(stub_msg)
+        db.commit()
+        db.refresh(stub_msg)
+        return {
+            "assistant_content": stub_msg.content,
+            "message_id": str(stub_msg.id),
+            "references": merged_references,
+            "preview": False,
+        }
 
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model=get_default_model(),
         messages=openai_messages,  # pyright: ignore[reportArgumentType]
         tools=openai_tools if openai_tools else None,  # pyright: ignore[reportArgumentType]
         tool_choice="auto" if openai_tools else None,  # pyright: ignore[reportArgumentType]
@@ -734,7 +752,7 @@ def run_chat_turn(
                 }
             )
         follow_up = client.chat.completions.create(
-            model="gpt-4o",
+            model=get_default_model(),
             messages=openai_messages,  # pyright: ignore[reportArgumentType]
         )
         follow_msg_content = ""
@@ -974,11 +992,11 @@ def run_chat_turn_stream(
 
         yield _sse_status("thinking", "Thinking...")
 
-        if not settings.openai_api_key:
+        if not has_openai_compatible_provider():
             stub_msg = Message(
                 conversation_id=conversation_id,
                 role="assistant",
-                content="OpenAI API key not configured; chat is disabled.",
+                content="OPENROUTER_API_KEY not configured; chat is disabled.",
             )
             db.add(stub_msg)
             db.commit()
@@ -994,12 +1012,29 @@ def run_chat_turn_stream(
             )
             return
 
-        from openai import OpenAI
-
-        client = OpenAI(api_key=settings.openai_api_key)
+        client = create_sync_openai_client()
+        if not client:
+            stub_msg = Message(
+                conversation_id=conversation_id,
+                role="assistant",
+                content="OPENROUTER_API_KEY not configured; chat is disabled.",
+            )
+            db.add(stub_msg)
+            db.commit()
+            db.refresh(stub_msg)
+            yield _sse_event(
+                "done",
+                {
+                    "assistant_content": stub_msg.content,
+                    "message_id": str(stub_msg.id),
+                    "references": merged_references,
+                    "preview": False,
+                },
+            )
+            return
 
         stream = client.chat.completions.create(
-            model="gpt-4o",
+            model=get_default_model(),
             messages=openai_messages,  # pyright: ignore[reportArgumentType]
             tools=openai_tools if openai_tools else None,  # pyright: ignore[reportArgumentType]
             tool_choice="auto" if openai_tools else None,  # pyright: ignore[reportArgumentType]
@@ -1105,7 +1140,7 @@ def run_chat_turn_stream(
 
             yield _sse_status("finalizing", "Finalizing answer...")
             follow_up_stream = client.chat.completions.create(
-                model="gpt-4o",
+                model=get_default_model(),
                 messages=openai_messages,  # pyright: ignore[reportArgumentType]
                 stream=True,
             )

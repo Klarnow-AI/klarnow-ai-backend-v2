@@ -130,6 +130,39 @@ class PosterPromptAssemblyTests(unittest.TestCase):
         self.assertLess(prompt.index("- v2: template=offer, variant=B"), prompt.index("- v3: template=proof, variant=C"))
         self.assertLess(prompt.index("- v3: template=proof, variant=C"), prompt.index("- v4: template=offer, variant=A"))
 
+    def test_edit_prompt_targets_selected_variant_and_embeds_current_files(self) -> None:
+        prompt = build_poster_system_prompt(
+            pack=make_pack(),
+            brand_context=GenerationBrandContext(brand_name="Acme"),
+            generation_mode="edit",
+            edit_variant="v2",
+            existing_files=[
+                {
+                    "name": "/poster-v2-4x5.tsx",
+                    "code": "export default function Poster(){return <div style={{width:1080,height:1350}} />}",
+                },
+                {
+                    "name": "/poster-v2-9x16.tsx",
+                    "code": "export default function Poster(){return <div style={{width:1080,height:1920}} />}",
+                },
+            ],
+        )
+
+        required_files = _required_filenames(prompt)
+
+        self.assertEqual(
+            required_files,
+            [
+                "/poster-v2-4x5.tsx",
+                "/poster-v2-9x16.tsx",
+                "/poster-v2-16x9.tsx",
+                "/poster-v2-1x1.tsx",
+            ],
+        )
+        self.assertIn("CURRENT FILES TO EDIT", prompt)
+        self.assertIn('<current_file name="/poster-v2-4x5.tsx">', prompt)
+        self.assertIn("Apply the latest user-requested edit across all four sizes for slot v2.", prompt)
+
     def test_resolved_brief_uses_pack_and_brand_context_fallbacks(self) -> None:
         pack = make_pack(
             brand_name="",
@@ -225,6 +258,50 @@ class CreativeGenerationRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.headers["content-type"].startswith("text/plain"))
         self.assertIn("<summary>Poster ready.</summary>", response.text)
+
+    def test_generate_route_passes_edit_variant_and_existing_files(self) -> None:
+        pack = make_pack()
+        brand_context = GenerationBrandContext(brand_name="Acme")
+
+        async def fake_stream(**kwargs):
+            self.assertEqual(kwargs["generation_mode"], "edit")
+            self.assertEqual(kwargs["edit_variant"], "v2")
+            self.assertEqual(
+                kwargs["existing_files"],
+                [{"name": "/poster-v2-4x5.tsx", "code": "export default function Poster(){return <div style={{width:1080,height:1350}} />}"}],
+            )
+
+            async def iterator():
+                yield "<summary>Edited.</summary>"
+                yield "<file name=\"/poster-v2-4x5.tsx\">export default function Poster(){return <div style={{width:1080,height:1350}} />}</file>"
+
+            return iterator()
+
+        with (
+            patch.object(creative_routes, "get_pack_for_user", return_value=pack),
+            patch.object(creative_routes, "can_generate_assets", return_value=None),
+            patch.object(creative_routes, "load_generation_brand_context", return_value=brand_context),
+            patch.object(creative_routes, "create_poster_generation_stream", side_effect=fake_stream),
+            TestClient(main_module.app, raise_server_exceptions=False) as client,
+        ):
+            response = client.post(
+                "/api/v1/creative/generate",
+                json={
+                    "packId": str(pack.id),
+                    "messages": [{"role": "user", "content": "Tighten the headline"}],
+                    "generationMode": "edit",
+                    "editVariant": "v2",
+                    "existingFiles": [
+                        {
+                            "name": "/poster-v2-4x5.tsx",
+                            "code": "export default function Poster(){return <div style={{width:1080,height:1350}} />}",
+                        }
+                    ],
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("<summary>Edited.</summary>", response.text)
 
 
 class GenerationContextLogoTests(unittest.TestCase):

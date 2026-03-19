@@ -51,16 +51,31 @@ class PosterReferenceImageInput(BaseModel):
     data_url: str = Field(alias="dataUrl")
 
 
+class PosterExistingFileInput(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    name: str
+    code: str
+
+
 class PosterGenerateRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     pack_id: UUID = Field(alias="packId")
     messages: list[GenerationMessage]
-    generation_mode: Literal["auto", "manual"] = Field(
+    generation_mode: Literal["auto", "manual", "edit"] = Field(
         default="manual",
         alias="generationMode",
     )
     reference_images: list[PosterReferenceImageInput] = Field(
         default_factory=list,
         alias="referenceImages",
+    )
+    edit_variant: Literal["v1", "v2", "v3", "v4"] | None = Field(
+        default=None,
+        alias="editVariant",
+    )
+    existing_files: list[PosterExistingFileInput] = Field(
+        default_factory=list,
+        alias="existingFiles",
     )

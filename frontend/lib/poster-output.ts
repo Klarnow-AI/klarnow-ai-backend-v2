@@ -1,6 +1,6 @@
 export type PosterSizeId = "4x5" | "9x16" | "16x9" | "1x1";
 export type PosterVariantId = "v1" | "v2" | "v3" | "v4";
-export type PosterGenerationMode = "auto" | "manual";
+export type PosterGenerationMode = "auto" | "manual" | "edit";
 
 export type PosterConversationMessage = {
   role: "user" | "assistant";
@@ -92,9 +92,18 @@ export const EXPECTED_POSTER_FILENAMES = POSTER_VARIANTS.flatMap((variant) =>
 );
 
 export function getExpectedPosterFileNames(
-  mode: PosterGenerationMode = "auto",
+  options?: {
+    mode?: PosterGenerationMode;
+    variant?: PosterVariantId | null;
+  },
 ): string[] {
-  const variants = mode === "manual" ? MANUAL_POSTER_VARIANTS : POSTER_VARIANTS;
+  const mode = options?.mode ?? "auto";
+  const variants =
+    mode === "auto"
+      ? POSTER_VARIANTS
+      : mode === "edit"
+        ? [options?.variant ?? "v1"]
+        : MANUAL_POSTER_VARIANTS;
   return variants.flatMap((variant) =>
     POSTER_SIZES.map((size) => buildPosterFileName(variant, size)),
   );
@@ -333,10 +342,18 @@ export function extractPosterTemplateIdFromFilename(
   return meta?.size ?? null;
 }
 
+export function extractPosterVariantFromFilename(
+  name: string,
+): PosterVariantId | null {
+  const meta = parsePosterMetaFromName(name);
+  return meta?.variant ?? null;
+}
+
 export function validatePosterTsxFiles(
   filesInput: Record<string, string>,
   options?: {
     mode?: PosterGenerationMode;
+    variant?: PosterVariantId | null;
   },
 ): PosterValidationResult {
   const files: Record<string, string> = {};
@@ -344,7 +361,10 @@ export function validatePosterTsxFiles(
     files[normalizePosterFileName(name)] = code;
   }
 
-  const expectedFileNames = getExpectedPosterFileNames(options?.mode ?? "auto");
+  const expectedFileNames = getExpectedPosterFileNames({
+    mode: options?.mode ?? "auto",
+    variant: options?.variant ?? null,
+  });
   const expected = new Set(expectedFileNames);
   const actualNames = Object.keys(files);
 

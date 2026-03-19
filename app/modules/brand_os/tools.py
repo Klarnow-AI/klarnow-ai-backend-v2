@@ -12,6 +12,12 @@ from app.modules.brand_os.models import BrandOS
 from app.modules.brand_os.services import get_active_for_pack, get_by_source_job_id, list_versions_for_pack
 from app.modules.packs.models import Pack
 from app.modules.packs.services import build_step_2_finalization_payload
+from app.shared.services.openai_compatible import (
+    create_sync_openai_client,
+    get_default_model,
+    get_fast_model,
+    has_openai_compatible_provider,
+)
 
 
 GENERATE_BRAND_OS_SCHEMA = {
@@ -100,6 +106,17 @@ def _stub_brand_os_domain() -> BrandOSDomain:
     )
 
 
+def _strip_markdown_fences(raw: str) -> str:
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[-1] if "\n" in text else text[3:]
+    if text.startswith("json"):
+        text = text[4:].lstrip()
+    if text.endswith("```"):
+        text = text.rsplit("```", 1)[0].strip()
+    return text
+
+
 def _build_brand_os_context_payload(
     pack: Pack,
     onboarding_answers_override: dict | None = None,
@@ -157,12 +174,12 @@ def _call_openai_for_brand_os(context: str) -> BrandOSDomain:
     1. Brief reasoning pass to identify core brand signals
     2. Structured generation using that reasoning as additional context
     """
-    from openai import OpenAI
-
     settings = get_settings()
-    if not settings.openai_api_key:
+    if not has_openai_compatible_provider():
         return _stub_brand_os_domain()
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = create_sync_openai_client()
+    if not client:
+        return _stub_brand_os_domain()
     context_trimmed = context[:6000]
 
     # Step 1: Brief reasoning pass — identify key brand signals before generating
@@ -170,7 +187,7 @@ def _call_openai_for_brand_os(context: str) -> BrandOSDomain:
     if settings.ai_brand_os_reasoning_enabled:
         try:
             reasoning_response = client.chat.completions.create(
-                model="gpt-4o",
+                model=get_default_model(),
                 messages=[
                     {
                         "role": "system",
@@ -216,8 +233,8 @@ def _call_openai_for_brand_os(context: str) -> BrandOSDomain:
     )
 
     try:
-        completion = client.chat.completions.parse(
-            model="gpt-4o",
+        completion = client.chat.completions.create(
+            model=get_default_model(),
             messages=[
                 {
                     "role": "system",
@@ -226,17 +243,19 @@ def _call_openai_for_brand_os(context: str) -> BrandOSDomain:
                         "strategies tailored to the business — not generic filler."
                     ),
                 },
-                {"role": "user", "content": generation_prompt},
+                {
+                    "role": "user",
+                    "content": (
+                        f"{generation_prompt}\n\n"
+                        "JSON schema:\n"
+                        f"{json.dumps(BrandOSDomain.model_json_schema(), ensure_ascii=True)}"
+                    ),
+                },
             ],
             temperature=0.6,
-            response_format=BrandOSDomain,
         )
-        parsed = completion.choices[0].message.parsed
-        if parsed is not None:
-            return parsed
         content = completion.choices[0].message.content or "{}"
-        content = content.strip().removeprefix("```json").removeprefix("```").strip()
-        return BrandOSDomain.model_validate(json.loads(content))
+        return BrandOSDomain.model_validate(json.loads(_strip_markdown_fences(content)))
     except Exception:
         return _stub_brand_os_domain()
 
@@ -416,15 +435,14 @@ Field to suggest: {field_label}.
 
 Respond with only the suggested value. For list fields (e.g. one per line), output each item on its own line. No explanation, no markdown, no quotes around the whole thing."""
 
-    settings = get_settings()
-    if not settings.openai_api_key:
-        return current or f"(Suggestions require an API key; field: {field_label})"
-    from openai import OpenAI
-
-    client = OpenAI(api_key=settings.openai_api_key)
+    if not has_openai_compatible_provider():
+        return current or f"(Suggestions require OPENROUTER_API_KEY; field: {field_label})"
+    client = create_sync_openai_client()
+    if not client:
+        return current or f"(Suggestions require OPENROUTER_API_KEY; field: {field_label})"
     try:
         r = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=get_fast_model(),
             messages=[{"role": "user", "content": prompt}],
             temperature=0.8,
             max_tokens=500,

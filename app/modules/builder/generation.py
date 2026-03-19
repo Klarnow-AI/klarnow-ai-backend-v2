@@ -3,7 +3,11 @@
 from collections.abc import AsyncIterator
 
 from app.shared.generation_schemas import GenerationBrandContext, GenerationMessage
-from app.shared.services.llm_streaming import create_text_stream_with_fallback
+from app.shared.services.llm_streaming import create_text_stream
+from app.shared.services.openai_compatible import (
+    get_builder_model,
+    get_reasoning_model,
+)
 
 
 _DEFAULT_APP_MARKER = "Describe your website to get started"
@@ -299,23 +303,16 @@ async def create_website_generation_stream(
         selected_style=selected_style,
     )
     max_tokens = 8192
-    anthropic_model = "claude-opus-4-6" if generation_mode else "claude-sonnet-4-6"
-    thinking_budget = _resolve_thinking_budget(
-        max_tokens,
-        10000 if generation_mode else 6000,
-    )
+    primary_model = get_builder_model() if generation_mode else get_reasoning_model()
 
-    simple_messages = [
+    messages_payload = [
         {"role": message.role, "content": message.content}
         for message in messages
     ]
-    return await create_text_stream_with_fallback(
+    return await create_text_stream(
         system_prompt=system_prompt,
-        openai_messages=simple_messages,
-        anthropic_messages=simple_messages,
-        openai_model="gpt-4o",
-        anthropic_model=anthropic_model,
+        messages=messages_payload,
+        model=primary_model,
         max_tokens=max_tokens,
-        anthropic_thinking_budget=thinking_budget,
         prelude="<thinking>Reasoning about your website...</thinking>",
     )

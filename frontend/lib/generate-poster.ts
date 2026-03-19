@@ -1,6 +1,7 @@
 import type { BrandContext } from "@/types/generation";
 import {
   type PosterGenerationMode,
+  type PosterVariantId,
   extractCompletedPosterFiles,
   parsePosterFileTags,
   parsePosterResponseEnvelope,
@@ -28,6 +29,8 @@ type PosterGenerationRequest = {
   messages: { role: string; content: string }[];
   brandContext?: BrandContext | null;
   referenceImages?: PosterReferenceImage[];
+  existingFiles?: Record<string, string>;
+  editVariant?: PosterVariantId | null;
   packId: string;
   generationMode?: PosterGenerationMode;
   authToken?: string | null;
@@ -50,6 +53,8 @@ export async function streamPosterGeneration(
     messages,
     brandContext,
     referenceImages,
+    existingFiles,
+    editVariant,
     packId,
     generationMode,
     authToken,
@@ -75,6 +80,11 @@ export async function streamPosterGeneration(
       brandContext: brandContext ?? undefined,
       packId: packId ?? undefined,
       generationMode: generationMode ?? "manual",
+      editVariant: editVariant ?? undefined,
+      existingFiles:
+        existingFiles && Object.keys(existingFiles).length > 0
+          ? Object.entries(existingFiles).map(([name, code]) => ({ name, code }))
+          : undefined,
       referenceImages:
         referenceImages && referenceImages.length > 0
           ? referenceImages
@@ -117,6 +127,7 @@ export async function streamPosterGeneration(
 
   const validation = validatePosterTsxFiles(parsed.files, {
     mode: generationMode ?? "manual",
+    variant: editVariant ?? null,
   });
   if (!validation.ok) {
     throw new Error(validation.errors.join(" "));

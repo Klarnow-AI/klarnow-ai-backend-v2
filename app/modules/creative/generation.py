@@ -7,7 +7,8 @@ from typing import Literal
 
 from app.core.config import get_settings
 from app.shared.generation_schemas import GenerationBrandContext, GenerationMessage
-from app.shared.services.llm_streaming import create_text_stream_with_fallback
+from app.shared.services.llm_streaming import create_text_stream
+from app.shared.services.openai_compatible import get_poster_flyer_model
 
 MAX_REFERENCE_IMAGES = 3
 MAX_REFERENCE_IMAGE_BYTES = 4 * 1024 * 1024
@@ -60,7 +61,7 @@ POSTER_SIZE_SPECS: tuple[tuple[str, int, int, str], ...] = (
     ("1x1", 1080, 1080, "Compress the hierarchy without shrinking the main idea."),
 )
 
-PosterGenerationMode = Literal["auto", "manual"]
+PosterGenerationMode = Literal["auto", "manual", "edit"]
 PosterTemplateKey = Literal["offer", "proof", "objection"]
 PosterVariantKey = Literal["A", "B", "C"]
 PosterSlotId = Literal["v1", "v2", "v3", "v4"]
@@ -344,6 +345,24 @@ def _build_slot_mapping(slot_configs: tuple[PosterSlotConfig, ...]) -> str:
     )
 
 
+def _build_existing_files_context(existing_files: list[dict[str, str]]) -> str:
+    blocks: list[str] = []
+    for file in sorted(existing_files, key=lambda item: str(item.get("name") or "")):
+        name = _clean_text(file.get("name"))
+        code = _clean_text(file.get("code"))
+        if not name or not code:
+            continue
+        blocks.append(f'<current_file name="{name}">\n{code}\n</current_file>')
+    return "\n\n".join(blocks)
+
+
+def _edit_slot_config(slot_id: PosterSlotId) -> PosterSlotConfig:
+    for slot in AUTO_SLOT_CONFIGS:
+        if slot.slot_id == slot_id:
+            return slot
+    return PosterSlotConfig(slot_id=slot_id, template_key="offer", variant_key="A")
+
+
 def build_shared_creative_prompt_block(
     *,
     brief: PosterPromptBrief,
@@ -415,7 +434,83 @@ def build_poster_system_prompt(
     pack,
     brand_context: GenerationBrandContext | None,
     generation_mode: PosterGenerationMode = "manual",
+    edit_variant: PosterSlotId | None = None,
+    existing_files: list[dict[str, str]] | None = None,
 ) -> str:
+    if generation_mode == "edit":
+        if edit_variant is None:
+            raise ValueError("Edit mode requires an edit variant.")
+        current_files = _build_existing_files_context(existing_files or [])
+        if not current_files:
+            raise ValueError("Edit mode requires existing files.")
+        slot_config = _edit_slot_config(edit_variant)
+        slot_configs = (slot_config,)
+        filenames = _build_required_filenames(slot_configs)
+        size_rules = _build_size_rules(slot_configs)
+        brief = resolve_poster_prompt_brief(pack=pack, brand_context=brand_context)
+
+        return f"""{SHARED_CREATIVE_SYSTEM_PROMPT}
+
+You are returning TSX poster source files, not a raster image.
+
+MODE SELECTION
+- Edit immediately. Do not ask discovery questions.
+
+OUTPUT FORMAT
+- Output ONLY XML tags. No markdown.
+- Generation mode:
+<summary>One short sentence.</summary>
+<file name="/poster-{edit_variant}-4x5.tsx">
+// complete code
+</file>
+
+MANDATORY FILES
+Return exactly these filenames:
+{filenames}
+
+FILE RULES
+- Each file must be complete self-contained TSX.
+- No imports.
+- Use export default function ComponentName() {{ ... }}.
+- Inline styles only.
+- Match the named artboard size in the root element.
+- Re-layout each size; do not stretch one layout.
+- Preserve the existing concept unless the user explicitly asks for a total redesign.
+- Apply the latest user-requested edit across all four sizes for slot {edit_variant}.
+
+SIZE RULES
+{size_rules}
+
+EDIT RULES
+- Use the current files below as the source of truth.
+- Keep filenames exactly the same.
+- Preserve successful details that were not asked to change.
+- If the requested change creates layout conflicts, recompose each size cleanly while keeping the concept recognizable.
+- Keep the brand, CTA, and offer aligned with the current pack and brand context.
+
+COPY RULES
+- Headline should read instantly.
+- Avoid jargon and fake hype.
+- Use believable specificity and proof.
+- One CTA only.
+
+{_logo_rules(brand_context)}
+
+{_brand_section(brand_context)}
+
+EDIT BRIEF
+BRAND: {brief.business_name}
+OFFER: {brief.offer}
+USP: {brief.usp}
+CTA: {brief.cta}
+{brief.proof_line}
+Business type: {brief.business_type}
+Tone: {brief.tone}
+
+CURRENT FILES TO EDIT
+{current_files}
+"""
+
     slot_configs = get_poster_slot_configs(generation_mode)
     filenames = _build_required_filenames(slot_configs)
     size_rules = _build_size_rules(slot_configs)
@@ -506,42 +601,6 @@ def build_openai_messages(
     return built
 
 
-def build_anthropic_messages(
-    messages: list[GenerationMessage],
-    reference_images: list[dict[str, str]],
-) -> list[dict[str, object]]:
-    if not reference_images:
-        return [
-            {
-                "role": "assistant" if message.role == "system" else message.role,
-                "content": message.content,
-            }
-            for message in messages
-        ]
-
-    latest_user_index = _find_latest_user_index(messages)
-    built: list[dict[str, object]] = []
-    for index, message in enumerate(messages):
-        role = "assistant" if message.role == "system" else message.role
-        if role != "user" or index != latest_user_index:
-            built.append({"role": role, "content": message.content})
-            continue
-        content: list[dict[str, object]] = [{"type": "text", "text": message.content}]
-        for image in reference_images:
-            content.append(
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": image["mime_type"],
-                        "data": image["base64_data"],
-                    },
-                }
-            )
-        built.append({"role": role, "content": content})
-    return built
-
-
 async def create_poster_generation_stream(
     *,
     messages: list[GenerationMessage],
@@ -549,6 +608,8 @@ async def create_poster_generation_stream(
     brand_context: GenerationBrandContext | None,
     reference_images: list[dict[str, str]],
     generation_mode: PosterGenerationMode,
+    edit_variant: PosterSlotId | None = None,
+    existing_files: list[dict[str, str]] | None = None,
 ) -> AsyncIterator[str]:
     settings = get_settings()
     max_tokens = max(4096, min(20000, settings.poster_max_output_tokens))
@@ -556,12 +617,12 @@ async def create_poster_generation_stream(
         pack=pack,
         brand_context=brand_context,
         generation_mode=generation_mode,
+        edit_variant=edit_variant,
+        existing_files=existing_files,
     )
-    return await create_text_stream_with_fallback(
+    return await create_text_stream(
         system_prompt=system_prompt,
-        openai_messages=build_openai_messages(messages, reference_images),
-        anthropic_messages=build_anthropic_messages(messages, reference_images),
-        openai_model="gpt-4o",
-        anthropic_model="claude-sonnet-4-6",
+        messages=build_openai_messages(messages, reference_images),
+        model=get_poster_flyer_model(),
         max_tokens=max_tokens,
     )
