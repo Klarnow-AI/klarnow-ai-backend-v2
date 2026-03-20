@@ -14,8 +14,10 @@ from app.core.logging import get_logger, log_service_action
 from app.core.storage import get_asset_url, upload_file
 from app.shared.services.openai_compatible import (
     create_sync_openai_client,
+    get_image_generation_extra_body_attempts,
     get_logo_model,
     has_openai_compatible_provider,
+    is_unsupported_output_modalities_error,
 )
 
 OPENROUTER_IMAGE_ASPECT_RATIO = "1:1"
@@ -215,6 +217,46 @@ def _extension_for_mime_type(mime_type: str) -> str:
     return _IMAGE_EXTENSION_BY_MIME_TYPE.get(normalized, "png")
 
 
+def _request_logo_image_generation(
+    client: object,
+    *,
+    model_name: str,
+    prompt_for_model: str,
+) -> object:
+    message_payload = [{"role": "user", "content": prompt_for_model}]
+    extra_body_attempts = get_image_generation_extra_body_attempts(
+        model_name,
+        aspect_ratio=OPENROUTER_IMAGE_ASPECT_RATIO,
+        image_size=OPENROUTER_IMAGE_SIZE,
+    )
+
+    last_exc: Exception | None = None
+    for attempt_index, extra_body in enumerate(extra_body_attempts):
+        try:
+            return client.chat.completions.create(
+                model=model_name,
+                messages=message_payload,
+                extra_body=extra_body,
+            )
+        except Exception as exc:
+            last_exc = exc
+            has_fallback = attempt_index < len(extra_body_attempts) - 1
+            if not has_fallback or not is_unsupported_output_modalities_error(exc):
+                raise
+            attempted_modalities = extra_body.get("modalities")
+            next_modalities = extra_body_attempts[attempt_index + 1].get("modalities")
+            logger.info(
+                "logo_generation: model %s rejected output modalities %s; retrying with %s",
+                model_name,
+                attempted_modalities,
+                next_modalities,
+            )
+
+    if last_exc is not None:
+        raise last_exc
+    raise BadRequestError("Logo generation failed before any OpenRouter request was sent.")
+
+
 def generate_logo_with_openrouter(
     prompt_text: str,
     pack_id: str,
@@ -245,16 +287,10 @@ def generate_logo_with_openrouter(
     model_name = get_logo_model()
     prompt_for_model = _truncate_logo_prompt(prompt_text)
     try:
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=[{"role": "user", "content": prompt_for_model}],
-            extra_body={
-                "modalities": ["image", "text"],
-                "image_config": {
-                    "aspect_ratio": OPENROUTER_IMAGE_ASPECT_RATIO,
-                    "image_size": OPENROUTER_IMAGE_SIZE,
-                },
-            },
+        response = _request_logo_image_generation(
+            client,
+            model_name=model_name,
+            prompt_for_model=prompt_for_model,
         )
     except Exception as exc:
         if _is_provider_auth_or_quota_error(exc):

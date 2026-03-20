@@ -125,6 +125,64 @@ class LogoGenerationServiceTests(unittest.TestCase):
         self.assertIn("did not return an image", str(exc_info.exception).lower())
         mock_upload.assert_not_called()
 
+    def test_generate_logo_with_openrouter_retries_with_image_only_when_modalities_are_wrong(self) -> None:
+        class FakeModalitiesError(Exception):
+            def __init__(self) -> None:
+                super().__init__(
+                    "{'error': {'message': 'No endpoints found that support the requested output modalities: image, text', 'code': 404}}"
+                )
+
+        encoded = "data:image/png;base64," + base64.b64encode(b"png-image").decode("ascii")
+        fake_response = SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        images=[SimpleNamespace(image_url=SimpleNamespace(url=encoded))]
+                    )
+                )
+            ]
+        )
+        create_mock = MagicMock(side_effect=[FakeModalitiesError(), fake_response])
+        fake_client = SimpleNamespace(
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(create=create_mock)
+            )
+        )
+
+        with (
+            patch.object(
+                logo_generation,
+                "get_settings",
+                return_value=SimpleNamespace(ai_logo_generation_enabled=True),
+            ),
+            patch.object(logo_generation, "has_openai_compatible_provider", return_value=True),
+            patch.object(logo_generation, "create_sync_openai_client", return_value=fake_client),
+            patch.object(logo_generation, "get_logo_model", return_value="custom/experimental-image-model"),
+            patch.object(logo_generation, "upload_file", return_value="stored-key") as mock_upload,
+            patch.object(
+                logo_generation,
+                "get_asset_url",
+                return_value="https://cdn.example.com/generated-logo.png",
+            ),
+        ):
+            result = logo_generation.generate_logo_with_openrouter("Make a bold logo", "pack-123")
+
+        self.assertEqual(
+            result,
+            {
+                "logo_url": "https://cdn.example.com/generated-logo.png",
+                "wordmark_svg_or_url": None,
+            },
+        )
+        self.assertEqual(create_mock.call_count, 2)
+        first_call = create_mock.call_args_list[0].kwargs
+        second_call = create_mock.call_args_list[1].kwargs
+        self.assertEqual(first_call["extra_body"]["modalities"], ["image", "text"])
+        self.assertEqual(second_call["extra_body"]["modalities"], ["image"])
+        upload_call = mock_upload.call_args
+        self.assertEqual(upload_call.args[1], b"png-image")
+        self.assertEqual(upload_call.kwargs["content_type"], "image/png")
+
     def test_generate_logo_with_openrouter_sets_cooldown_for_quota_errors(self) -> None:
         class FakeQuotaError(Exception):
             def __init__(self) -> None:
