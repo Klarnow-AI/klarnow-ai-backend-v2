@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { sprintApi } from "@/api_requests/sprint";
+import { getSprintSuggestionErrorMessage, sprintApi } from "@/api_requests/sprint";
 
 export function Day3Modal({
   open,
@@ -69,13 +69,9 @@ export function Day3Modal({
         field: "pitch_script",
         current_value: pitchScript || undefined,
       });
-      if (res.source === "fallback") {
-        setError(res.reason ?? "AI suggestions are currently unavailable.");
-        return;
-      }
       setPitchScript(res.suggestion);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not get suggestion");
+      setError(getSprintSuggestionErrorMessage(err));
     } finally {
       setRefiningPitch(false);
     }

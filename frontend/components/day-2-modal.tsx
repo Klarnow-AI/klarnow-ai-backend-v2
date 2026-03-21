@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { packs } from "@/api_requests/packs";
-import { sprintApi } from "@/api_requests/sprint";
+import { getSprintSuggestionErrorMessage, sprintApi } from "@/api_requests/sprint";
 import { dispatchPackRefresh } from "@/lib/pack-refresh-events";
 import type { Pack } from "@/types/api-types";
 
@@ -88,13 +88,9 @@ export function Day2Modal({
         field: "primary_pain",
         current_value: primaryPain || undefined,
       });
-      if (res.source === "fallback") {
-        setError(res.reason ?? "AI suggestions are currently unavailable.");
-        return;
-      }
       setPrimaryPain(res.suggestion);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not get suggestion");
+      setError(getSprintSuggestionErrorMessage(err));
     } finally {
       setRefiningPain(false);
     }
@@ -109,13 +105,9 @@ export function Day2Modal({
         field: "primary_outcome",
         current_value: primaryOutcome || undefined,
       });
-      if (res.source === "fallback") {
-        setError(res.reason ?? "AI suggestions are currently unavailable.");
-        return;
-      }
       setPrimaryOutcome(res.suggestion);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not get suggestion");
+      setError(getSprintSuggestionErrorMessage(err));
     } finally {
       setRefiningOutcome(false);
     }

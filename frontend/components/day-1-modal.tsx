@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { packs } from "@/api_requests/packs";
-import { sprintApi } from "@/api_requests/sprint";
+import { getSprintSuggestionErrorMessage, sprintApi } from "@/api_requests/sprint";
 import type { Pack } from "@/types/api-types";
 
 export function Day1Modal({
@@ -72,13 +72,9 @@ export function Day1Modal({
         field: "offer_one_liner",
         current_value: offerOneLiner || undefined,
       });
-      if (res.source === "fallback") {
-        setError(res.reason ?? "AI suggestions are currently unavailable.");
-        return;
-      }
       setOfferOneLiner(res.suggestion);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not get suggestion");
+      setError(getSprintSuggestionErrorMessage(err));
     } finally {
       setRefiningOffer(false);
     }

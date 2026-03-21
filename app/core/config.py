@@ -37,10 +37,10 @@ class Settings(BaseSettings):
     # App
     app_env: str = "development"
     secret_key: str = ""
-    cors_allow_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
+    cors_allow_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000","http://localhost:3001"]
     access_token_expiry_time: int = 60  # minutes
     refresh_token_expiry_days: int = 30
-    frontend_url: str = "http://localhost:3000"
+    frontend_url: str = "http://localhost:3001"
     google_oauth_client_id: str = ""
     # Optional: when set, published sites use subdomains (e.g. sites.klarnow.com → acme.sites.klarnow.com)
     sites_domain: str = ""

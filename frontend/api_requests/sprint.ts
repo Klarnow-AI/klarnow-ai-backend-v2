@@ -1,4 +1,4 @@
-import { api } from "@/lib/http";
+import { api, isAppRequestError } from "@/lib/http";
 import {
   dispatchPackRefresh,
   type PackRefreshScope,
@@ -33,6 +33,16 @@ export type SuggestFieldResponse = {
   source?: "ai" | "fallback";
   reason?: string | null;
 };
+
+export function getSprintSuggestionErrorMessage(error: unknown): string {
+  if (
+    isAppRequestError(error) &&
+    (error.kind === "service" || error.kind === "server")
+  ) {
+    return "Sprint AI suggestions are temporarily unavailable. Please try again.";
+  }
+  return error instanceof Error ? error.message : "Could not get suggestion";
+}
 
 type CompleteDayOptions = {
   suppressPackRefresh?: boolean;

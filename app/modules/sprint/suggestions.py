@@ -5,11 +5,28 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.errors import (
+    AppError,
+    BadGatewayError,
+    BadRequestError,
+    NotFoundError,
+    ServiceUnavailableError,
+)
+from app.core.logging import get_logger
 from app.modules.packs.models import Pack
 from app.shared.services.openai_compatible import (
     create_sync_openai_client,
     get_fast_model,
     has_openai_compatible_provider,
+)
+
+logger = get_logger("klarnow.sprint.suggestions")
+
+SPRINT_AI_UNAVAILABLE_MESSAGE = (
+    "Sprint AI suggestions are unavailable right now. Please try again shortly."
+)
+SPRINT_AI_TEMPORARY_FAILURE_MESSAGE = (
+    "Sprint AI suggestions are temporarily unavailable. Please try again."
 )
 
 
@@ -23,6 +40,34 @@ def _sprint_ai_unavailable_reason() -> str | None:
             "AI_SPRINT_FIELD_SUGGESTIONS_ENABLED=true and restart the backend."
         )
     return None
+
+
+def _require_sprint_ai_available() -> None:
+    reason = _sprint_ai_unavailable_reason()
+    if reason:
+        logger.warning("sprint_ai_unavailable | reason=%s", reason)
+        raise ServiceUnavailableError(SPRINT_AI_UNAVAILABLE_MESSAGE)
+
+
+def _map_sprint_ai_error(exc: Exception, *, field: str) -> AppError:
+    raw_message = str(exc).strip() or exc.__class__.__name__
+    lowered = raw_message.lower()
+
+    logger.warning(
+        "sprint_ai_request_failed | model=%s | field=%s | error=%s",
+        get_fast_model(),
+        field,
+        raw_message,
+    )
+
+    if (
+        "guardrail restrictions and data policy" in lowered
+        or "settings/privacy" in lowered
+    ):
+        return ServiceUnavailableError(SPRINT_AI_UNAVAILABLE_MESSAGE)
+    if "must be configured" in lowered or "not configured" in lowered:
+        return ServiceUnavailableError(SPRINT_AI_UNAVAILABLE_MESSAGE)
+    return BadGatewayError(SPRINT_AI_TEMPORARY_FAILURE_MESSAGE)
 
 
 def _pack_context_for_suggestions(pack: Pack) -> str:
@@ -64,85 +109,73 @@ def suggest_day_fields(db: Session, pack_id: UUID, day_number: int) -> dict:
     """
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
-        return _empty_day_response(
-            day_number,
-            source="fallback",
-            reason="Pack not found.",
-        )
+        raise NotFoundError("Pack not found")
 
     context = _pack_context_for_suggestions(pack)
-    unavailable_reason = _sprint_ai_unavailable_reason()
-    if unavailable_reason:
-        return _fallback_day_response(
-            day_number,
-            pack,
-            source="fallback",
-            reason=unavailable_reason,
-        )
+    _require_sprint_ai_available()
 
     client = create_sync_openai_client()
     if not client:
-        return _fallback_day_response(
-            day_number,
-            pack,
-            source="fallback",
-            reason="Sprint AI suggestions need OPENROUTER_API_KEY to be set.",
+        logger.warning(
+            "sprint_ai_client_unavailable | reason=%s",
+            "create_sync_openai_client returned None",
         )
+        raise ServiceUnavailableError(SPRINT_AI_UNAVAILABLE_MESSAGE)
 
-    if day_number == 1:
-        suggestion = _call_llm_single(
-            client,
-            context=context,
-            field_label="offer one-liner (one clear sentence: what you're selling)",
-            current_value=(pack.offer_one_liner or "").strip(),
-            instruction="Suggest a compelling one-sentence offer that someone can say yes or no to.",
-        )
-        return {
-            "offer_one_liner": suggestion or (pack.offer_one_liner or ""),
-            "source": "ai",
-            "reason": None,
-        }
+    try:
+        if day_number == 1:
+            suggestion = _call_llm_single(
+                client,
+                context=context,
+                field_label="offer one-liner (one clear sentence: what you're selling)",
+                current_value=(pack.offer_one_liner or "").strip(),
+                instruction="Suggest a compelling one-sentence offer that someone can say yes or no to.",
+                suppress_errors=False,
+            )
+            return {
+                "offer_one_liner": suggestion or (pack.offer_one_liner or ""),
+                "source": "ai",
+                "reason": None,
+            }
 
-    if day_number == 2:
-        pain = _call_llm_single(
-            client,
-            context=context,
-            field_label="primary pain point (main problem/frustration of target audience)",
-            current_value=(pack.primary_pain or "").strip(),
-            instruction="Suggest the main problem or frustration the target audience experiences.",
-        )
-        outcome = _call_llm_single(
-            client,
-            context=context,
-            field_label="primary outcome (desired result/transformation)",
-            current_value=(pack.primary_outcome or "").strip(),
-            instruction="Suggest the desired result or transformation they want.",
-        )
-        return {
-            "primary_pain": pain or (pack.primary_pain or ""),
-            "primary_outcome": outcome or (pack.primary_outcome or ""),
-            "source": "ai",
-            "reason": None,
-        }
+        if day_number == 2:
+            pain = _call_llm_single(
+                client,
+                context=context,
+                field_label="primary pain point (main problem/frustration of target audience)",
+                current_value=(pack.primary_pain or "").strip(),
+                instruction="Suggest the main problem or frustration the target audience experiences.",
+                suppress_errors=False,
+            )
+            outcome = _call_llm_single(
+                client,
+                context=context,
+                field_label="primary outcome (desired result/transformation)",
+                current_value=(pack.primary_outcome or "").strip(),
+                instruction="Suggest the desired result or transformation they want.",
+                suppress_errors=False,
+            )
+            return {
+                "primary_pain": pain or (pack.primary_pain or ""),
+                "primary_outcome": outcome or (pack.primary_outcome or ""),
+                "source": "ai",
+                "reason": None,
+            }
 
-    if day_number == 3:
-        offer = (pack.offer_one_liner or "").strip()
-        pain = (pack.primary_pain or "").strip()
-        outcome = (pack.primary_outcome or "").strip()
-        pitch = _call_llm_single(
-            client,
-            context=context,
-            field_label="pitch script (under 60 seconds: Hi [Name], I help [who] with [problem]...)",
-            current_value="",
-            instruction="Write a short pitch script (under 60 seconds) using the pack's offer, pain, and outcome. Template: Hi [Name], I help [who] with [problem]. Most people struggle with [pain], but we [solution]. Interested in [CTA]?",
-        )
-        return {"pitch_script": pitch or "", "source": "ai", "reason": None}
+        if day_number == 3:
+            pitch = _call_llm_single(
+                client,
+                context=context,
+                field_label="pitch script (under 60 seconds: Hi [Name], I help [who] with [problem]...)",
+                current_value="",
+                instruction="Write a short pitch script (under 60 seconds) using the pack's offer, pain, and outcome. Template: Hi [Name], I help [who] with [problem]. Most people struggle with [pain], but we [solution]. Interested in [CTA]?",
+                suppress_errors=False,
+            )
+            return {"pitch_script": pitch or "", "source": "ai", "reason": None}
+    except Exception as exc:
+        raise _map_sprint_ai_error(exc, field=f"day_{day_number}_suggestion") from exc
 
-    return _empty_day_response(
-        day_number,
-        source="fallback",
-        reason="Unsupported sprint day.",
-    )
+    raise BadRequestError(f"Unsupported sprint day: {day_number}.")
 
 
 def _call_llm_single(
@@ -179,57 +212,16 @@ Respond with ONLY the suggested value. No explanation, no markdown, no quotes ar
             max_tokens=500,
         )
         return (r.choices[0].message.content or "").strip() or current_value
-    except Exception:
+    except Exception as exc:
         if not suppress_errors:
             raise
+        logger.warning(
+            "sprint_field_llm_failed | model=%s | field=%s | error=%s",
+            get_fast_model(),
+            field_label,
+            str(exc),
+        )
         return current_value
-
-
-def _empty_day_response(
-    day_number: int,
-    *,
-    source: str = "fallback",
-    reason: str | None = None,
-) -> dict:
-    if day_number == 1:
-        return {"offer_one_liner": "", "source": source, "reason": reason}
-    if day_number == 2:
-        return {
-            "primary_pain": "",
-            "primary_outcome": "",
-            "source": source,
-            "reason": reason,
-        }
-    if day_number == 3:
-        return {"pitch_script": "", "source": source, "reason": reason}
-    return {}
-
-
-def _fallback_day_response(
-    day_number: int,
-    pack: Pack,
-    *,
-    source: str = "fallback",
-    reason: str | None = None,
-) -> dict:
-    """When API key is missing, return current pack values where applicable."""
-    if day_number == 1:
-        return {
-            "offer_one_liner": (pack.offer_one_liner or "").strip(),
-            "source": source,
-            "reason": reason,
-        }
-    if day_number == 2:
-        return {
-            "primary_pain": (pack.primary_pain or "").strip(),
-            "primary_outcome": (pack.primary_outcome or "").strip(),
-            "source": source,
-            "reason": reason,
-        }
-    if day_number == 3:
-        return {"pitch_script": "", "source": source, "reason": reason}
-    return _empty_day_response(day_number, source=source, reason=reason)
-
 
 SPRINT_DAY_FIELDS = {"offer_one_liner", "primary_pain", "primary_outcome", "pitch_script"}
 
@@ -332,36 +324,22 @@ def suggest_sprint_field(
     """
     current = (current_value or "").strip()
     if field not in SPRINT_DAY_FIELDS:
-        return {
-            "suggestion": current,
-            "source": "fallback",
-            "reason": f"Unsupported sprint field: {field}.",
-        }
+        raise BadRequestError(f"Unsupported sprint field: {field}.")
 
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
-        return {
-            "suggestion": current,
-            "source": "fallback",
-            "reason": "Pack not found.",
-        }
+        raise NotFoundError("Pack not found")
 
     context = _pack_context_for_suggestions(pack)
-    unavailable_reason = _sprint_ai_unavailable_reason()
-    if unavailable_reason:
-        return {
-            "suggestion": current,
-            "source": "fallback",
-            "reason": unavailable_reason,
-        }
+    _require_sprint_ai_available()
 
     client = create_sync_openai_client()
     if not client:
-        return {
-            "suggestion": current,
-            "source": "fallback",
-            "reason": "Sprint AI suggestions need OPENROUTER_API_KEY to be set.",
-        }
+        logger.warning(
+            "sprint_ai_client_unavailable | reason=%s",
+            "create_sync_openai_client returned None",
+        )
+        raise ServiceUnavailableError(SPRINT_AI_UNAVAILABLE_MESSAGE)
 
     labels = {
         "offer_one_liner": "offer one-liner (one clear sentence: what you're selling)",
@@ -385,12 +363,8 @@ def suggest_sprint_field(
             instruction=instructions.get(field, "Suggest a value for this field."),
             suppress_errors=False,
         )
-    except Exception:
-        return {
-            "suggestion": current,
-            "source": "fallback",
-            "reason": "Sprint AI suggestions are temporarily unavailable. Please try again.",
-        }
+    except Exception as exc:
+        raise _map_sprint_ai_error(exc, field=field) from exc
 
     return {
         "suggestion": suggestion,
