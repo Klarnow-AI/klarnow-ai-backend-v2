@@ -192,6 +192,10 @@ function buildBrandContext(pack: Pack, brand: BrandOS | null): BrandContext {
   return {
     brandName: pack.brand_name ?? foundation?.brand_name ?? undefined,
     industry: foundation?.brand_industry ?? undefined,
+    targetAudience: pack.target_audience ?? undefined,
+    mainAudience: foundation?.main_audience?.length
+      ? foundation.main_audience
+      : undefined,
     coreOffer: pack.offer_one_liner ?? foundation?.one_line_offer ?? undefined,
     primaryCta: pack.primary_cta ?? undefined,
     primaryPain: pack.primary_pain ?? undefined,
@@ -206,8 +210,12 @@ function buildBrandContext(pack: Pack, brand: BrandOS | null): BrandContext {
         ? palette
         : undefined,
     fonts: fonts.length > 0 ? fonts : undefined,
+    brandPurpose: foundation?.brand_purpose?.length
+      ? foundation.brand_purpose
+      : undefined,
     mission: bs?.mission_vision?.mission ?? undefined,
     vision: bs?.mission_vision?.vision ?? undefined,
+    promise: bs?.mission_vision?.promise ?? undefined,
     elevatorPitch: bs?.core_messaging_hierarchy?.elevator_pitch ?? undefined,
     proofPoints: bs?.core_messaging_hierarchy?.proof_points?.length
       ? bs.core_messaging_hierarchy.proof_points
@@ -220,9 +228,17 @@ function buildBrandContext(pack: Pack, brand: BrandOS | null): BrandContext {
         }))
       : undefined,
     voiceArchetype: bs?.voice_personality?.archetype ?? undefined,
+    voiceTraits: bs?.voice_personality?.profile?.length
+      ? bs.voice_personality.profile
+      : undefined,
     designCues: bs?.style_direction_seeds?.design_cues?.length
       ? bs.style_direction_seeds.design_cues
       : undefined,
+    stylePalette: bs?.style_direction_seeds?.palette?.length
+      ? bs.style_direction_seeds.palette
+      : undefined,
+    typographyDirection:
+      bs?.style_direction_seeds?.typography ?? undefined,
   };
 }
 
@@ -323,7 +339,6 @@ export default function WebsiteModule() {
         </div>
         <ExportButton />
       </div>
-
       {isDesktop ? (
         <ResizableLayout brandContext={brandContext} packName={packName} />
       ) : (

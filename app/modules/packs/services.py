@@ -19,6 +19,8 @@ _STEP_2_FINALIZATION_IGNORED_ANSWER_KEYS = {
     "_starter_brand_input_fingerprint",
     "_onboarding_brand_os_input_fingerprint",
     "_final_logo_input_fingerprint",
+    "generated_logo_url",
+    "transparent_logo_url",
     "wordmark_svg_or_url",
     "palette",
     "starter_brand_job_id",
@@ -300,6 +302,15 @@ def _append_suggested_logo(pack: Pack, logo_url_or_svg: str) -> Pack:
     return pack
 
 
+def _append_suggested_logos(pack: Pack, logo_urls_or_svgs: list[str]) -> Pack:
+    for logo_url_or_svg in logo_urls_or_svgs:
+        text = str(logo_url_or_svg or "").strip()
+        if not text:
+            continue
+        _append_suggested_logo(pack, text)
+    return pack
+
+
 @log_service_action()
 def merge_onboarding_answers(
     db: Session,
@@ -324,6 +335,20 @@ def append_suggested_logo(
 ) -> Pack:
     """Append a logo URL (or SVG/data URL) to suggested_logos in onboarding_answers, cap at SUGGESTED_LOGOS_MAX."""
     _append_suggested_logo(pack, logo_url_or_svg)
+    if commit:
+        db.commit()
+    return pack
+
+
+def append_suggested_logos(
+    db: Session,
+    pack: Pack,
+    logo_urls_or_svgs: list[str],
+    *,
+    commit: bool = True,
+) -> Pack:
+    """Append multiple logo assets to suggested_logos, skipping blank values."""
+    _append_suggested_logos(pack, logo_urls_or_svgs)
     if commit:
         db.commit()
     return pack

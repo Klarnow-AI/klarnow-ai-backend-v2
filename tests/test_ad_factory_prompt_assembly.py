@@ -10,7 +10,15 @@ from app.modules.ad_factory.engines.engine4_script_converter import run as run_e
 from app.modules.ad_factory.engines.engine5_visual_director import run as run_engine5
 from app.modules.ad_factory.engines.engine6_kling_assembler import run as run_engine6
 from app.modules.ad_factory.kling_adapter import build_kling_prompt, build_kling_request
-from app.modules.ad_factory.schemas import BrandBrief, CTADestination, PackSnapshot, ProofAsset
+from app.modules.ad_factory.schemas import (
+    BrandBrief,
+    BrandContextAudiencePersona,
+    BrandContextColorPalette,
+    BrandContextSnapshot,
+    CTADestination,
+    PackSnapshot,
+    ProofAsset,
+)
 
 
 def _brand_brief() -> BrandBrief:
@@ -19,6 +27,7 @@ def _brand_brief() -> BrandBrief:
         offer="professional teeth whitening",
         audience="busy professionals",
         location="London",
+        primary_pain="yellowing that shows up in every meeting",
         primary_outcome="a brighter smile",
         proof_assets=[ProofAsset(asset_type="testimonial", label="5-star reviews")],
         tone="direct",
@@ -31,6 +40,34 @@ def _brand_brief() -> BrandBrief:
         ),
         usp="Dentist-led whitening with natural-looking results",
         core_concept="Smile reset",
+        hero_angle="specialist_precision",
+        brand_context=BrandContextSnapshot(
+            mission="Help professionals feel camera-ready without overdone cosmetic work.",
+            promise="Natural-looking whitening delivered with specialist care.",
+            elevator_pitch="Glow Clinic gives busy professionals a fast, confidence-building smile reset.",
+            proof_points=["1,200+ whitening treatments completed", "5-star local reviews"],
+            audience_personas=[
+                BrandContextAudiencePersona(
+                    persona="Image-conscious professionals",
+                    needs=["look polished for meetings and events"],
+                    pain_points=["yellowing that shows up in every meeting"],
+                )
+            ],
+            voice_archetype="calm authority",
+            voice_traits=["warm", "expert", "reassuring"],
+            design_cues=[
+                "clean editorial lighting",
+                "natural close-ups",
+                "premium clinic realism",
+            ],
+            style_palette=["soft neutrals", "polished whites", "subtle navy"],
+            typography_direction="Modern sans with elegant serif support",
+            color_palette=BrandContextColorPalette(
+                primary="#0B1020",
+                secondary="#F6F1E8",
+                accent="#C7A46A",
+            ),
+        ),
     )
 
 
@@ -68,6 +105,8 @@ class AdFactoryPromptAssemblyTests(unittest.TestCase):
         self.assertTrue(all(shot.caption_overlay["enabled"] for shot in first_variant_shots))
         self.assertTrue(all(shot.lineage.source_registry_item_id.startswith("pattern_") for shot in first_variant_shots))
         self.assertIn("Avoid factories", first_variant_shots[0].nanobanana_prompt)
+        self.assertIn("clean editorial lighting", first_variant_shots[0].nanobanana_prompt)
+        self.assertIn("#0B1020", first_variant_shots[0].nanobanana_prompt)
 
     def test_render_intent_stays_provider_neutral_until_adapter(self) -> None:
         brand_brief = _brand_brief()
@@ -94,6 +133,9 @@ class AdFactoryPromptAssemblyTests(unittest.TestCase):
         self.assertEqual(len(intent.anchor_frames), 5)
         self.assertIn("Glow Clinic", prompt)
         self.assertIn("professional teeth whitening", prompt)
+        self.assertIn("Brand context:", prompt)
+        self.assertIn("clean editorial lighting", prompt)
+        self.assertIn("yellowing that shows up in every meeting", prompt)
         self.assertIn("Narration should say exactly", prompt)
         self.assertEqual(request["aspect_ratio"], "9:16")
         self.assertEqual(request["duration"], 10)

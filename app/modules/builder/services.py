@@ -3,6 +3,8 @@
 import json
 import re
 from datetime import datetime, timezone
+from html import escape
+from urllib.parse import quote
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -10,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.logging import log_service_action
 from app.core.storage import delete_file, download_file, storage_enabled, upload_file
 from app.modules.builder.models import BuilderProject
+from app.shared.generation_schemas import GenerationBrandContext
 
 # Subdomains that must not be used (reserved or ambiguous)
 _RESERVED_SUBDOMAINS = frozenset({"www", "api", "app", "admin", "mail", "ftp", "staging"})
@@ -38,6 +41,39 @@ def _strip_exports(code: str, fallback_name: str | None = None) -> str:
     code = re.sub(r"export\s+let\s+", "let ", code)
     code = re.sub(r"export\s+var\s+", "var ", code)
     return code
+
+
+def _inject_head_tag(header: str, tag: str) -> str:
+    return header.replace("</head>", f"{tag}\n</head>", 1)
+
+
+def _svg_to_data_uri(svg_markup: str) -> str:
+    return "data:image/svg+xml;charset=utf-8," + quote(
+        svg_markup,
+        safe="/:;,+-_=?.!~*'()#[]@&$",
+    )
+
+
+def build_site_shell_meta(
+    brand_context: GenerationBrandContext | None,
+    *,
+    fallback_title: str,
+) -> dict[str, str]:
+    title = (brand_context.brand_name if brand_context else None) or fallback_title or "Website"
+    favicon_href = ""
+    if brand_context:
+        if brand_context.logo_markup:
+            favicon_href = _svg_to_data_uri(brand_context.logo_markup.strip())
+        elif brand_context.logo_url:
+            favicon_href = brand_context.logo_url.strip()
+    theme_color = ""
+    if brand_context and brand_context.color_palette and brand_context.color_palette.primary:
+        theme_color = brand_context.color_palette.primary.strip()
+    return {
+        "site_title": title,
+        "favicon_href": favicon_href,
+        "theme_color": theme_color,
+    }
 
 
 _DEPLOY_HEADER = """\
@@ -88,6 +124,9 @@ def build_deploy_html(
     files: dict,
     project_id: str | None = None,
     lead_url: str | None = None,
+    site_title: str | None = None,
+    favicon_href: str | None = None,
+    theme_color: str | None = None,
 ) -> str:
     """Build a self-contained HTML page from a dict of project files.
     If lead_url is set (e.g. /lead for subdomain), use it; else use /p/{project_id}/lead when project_id is set.
@@ -111,12 +150,27 @@ def build_deploy_html(
 
     # Inject the lead capture URL so any form in the page can POST to it.
     header = _DEPLOY_HEADER
+    if site_title:
+        header = _inject_head_tag(header, f"  <title>{escape(site_title)}</title>")
+    if favicon_href:
+        safe_favicon_href = escape(favicon_href, quote=True)
+        header = _inject_head_tag(header, f'  <link rel="icon" href="{safe_favicon_href}" />')
+        header = _inject_head_tag(header, f'  <link rel="apple-touch-icon" href="{safe_favicon_href}" />')
+    if theme_color:
+        header = _inject_head_tag(
+            header,
+            f'  <meta name="theme-color" content="{escape(theme_color, quote=True)}" />',
+        )
     if lead_url:
-        lead_tag = f'  <script>window.KLARO_LEAD_URL="{lead_url}";</script>\n'
-        header = header.replace("</head>", lead_tag + "</head>", 1)
+        header = _inject_head_tag(
+            header,
+            f'  <script>window.KLARO_LEAD_URL="{escape(lead_url, quote=True)}";</script>',
+        )
     elif project_id:
-        lead_tag = f'  <script>window.KLARO_LEAD_URL="/p/{project_id}/lead";</script>\n'
-        header = header.replace("</head>", lead_tag + "</head>", 1)
+        header = _inject_head_tag(
+            header,
+            f'  <script>window.KLARO_LEAD_URL="/p/{escape(project_id, quote=True)}/lead";</script>',
+        )
 
     return header + escaped + _DEPLOY_FOOTER
 
@@ -151,7 +205,11 @@ def _decode_json_bytes(raw: bytes | None) -> dict | None:
     return decoded if isinstance(decoded, dict) else None
 
 
-def load_published_html(*, project_id: UUID | str | None = None, subdomain: str | None = None) -> str | None:
+def load_published_html(
+    *,
+    project_id: UUID | str | None = None,
+    subdomain: str | None = None,
+) -> str | None:
     if not storage_enabled():
         return None
     key: str | None = None
@@ -202,18 +260,31 @@ def publish_project_artifacts(
     *,
     lead_url: str,
     previous_subdomain_slug: str | None = None,
+    site_meta: dict[str, str] | None = None,
 ) -> bool:
     """Persist public HTML + metadata to object storage. Returns False when storage is unavailable."""
     if not storage_enabled():
         return False
 
     files = dict(project.files or {})
-    html = build_deploy_html(files, project_id=str(project.id), lead_url=lead_url)
+    page_meta = site_meta or {}
+    html = build_deploy_html(
+        files,
+        project_id=str(project.id),
+        lead_url=lead_url,
+        site_title=page_meta.get("site_title"),
+        favicon_href=page_meta.get("favicon_href"),
+        theme_color=page_meta.get("theme_color"),
+    )
     metadata = json.dumps(
         {
             "project_id": str(project.id),
             "pack_id": str(project.pack_id),
             "subdomain_slug": project.subdomain_slug,
+            "lead_url": lead_url,
+            "site_title": page_meta.get("site_title"),
+            "favicon_href": page_meta.get("favicon_href"),
+            "theme_color": page_meta.get("theme_color"),
             "published_at": (
                 project.published_at.isoformat() if project.published_at else datetime.now(timezone.utc).isoformat()
             ),
@@ -431,7 +502,6 @@ def slug_from_name(name: str) -> str:
     if not s:
         return "site"
     return s[: _SUBDOMAIN_MAX_LEN] if len(s) > _SUBDOMAIN_MAX_LEN else s
-
 
 @log_service_action()
 def ensure_unique_subdomain_slug(

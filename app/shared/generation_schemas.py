@@ -27,6 +27,8 @@ class GenerationBrandContext(BaseModel):
 
     brand_name: str | None = None
     industry: str | None = None
+    target_audience: str | None = None
+    main_audience: list[str] | None = None
     core_offer: str | None = None
     primary_cta: str | None = None
     primary_pain: str | None = None
@@ -38,10 +40,15 @@ class GenerationBrandContext(BaseModel):
     logo_markup: str | None = None
     color_palette: GenerationColorPalette | None = None
     fonts: list[str] | None = None
+    brand_purpose: list[str] | None = None
     mission: str | None = None
     vision: str | None = None
+    promise: str | None = None
     elevator_pitch: str | None = None
     proof_points: list[str] | None = None
     audience_personas: list[GenerationAudiencePersona] | None = None
     voice_archetype: str | None = None
+    voice_traits: list[str] | None = None
     design_cues: list[str] | None = None
+    style_palette: list[str] | None = None
+    typography_direction: str | None = None

@@ -51,6 +51,7 @@ from app.modules.packs.schemas import (
 from app.modules.packs.services import (
     archive_pack,
     append_suggested_logo,
+    append_suggested_logos,
     build_onboarding_context,
     build_step_2_finalization_payload,
     complete_onboarding,
@@ -69,7 +70,11 @@ from app.modules.packs.services import (
     sync_pack_target_audience,
 )
 from app.modules.packs.onboarding_services import extract_brand, generate_starter_brand
-from app.modules.packs.logo_generation import generate_logo
+from app.modules.packs.logo_generation import (
+    generate_logo,
+    get_logo_primary_asset_url,
+    get_logo_variant_urls,
+)
 from app.modules.packs.brand_identity_suggestions import suggest_typography, suggest_palette
 from app.modules.packs.onboarding_jobs import (
     get_onboarding_job_status,
@@ -657,12 +662,19 @@ def complete_onboarding_route(
                 pack_id=str(pack_id),
             )
             wordmark = starter_brand_result["wordmark_svg_or_url"]
-            pack = append_suggested_logo(db, pack, wordmark, commit=False)
+            pack = append_suggested_logos(
+                db,
+                pack,
+                get_logo_variant_urls(starter_brand_result) or [wordmark],
+                commit=False,
+            )
             pack = merge_onboarding_answers(
                 db,
                 pack,
                 {
                     "wordmark_svg_or_url": wordmark,
+                    "generated_logo_url": starter_brand_result.get("logo_url"),
+                    "transparent_logo_url": starter_brand_result.get("transparent_logo_url"),
                     "palette": starter_brand_result["palette"],
                 },
                 commit=False,
@@ -670,6 +682,8 @@ def complete_onboarding_route(
             starter_brand_response = GenerateStarterBrandResponse(
                 wordmark_svg_or_url=wordmark,
                 palette=starter_brand_result["palette"],
+                logo_url=starter_brand_result.get("logo_url"),
+                transparent_logo_url=starter_brand_result.get("transparent_logo_url"),
             )
             cached["starter_brand"] = starter_brand_response.model_dump()
             set_step_2_finalization_cache(pack, cached)
@@ -694,11 +708,26 @@ def complete_onboarding_route(
                 brand_os_summary=_build_brand_os_summary_text(brand_os_row),
                 color_palette=palette,
             )
-            logo_url = logo_result.get("logo_url") or logo_result.get("wordmark_svg_or_url") or ""
-            pack = append_suggested_logo(db, pack, logo_url, commit=False)
+            logo_url = logo_result.get("logo_url") or get_logo_primary_asset_url(logo_result) or ""
+            pack = append_suggested_logos(
+                db,
+                pack,
+                get_logo_variant_urls(logo_result),
+                commit=False,
+            )
+            pack = merge_onboarding_answers(
+                db,
+                pack,
+                {
+                    "generated_logo_url": logo_result.get("logo_url"),
+                    "transparent_logo_url": logo_result.get("transparent_logo_url"),
+                },
+                commit=False,
+            )
             logo_response = GenerateLogoResponse(
                 logo_url=logo_url,
                 wordmark_svg_or_url=logo_result.get("wordmark_svg_or_url"),
+                transparent_logo_url=logo_result.get("transparent_logo_url"),
             )
             cached["logo"] = logo_response.model_dump()
             set_step_2_finalization_cache(pack, cached)
@@ -791,12 +820,19 @@ def generate_starter_brand_route(
         pack_id=str(pack_id),
     )
     wordmark = result["wordmark_svg_or_url"]
-    pack = append_suggested_logo(db, pack, wordmark, commit=False)
+    pack = append_suggested_logos(
+        db,
+        pack,
+        get_logo_variant_urls(result) or [wordmark],
+        commit=False,
+    )
     pack = merge_onboarding_answers(
         db,
         pack,
         {
             "wordmark_svg_or_url": wordmark,
+            "generated_logo_url": result.get("logo_url"),
+            "transparent_logo_url": result.get("transparent_logo_url"),
             "palette": result["palette"],
         },
         commit=False,
@@ -805,6 +841,8 @@ def generate_starter_brand_route(
     return GenerateStarterBrandResponse(
         wordmark_svg_or_url=wordmark,
         palette=result["palette"],
+        logo_url=result.get("logo_url"),
+        transparent_logo_url=result.get("transparent_logo_url"),
     )
 
 
@@ -873,12 +911,27 @@ def generate_logo_route(
         brand_os_summary=body.brand_os_summary,
         color_palette=color_palette,
     )
-    logo_url = result.get("logo_url") or result.get("wordmark_svg_or_url") or ""
-    pack = append_suggested_logo(db, pack, logo_url, commit=False)
+    logo_url = result.get("logo_url") or get_logo_primary_asset_url(result) or ""
+    pack = append_suggested_logos(
+        db,
+        pack,
+        get_logo_variant_urls(result),
+        commit=False,
+    )
+    pack = merge_onboarding_answers(
+        db,
+        pack,
+        {
+            "generated_logo_url": result.get("logo_url"),
+            "transparent_logo_url": result.get("transparent_logo_url"),
+        },
+        commit=False,
+    )
     db.commit()
     return GenerateLogoResponse(
         logo_url=logo_url,
         wordmark_svg_or_url=result.get("wordmark_svg_or_url"),
+        transparent_logo_url=result.get("transparent_logo_url"),
     )
 @router.post(
     "/{pack_id}/brand-identity/suggest-typography",

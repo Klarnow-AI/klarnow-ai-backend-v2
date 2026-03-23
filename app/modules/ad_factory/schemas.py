@@ -44,11 +44,48 @@ class CTADestination(BaseModel):
     value: str = Field(..., min_length=3, max_length=2048)
 
 
+class BrandContextColorPalette(BaseModel):
+    primary: str | None = Field(None, max_length=32)
+    secondary: str | None = Field(None, max_length=32)
+    accent: str | None = Field(None, max_length=32)
+
+
+class BrandContextAudiencePersona(BaseModel):
+    persona: str = Field(..., min_length=1, max_length=120)
+    needs: list[str] = Field(default_factory=list, max_length=4)
+    pain_points: list[str] = Field(default_factory=list, max_length=4)
+
+
+class BrandContextSnapshot(BaseModel):
+    industry: str | None = Field(None, max_length=120)
+    main_audience: list[str] = Field(default_factory=list, max_length=4)
+    primary_pain: str | None = Field(None, max_length=240)
+    hero_angle: str | None = Field(None, max_length=120)
+    usp_proof: str | None = Field(None, max_length=240)
+    brand_purpose: list[str] = Field(default_factory=list, max_length=4)
+    mission: str | None = Field(None, max_length=240)
+    vision: str | None = Field(None, max_length=240)
+    promise: str | None = Field(None, max_length=240)
+    elevator_pitch: str | None = Field(None, max_length=320)
+    proof_points: list[str] = Field(default_factory=list, max_length=4)
+    audience_personas: list[BrandContextAudiencePersona] = Field(
+        default_factory=list,
+        max_length=3,
+    )
+    voice_archetype: str | None = Field(None, max_length=120)
+    voice_traits: list[str] = Field(default_factory=list, max_length=5)
+    design_cues: list[str] = Field(default_factory=list, max_length=5)
+    style_palette: list[str] = Field(default_factory=list, max_length=5)
+    typography_direction: str | None = Field(None, max_length=200)
+    color_palette: BrandContextColorPalette | None = None
+
+
 class BrandBrief(BaseModel):
     business_name: str = Field(..., min_length=2, max_length=120)
     offer: str = Field(..., min_length=2, max_length=240)
     audience: str = Field(..., min_length=2, max_length=180)
     location: str = Field(..., min_length=2, max_length=120)
+    primary_pain: str | None = Field(None, max_length=180)
     primary_outcome: str = Field(..., min_length=2, max_length=180)
     proof_assets: list[ProofAsset] = Field(default_factory=list)
     tone: Literal["direct", "calm", "bold", "friendly", "luxury", "playful"]
@@ -58,6 +95,8 @@ class BrandBrief(BaseModel):
     cta_destination: CTADestination
     usp: str | None = Field(None, max_length=240)
     core_concept: str | None = Field(None, max_length=120)
+    hero_angle: str | None = Field(None, max_length=120)
+    brand_context: BrandContextSnapshot | None = None
 
 
 class PackSnapshot(BaseModel):
@@ -169,8 +208,11 @@ class ProviderNeutralRenderIntent(BaseModel):
     business_name: str = Field(..., min_length=1, max_length=120)
     offer: str = Field(..., min_length=1, max_length=240)
     audience: str = Field(..., min_length=1, max_length=180)
+    primary_pain: str | None = Field(None, max_length=180)
     primary_outcome: str = Field(..., min_length=1, max_length=180)
     proof_line: str = Field(..., min_length=1, max_length=180)
+    brand_context_summary: str | None = Field(None, max_length=600)
+    visual_direction: str | None = Field(None, max_length=600)
 
 
 class Engine0PackContextOutput(BaseModel):

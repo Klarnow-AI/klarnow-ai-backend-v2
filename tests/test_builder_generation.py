@@ -9,12 +9,33 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test-builder-generation.db")
 from app.modules.builder import generation as builder_generation
 from app.modules.builder.generation import (
     _DEFAULT_APP_MARKER,
+    build_system_prompt,
     create_website_generation_stream,
 )
-from app.shared.generation_schemas import GenerationMessage
+from app.shared.generation_schemas import GenerationBrandContext, GenerationMessage
 
 
 class BuilderGenerationTests(unittest.IsolatedAsyncioTestCase):
+    def test_system_prompt_includes_brand_context_and_mode(self) -> None:
+        prompt = build_system_prompt(
+            files={"/App.tsx": "export default function App() { return <main />; }"},
+            brand_context=GenerationBrandContext(
+                brand_name="Northstar Studio",
+                target_audience="Founders launching premium service businesses",
+                promise="Launch with clarity and confidence",
+                design_cues=["editorial", "high contrast"],
+                style_palette=["sand", "graphite"],
+                typography_direction="Refined sans with dramatic display moments",
+            ),
+            selected_style="luxury",
+            assistant_mode="polish",
+        )
+
+        self.assertIn("ASSISTANT MODE: POLISH", prompt)
+        self.assertIn("Brand promise: Launch with clarity and confidence", prompt)
+        self.assertIn("Target audience: Founders launching premium service businesses", prompt)
+        self.assertIn("Typography direction: Refined sans with dramatic display moments", prompt)
+
     async def test_discovery_mode_uses_builder_model(self) -> None:
         async def fake_create_text_stream(**kwargs):
             self.assertEqual(kwargs["max_tokens"], 8192)

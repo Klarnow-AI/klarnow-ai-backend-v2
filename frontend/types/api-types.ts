@@ -726,6 +726,8 @@ export type GenerateStarterBrandResponse = {
     accent?: string;
     [key: string]: string | undefined;
   };
+  logo_url?: string | null;
+  transparent_logo_url?: string | null;
 };
 
 export type GenerateLogoBody = {
@@ -744,6 +746,7 @@ export type GenerateLogoBody = {
 export type GenerateLogoResponse = {
   logo_url: string;
   wordmark_svg_or_url?: string | null;
+  transparent_logo_url?: string | null;
 };
 
 export type UploadLogoResponse = {
@@ -840,6 +843,7 @@ export type BuilderProject = {
   messages: Array<{ role: string; content: string; files_snapshot?: Record<string, string> }>;
   published_files?: Record<string, string> | null;
   live_url: string | null;
+  subdomain_slug?: string | null;
   published_at: string | null;
   created_at: string;
   updated_at: string;

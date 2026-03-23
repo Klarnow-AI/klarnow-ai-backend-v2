@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { builder } from "@/api_requests/builder";
+import type { BuilderAssistantMode } from "@/types/generation";
 
 const DEFAULT_APP = `export default function App() {
   return (
@@ -41,6 +42,7 @@ const initialProjectState = {
   publishedFiles: null as Record<string, string> | null,
   isGenerating: false,
   selectedStyle: null as string | null,
+  selectedAssistantMode: "launch" as BuilderAssistantMode,
   liveUrl: null as string | null,
   fileHistory: [] as Array<Record<string, string>>,
 };
@@ -49,6 +51,7 @@ type ProjectState = typeof initialProjectState & {
   setActivePack: (packId: string) => void;
   setProjectId: (id: string) => void;
   setSelectedStyle: (style: string) => void;
+  setSelectedAssistantMode: (mode: BuilderAssistantMode) => void;
   setLiveUrl: (url: string | null) => void;
   hydrate: (data: {
     files: Record<string, string>;
@@ -80,6 +83,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       messages: [],
       isGenerating: false,
       selectedStyle: null,
+      selectedAssistantMode: "launch",
       liveUrl: null,
       publishedFiles: null,
       fileHistory: [],
@@ -89,6 +93,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   setProjectId: (id) => set({ projectId: id }),
 
   setSelectedStyle: (style) => set({ selectedStyle: style }),
+
+  setSelectedAssistantMode: (mode) => set({ selectedAssistantMode: mode }),
 
   setLiveUrl: (url) => set({ liveUrl: url }),
 

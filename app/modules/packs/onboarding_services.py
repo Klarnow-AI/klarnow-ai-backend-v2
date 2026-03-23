@@ -185,10 +185,15 @@ def generate_starter_brand(
     palette = _call_openai_palette(brand_name, vibe_chips, onboarding_context)
 
     logo_url: str | None = None
+    default_logo_url: str | None = None
+    transparent_logo_url: str | None = None
     if pack_id:
         chips_str = ", ".join(vibe_chips) if vibe_chips else "professional, modern"
         try:
-            from app.modules.packs.logo_generation import generate_logo
+            from app.modules.packs.logo_generation import (
+                generate_logo,
+                get_logo_primary_asset_url,
+            )
 
             result = generate_logo(
                 brand_name=brand_name,
@@ -199,11 +204,20 @@ def generate_starter_brand(
                 color_palette=palette,
                 strict=False,
             )
-            logo_url = result.get("logo_url") or result.get("wordmark_svg_or_url")
+            default_logo_url = result.get("logo_url")
+            transparent_logo_url = (
+                result.get("transparent_logo_url") or result.get("wordmark_svg_or_url")
+            )
+            logo_url = get_logo_primary_asset_url(result)
         except BadRequestError as e:
             logger.info("starter brand logo generation unavailable, using placeholder: %s", e)
         except Exception as e:
             logger.warning("starter brand logo generation failed: %s", e, exc_info=True)
 
     wordmark = logo_url or PLACEHOLDER_LOGO_URL
-    return {"wordmark_svg_or_url": wordmark, "palette": palette}
+    return {
+        "wordmark_svg_or_url": wordmark,
+        "palette": palette,
+        "logo_url": default_logo_url,
+        "transparent_logo_url": transparent_logo_url,
+    }

@@ -14,6 +14,11 @@ def _clip(text: str, limit: int) -> str:
     return " ".join(text.split())[:limit]
 
 
+def _sentence_fragment(text: str | None, fallback: str) -> str:
+    normalized = " ".join((text or "").split()).strip()
+    return (normalized or fallback).rstrip(".")
+
+
 def run(
     brand_brief: BrandBrief,
     engine0_output: Engine0PackContextOutput,
@@ -24,14 +29,27 @@ def run(
         selection_seed=selection_seed,
     )
     summary = (
-        f"{brand_brief.business_name} helps {brand_brief.audience} achieve "
-        f"{brand_brief.primary_outcome} with {brand_brief.offer}."
+        brand_brief.brand_context.elevator_pitch
+        if brand_brief.brand_context and brand_brief.brand_context.elevator_pitch
+        else (
+            f"{brand_brief.business_name} helps {brand_brief.audience} achieve "
+            f"{brand_brief.primary_outcome} with {brand_brief.offer}."
+        )
+    )
+    primary_pain = _sentence_fragment(
+        brand_brief.primary_pain,
+        f"{brand_brief.primary_outcome.lower()} feeling far away",
+    )
+    proof_point = (
+        brand_brief.brand_context.proof_points[0]
+        if brand_brief.brand_context and brand_brief.brand_context.proof_points
+        else ""
     )
 
     pains = [
-        f"{brand_brief.audience} are tired of {brand_brief.primary_outcome.lower()} feeling far away.",
+        f"{brand_brief.audience} are tired of {primary_pain.lower()}.",
         f"{brand_brief.offer} feels harder to trust when {engine0_output.awareness_level.replace('_', ' ')}.",
-        "Slow progress keeps draining time, energy, and confidence.",
+        f"Without a clear system, {brand_brief.primary_outcome.lower()} keeps taking too much time and energy.",
     ]
     outcomes = [
         brand_brief.primary_outcome,
@@ -40,7 +58,7 @@ def run(
     ]
     differentiators = [
         brand_brief.usp or brand_brief.offer,
-        f"{brand_brief.tone} delivery for {brand_brief.audience}",
+        proof_point or f"{brand_brief.tone} delivery for {brand_brief.audience}",
         f"{engine0_output.objective_type.replace('_', ' ')} focused structure",
     ]
 

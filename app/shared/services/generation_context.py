@@ -111,9 +111,29 @@ def build_generation_brand_context(pack: Pack, brand_os=None) -> GenerationBrand
         for item in messaging.get("proof_points") or []
         if str(item).strip()
     ]
+    brand_purpose = [
+        str(item).strip()
+        for item in foundation.get("brand_purpose") or []
+        if str(item).strip()
+    ]
+    main_audience = [
+        str(item).strip()
+        for item in foundation.get("main_audience") or []
+        if str(item).strip()
+    ]
     design_cues = [
         str(item).strip()
         for item in style.get("design_cues") or []
+        if str(item).strip()
+    ]
+    style_palette = [
+        str(item).strip()
+        for item in style.get("palette") or []
+        if str(item).strip()
+    ]
+    voice_traits = [
+        str(item).strip()
+        for item in voice.get("profile") or []
         if str(item).strip()
     ]
     fonts = _json_list(onboarding.get("fonts"))
@@ -125,6 +145,8 @@ def build_generation_brand_context(pack: Pack, brand_os=None) -> GenerationBrand
     return GenerationBrandContext(
         brand_name=pack.brand_name or foundation.get("brand_name"),
         industry=foundation.get("brand_industry"),
+        target_audience=pack.target_audience,
+        main_audience=main_audience or None,
         core_offer=pack.offer_one_liner or foundation.get("one_line_offer"),
         primary_cta=pack.primary_cta,
         primary_pain=pack.primary_pain,
@@ -136,13 +158,18 @@ def build_generation_brand_context(pack: Pack, brand_os=None) -> GenerationBrand
         logo_markup=logo_markup,
         color_palette=color_palette,
         fonts=fonts or None,
+        brand_purpose=brand_purpose or None,
         mission=mission_vision.get("mission"),
         vision=mission_vision.get("vision"),
+        promise=mission_vision.get("promise"),
         elevator_pitch=messaging.get("elevator_pitch"),
         proof_points=proof_points or None,
         audience_personas=audience_personas or None,
         voice_archetype=voice.get("archetype"),
+        voice_traits=voice_traits or None,
         design_cues=design_cues or None,
+        style_palette=style_palette or None,
+        typography_direction=str(style.get("typography") or "").strip() or None,
     )
 
 

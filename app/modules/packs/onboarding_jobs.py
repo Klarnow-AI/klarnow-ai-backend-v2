@@ -20,7 +20,7 @@ from app.core.logging import get_logger
 from app.core.db.session import SessionLocal
 from app.modules.packs.models import Pack, utc_now
 from app.modules.packs.onboarding_queue import dispatch_onboarding_job, redis_queue_enabled
-from app.modules.packs.services import append_suggested_logo, merge_onboarding_answers
+from app.modules.packs.services import append_suggested_logos, merge_onboarding_answers
 
 ONBOARDING_JOB_KEY = "_onboarding_job"
 ONBOARDING_JOB_MAX_ATTEMPTS = 3
@@ -44,6 +44,8 @@ _IGNORED_ONBOARDING_INPUT_KEYS = {
     STARTER_BRAND_INPUT_FINGERPRINT_KEY,
     BRAND_OS_INPUT_FINGERPRINT_KEY,
     LOGO_INPUT_FINGERPRINT_KEY,
+    "generated_logo_url",
+    "transparent_logo_url",
     "wordmark_svg_or_url",
     "palette",
     "starter_brand_job_id",
@@ -430,6 +432,7 @@ def _sync_pack_core_concept(pack: Pack, brand_os) -> None:
 
 def _run_starter_brand_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
     from app.modules.packs.onboarding_services import generate_starter_brand
+    from app.modules.packs.logo_generation import get_logo_variant_urls
 
     pack, job = _load_pack_and_job(db, pack_id, job_id)
     if not pack or not job:
@@ -463,12 +466,19 @@ def _run_starter_brand_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
         pack_id=str(pack_id),
     )
     wordmark_to_use = result["wordmark_svg_or_url"]
-    pack = append_suggested_logo(db, pack, wordmark_to_use, commit=False)
+    pack = append_suggested_logos(
+        db,
+        pack,
+        get_logo_variant_urls(result) or [wordmark_to_use],
+        commit=False,
+    )
     pack = merge_onboarding_answers(
         db,
         pack,
         {
             "wordmark_svg_or_url": wordmark_to_use,
+            "generated_logo_url": result.get("logo_url"),
+            "transparent_logo_url": result.get("transparent_logo_url"),
             "palette": result["palette"],
             "starter_brand_job_id": job_id,
             "starter_brand_completed_at": _iso_now(),
@@ -561,7 +571,11 @@ def _run_brand_os_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
 
 def _run_logo_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
     from app.modules.brand_os.services import get_active_for_pack, get_summary_fields
-    from app.modules.packs.logo_generation import generate_logo
+    from app.modules.packs.logo_generation import (
+        generate_logo,
+        get_logo_primary_asset_url,
+        get_logo_variant_urls,
+    )
 
     pack, job = _load_pack_and_job(db, pack_id, job_id)
     if not pack or not job:
@@ -600,16 +614,23 @@ def _run_logo_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
         color_palette=palette,
         strict=False,
     )
-    logo_url = logo_result.get("logo_url") or logo_result.get("wordmark_svg_or_url")
-    if not logo_url:
+    logo_url = str(logo_result.get("logo_url") or "").strip() or None
+    transparent_logo_url = (
+        str(logo_result.get("transparent_logo_url") or logo_result.get("wordmark_svg_or_url") or "").strip()
+        or None
+    )
+    primary_logo_url = get_logo_primary_asset_url(logo_result)
+    if not primary_logo_url:
         return _mark_stage(db, pack_id, job_id, STAGE_LOGO, "skipped")
 
-    pack = append_suggested_logo(db, pack, logo_url, commit=False)
+    pack = append_suggested_logos(db, pack, get_logo_variant_urls(logo_result), commit=False)
     pack = merge_onboarding_answers(
         db,
         pack,
         {
-            "wordmark_svg_or_url": logo_url,
+            "generated_logo_url": logo_url,
+            "transparent_logo_url": transparent_logo_url,
+            "wordmark_svg_or_url": primary_logo_url,
             "final_logo_job_id": job_id,
             "final_logo_completed_at": _iso_now(),
             LOGO_INPUT_FINGERPRINT_KEY: input_fingerprint,
@@ -622,7 +643,10 @@ def _run_logo_stage(db: Session, pack_id: UUID, job_id: str) -> Pack:
         job_id,
         STAGE_LOGO,
         "completed",
-        data={"logo_url": logo_url},
+        data={
+            "logo_url": logo_url,
+            "transparent_logo_url": transparent_logo_url,
+        },
     )
 
 

@@ -18,10 +18,7 @@ import {
   Stop,
   RotateCcw,
   Sparkles,
-  Globe,
-  Loader2,
 } from "@/components/icons";
-import { builder } from "@/api_requests/builder";
 import { StylePicker } from "@/components/builder/StylePicker";
 import {
   QuestionForm,
@@ -33,7 +30,7 @@ import {
   getApiErrorFromResponse,
   isRequestCancelled,
 } from "@/lib/http";
-import type { BrandContext } from "@/types/generation";
+import type { BrandContext, BuilderAssistantMode } from "@/types/generation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,16 +40,42 @@ type Message = {
   files_snapshot?: Record<string, string>;
 };
 
-type GenStage = "idle" | "thinking" | "planning" | "coding";
+type GenStage = "idle" | "planning" | "coding";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STAGE_CONFIG: Record<GenStage, { label: string; emoji: string }> = {
   idle: { label: "", emoji: "" },
-  thinking: { label: "Reasoning…", emoji: "" },
-  planning: { label: "Planning layout…", emoji: "" },
-  coding: { label: "Writing code…", emoji: "⌨" },
+  planning: { label: "Designing…", emoji: "" },
+  coding: { label: "Updating site…", emoji: "" },
 };
+
+const ASSISTANT_MODES: Array<{
+  id: BuilderAssistantMode;
+  label: string;
+  description: string;
+}> = [
+  {
+    id: "launch",
+    label: "Launch",
+    description: "Build a strong first version quickly.",
+  },
+  {
+    id: "convert",
+    label: "Convert",
+    description: "Sharpen CTA flow and lead capture.",
+  },
+  {
+    id: "polish",
+    label: "Polish",
+    description: "Refine visuals, spacing, and finish.",
+  },
+  {
+    id: "debug",
+    label: "Fix issues",
+    description: "Target bugs and broken layout behavior.",
+  },
+];
 
 const QUICK_ACTIONS = [
   {
@@ -188,12 +211,9 @@ function parseQuestions(text: string): ParsedQuestion[] {
 }
 
 function getStageFromStream(text: string): GenStage {
-  const hasThinkingOpen = text.includes("<thinking>");
-  const hasThinkingClose = text.includes("</thinking>");
   const hasFile = text.includes("<file");
-  if (hasThinkingOpen && !hasThinkingClose) return "thinking";
-  if (hasThinkingClose && !hasFile) return "planning";
   if (hasFile) return "coding";
+  if (text.trim()) return "planning";
   return "idle";
 }
 
@@ -255,6 +275,15 @@ function buildAutoKickoff(brand: BrandContext, style: string): string {
   if (brand.heroAngle) lines.push(`Hero angle: \u201c${brand.heroAngle}\u201d`);
   if (brand.primaryCta)
     lines.push(`Primary CTA: \u201c${brand.primaryCta}\u201d`);
+  if (brand.targetAudience)
+    lines.push(`Target audience: ${brand.targetAudience}.`);
+  if (brand.promise) lines.push(`Brand promise: ${brand.promise}.`);
+  if (brand.designCues?.length)
+    lines.push(`Design cues: ${brand.designCues.join(", ")}.`);
+  if (brand.typographyDirection)
+    lines.push(`Typography direction: ${brand.typographyDirection}.`);
+  if (brand.stylePalette?.length)
+    lines.push(`Palette direction: ${brand.stylePalette.join(", ")}.`);
 
   lines.push(
     "Use all brand context available. Build it now \u2014 no questions needed. Make it visually stunning and production-ready.",
@@ -273,22 +302,20 @@ type ChatPanelProps = {
 export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
   const storeMessages = useProjectStore((s) => s.messages);
   const selectedStyle = useProjectStore((s) => s.selectedStyle);
+  const selectedAssistantMode = useProjectStore((s) => s.selectedAssistantMode);
   const files = useProjectStore((s) => s.files);
   const canUndo = useProjectStore((s) => s.fileHistory.length > 0);
   const projectId = useProjectStore((s) => s.projectId);
-  const liveUrl = useProjectStore((s) => s.liveUrl);
   const publishedFiles = useProjectStore((s) => s.publishedFiles);
 
   const [messages, setMessagesLocal] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [showStreamingIndicator, setShowStreamingIndicator] = useState(false);
   const [genStage, setGenStage] = useState<GenStage>("idle");
   const [activeQuestions, setActiveQuestions] = useState<ParsedQuestion[]>([]);
   const [actionsExpanded, setActionsExpanded] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [isUnpublishing, setIsUnpublishing] = useState(false);
-  const [publishError, setPublishError] = useState<string | null>(null);
 
   // Tracks which message index → version number (local only, not synced)
   const fileUpdateMap = useRef<Map<number, number>>(new Map());
@@ -379,20 +406,39 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
   // ── Core send request ─────────────────────────────────────────────────────
 
   const sendRequest = useCallback(
-    async (userContent: string, currentMessages: Message[]) => {
+    async (
+      userContent: string,
+      currentMessages: Message[],
+      options?: {
+        visible?: boolean;
+        assistantMode?: BuilderAssistantMode;
+      },
+    ) => {
+      const visible = options?.visible ?? true;
+      const assistantMode = options?.assistantMode ?? selectedAssistantMode;
       setIsStreaming(true);
-      setGenStage("idle");
-      setActiveQuestions([]);
+      setShowStreamingIndicator(visible);
+      setGenStage(visible ? "planning" : "idle");
+      if (visible) {
+        setActiveQuestions([]);
+      } else {
+        useProjectStore.getState().setIsGenerating(true);
+      }
       const currentFiles = useProjectStore.getState().files;
       const controller = new AbortController();
       abortRef.current = controller;
 
       try {
         if (!projectId) {
-          setMessages((prev) => [
-            ...prev,
-            { role: "assistant", content: "Builder project is not ready yet." },
-          ]);
+          if (visible) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: "Builder project is not ready yet.",
+              },
+            ]);
+          }
           return;
         }
 
@@ -405,6 +451,7 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
               files: currentFiles,
               selectedStyle:
                 useProjectStore.getState().selectedStyle ?? undefined,
+              assistantMode,
             }),
             signal: controller.signal,
           },
@@ -415,10 +462,12 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
             res,
             "Builder generation failed",
           )).message;
-          setMessages((prev) => [
-            ...prev,
-            { role: "assistant", content: message },
-          ]);
+          if (visible) {
+            setMessages((prev) => [
+              ...prev,
+              { role: "assistant", content: message },
+            ]);
+          }
           return;
         }
 
@@ -433,8 +482,10 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
           if (done) break;
           accumulated += decoder.decode(value, { stream: true });
 
-          const stage = getStageFromStream(accumulated);
-          setGenStage(stage);
+          if (visible) {
+            const stage = getStageFromStream(accumulated);
+            setGenStage(stage);
+          }
 
           if (
             !useProjectStore.getState().isGenerating &&
@@ -456,7 +507,7 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
           lastAutoFixedError.current = null;
         }
 
-        if (questions.length > 0) {
+        if (visible && questions.length > 0) {
           const displayMsg =
             summary || "I have a few questions before I start:";
           setMessages((prev) => [
@@ -464,7 +515,7 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
             { role: "assistant", content: displayMsg },
           ]);
           setActiveQuestions(questions);
-        } else {
+        } else if (visible) {
           const displayMsg = summary || "Done! I\u2019ve updated your website.";
           setMessages((prev): Message[] => {
             const assistantMsg: Message = {
@@ -484,33 +535,38 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
           });
         }
       } catch (err) {
-        if (isRequestCancelled(err)) {
-          setMessages((prev) => [
-            ...prev,
-            { role: "assistant", content: "Stopped." },
-          ]);
-        } else {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content:
-                err instanceof Error
-                  ? err.message
-                  : "We're having trouble on our side. Please try again in a few moments.",
-            },
-          ]);
+        if (visible) {
+          if (isRequestCancelled(err)) {
+            setMessages((prev) => [
+              ...prev,
+              { role: "assistant", content: "Stopped." },
+            ]);
+          } else {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content:
+                  err instanceof Error
+                    ? err.message
+                    : "We're having trouble on our side. Please try again in a few moments.",
+              },
+            ]);
+          }
         }
       } finally {
         abortRef.current = null;
         setIsStreaming(false);
+        setShowStreamingIndicator(false);
         setGenStage("idle");
         useProjectStore.getState().setIsGenerating(false);
-        textareaRef.current?.focus();
+        if (visible) {
+          textareaRef.current?.focus();
+        }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [brandContext, projectId],
+    [projectId, selectedAssistantMode, setMessages],
   );
 
   // ── Auto-generate on first load ───────────────────────────────────────────
@@ -552,18 +608,16 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
 
       lastAutoFixedError.current = error;
       const fixMsg = `There's a JavaScript error in the preview:\n\n${error}\n\nPlease debug and fix the code. Return the complete corrected /App.tsx.`;
-      const userMsg: Message = { role: "user", content: fixMsg };
-
-      setMessages((prev): Message[] => {
-        const updated: Message[] = [...prev, userMsg];
-        sendRequest(fixMsg, updated);
-        return updated;
+      const hiddenUserMessage: Message = { role: "user", content: fixMsg };
+      sendRequest(fixMsg, [...messages, hiddenUserMessage], {
+        visible: false,
+        assistantMode: "debug",
       });
     };
 
     window.addEventListener("message", handlePreviewError);
     return () => window.removeEventListener("message", handlePreviewError);
-  }, [isStreaming, sendRequest]);
+  }, [isStreaming, messages, sendRequest]);
 
   // ── Input handlers ────────────────────────────────────────────────────────
 
@@ -633,38 +687,6 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
   const handleUndo = () => {
     useProjectStore.getState().undoLastChange();
   };
-
-  const handlePublish = useCallback(async () => {
-    if (!projectId) return;
-    setIsPublishing(true);
-    setPublishError(null);
-    try {
-      const result = await builder.publish(projectId);
-      useProjectStore.getState().setLiveUrl(result.live_url ?? null);
-      useProjectStore
-        .getState()
-        .setPublishedFiles(result.published_files ?? null);
-    } catch (err) {
-      setPublishError(err instanceof Error ? err.message : "Publish failed");
-    } finally {
-      setIsPublishing(false);
-    }
-  }, [projectId]);
-
-  const handleUnpublish = useCallback(async () => {
-    if (!projectId) return;
-    setIsUnpublishing(true);
-    setPublishError(null);
-    try {
-      await builder.unpublish(projectId);
-      useProjectStore.getState().setLiveUrl(null);
-      useProjectStore.getState().setPublishedFiles(null);
-    } catch (err) {
-      setPublishError(err instanceof Error ? err.message : "Unpublish failed");
-    } finally {
-      setIsUnpublishing(false);
-    }
-  }, [projectId]);
 
   const handleRevertToPublished = useCallback(() => {
     const files = useProjectStore.getState().publishedFiles;
@@ -834,21 +856,16 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
         )}
 
         {/* Streaming indicator */}
-        {isStreaming && (
+        {showStreamingIndicator && (
           <div className="flex justify-start">
             <div className="rounded-2xl rounded-tl-md px-4 py-3 bg-accent/40 text-sm text-foreground">
               <span className="flex items-center gap-2 text-muted-foreground">
-                {/* {stage.emoji && (
-                  <span className="text-base leading-none select-none">
-                    {stage.emoji}
-                  </span>
-                )} */}
                 <span className="flex gap-1 shrink-0">
                   <span className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:0ms]" />
                   <span className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:150ms]" />
                   <span className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:300ms]" />
                 </span>
-                <span>{stage.label || "Thinking\u2026"}</span>
+                <span>{stage.label || "Generating\u2026"}</span>
               </span>
             </div>
           </div>
@@ -857,6 +874,43 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
 
       {/* ── Bottom area ── */}
       <div className="shrink-0 px-3 pb-3 pt-2 space-y-2">
+        {selectedStyle && (
+          <div className="rounded-xl border border-border bg-background px-3 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Assistant Mode
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Choose how Klaro should prioritize the next pass.
+                </p>
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {ASSISTANT_MODES.map((mode) => (
+                <button
+                  key={mode.id}
+                  type="button"
+                  onClick={() =>
+                    useProjectStore.getState().setSelectedAssistantMode(mode.id)
+                  }
+                  title={mode.description}
+                  disabled={isStreaming}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                    selectedAssistantMode === mode.id
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border bg-accent/40 text-foreground hover:bg-accent",
+                    isStreaming && "cursor-not-allowed opacity-50",
+                  )}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Quick action chips */}
         {!isStreaming &&
           activeQuestions.length === 0 &&
@@ -937,7 +991,9 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={
-                isStreaming ? "Klaro is working\u2026" : "Message Klaro\u2026"
+                showStreamingIndicator
+                  ? "Klaro is working\u2026"
+                  : "Message Klaro\u2026"
               }
               disabled={isStreaming}
               rows={1}
@@ -948,7 +1004,7 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
                 ⌘↵ to send
               </span>
               <div className="flex items-center gap-1">
-                {isStreaming ? (
+                {showStreamingIndicator ? (
                   <button
                     type="button"
                     onClick={handleStop}
@@ -961,7 +1017,7 @@ export function ChatPanel({ brandContext, packName }: ChatPanelProps) {
                   <button
                     type="submit"
                     aria-label="Send message"
-                    disabled={!input.trim()}
+                    disabled={!input.trim() || isStreaming}
                     className="flex items-center justify-center w-8 h-8 rounded-lg bg-foreground text-background disabled:opacity-25 hover:opacity-80 transition-opacity"
                   >
                     <Send className="w-4 h-4" />

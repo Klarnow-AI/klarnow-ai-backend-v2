@@ -58,7 +58,12 @@ class PackRead(PackBase):
             return self
 
         normalized = dict(answers)
-        for key in ("wordmark_svg_or_url", "wordmark_result"):
+        for key in (
+            "wordmark_svg_or_url",
+            "wordmark_result",
+            "generated_logo_url",
+            "transparent_logo_url",
+        ):
             value = normalized.get(key)
             if isinstance(value, str):
                 normalized_value = resolve_asset_reference(value, expires_in=86400 * 7)
@@ -180,6 +185,8 @@ class GenerateStarterBrandResponse(BaseModel):
 
     wordmark_svg_or_url: str
     palette: dict  # e.g. primary, secondary, accent
+    logo_url: str | None = None
+    transparent_logo_url: str | None = None
 
 
 class GenerateLogoBody(BaseModel):
@@ -197,6 +204,7 @@ class GenerateLogoResponse(BaseModel):
 
     logo_url: str
     wordmark_svg_or_url: str | None = None
+    transparent_logo_url: str | None = None
 
 
 class UploadLogoResponse(BaseModel):

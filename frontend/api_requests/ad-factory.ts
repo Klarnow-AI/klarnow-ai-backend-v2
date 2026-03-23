@@ -81,8 +81,11 @@ export type ProviderNeutralRenderIntent = {
   business_name: string;
   offer: string;
   audience: string;
+  primary_pain?: string | null;
   primary_outcome: string;
   proof_line: string;
+  brand_context_summary?: string | null;
+  visual_direction?: string | null;
 };
 
 export type AdFactoryVariant = {

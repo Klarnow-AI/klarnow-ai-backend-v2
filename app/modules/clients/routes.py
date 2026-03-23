@@ -28,7 +28,7 @@ from app.modules.clients.services import (
     list_leads_for_pack,
     list_qualified_leads_for_pack,
     get_lead_for_pack_user,
-    create_lead,
+    create_lead_with_followups,
     update_lead,
     qualify_lead,
 )
@@ -91,7 +91,7 @@ def create_lead_route(
     if body.client_id:
         if not get_for_user(db, body.client_id, current_user.id):
             raise NotFoundError("Client not found")
-    lead = create_lead(
+    lead = create_lead_with_followups(
         db,
         pack_id=body.pack_id,
         name=body.name,
@@ -107,11 +107,6 @@ def create_lead_route(
         deal_value=body.deal_value,
         assigned_user_id=body.assigned_user_id,
     )
-    try:
-        from app.modules.tasks.services import create_new_lead_followup_tasks
-        create_new_lead_followup_tasks(db, pack_id=body.pack_id, lead_id=lead.id, lead_name=lead.name or "Lead")
-    except Exception:
-        pass  # Don't fail lead creation if task creation fails
     return LeadRead.model_validate(lead)
 
 

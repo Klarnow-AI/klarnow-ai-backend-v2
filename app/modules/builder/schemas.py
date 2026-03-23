@@ -1,6 +1,7 @@
 """Builder project Pydantic schemas."""
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -49,3 +50,7 @@ class BuilderGenerateRequest(BaseModel):
     messages: list[GenerationMessage]
     files: dict[str, str]
     selected_style: str | None = Field(default=None, alias="selectedStyle")
+    assistant_mode: Literal["launch", "convert", "polish", "debug"] | None = Field(
+        default=None,
+        alias="assistantMode",
+    )

@@ -1,5 +1,7 @@
 """Builder project API. CRUD for AI website builder projects (pack-scoped)."""
 
+from collections.abc import Mapping
+from json import JSONDecodeError
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -11,10 +13,11 @@ from app.core.errors import BadRequestError, NotFoundError, ServiceUnavailableEr
 from app.core.gates import can_generate_website
 from app.modules.packs.models import User
 from app.modules.packs.services import get_pack_for_user
-from app.modules.clients.services import create_lead
+from app.modules.clients.services import create_lead_with_followups
 from app.modules.builder.public_site_schemas import (
     PublicLeadCaptureBody,
     PublicLeadCaptureResponse,
+    normalize_public_lead_payload,
 )
 from app.modules.builder.schemas import (
     BuilderGenerateRequest,
@@ -26,6 +29,7 @@ from app.modules.builder.schemas import (
 from app.core.config import get_settings
 from app.modules.builder.services import (
     build_deploy_html,
+    build_site_shell_meta,
     create,
     delete,
     slug_from_name,
@@ -65,6 +69,29 @@ def _project_response(
     payload = BuilderProjectRead.model_validate(project).model_dump()
     payload["published_files"] = load_published_snapshot(project) if include_published_files else None
     return BuilderProjectRead(**payload)
+
+
+async def _parse_public_lead_capture_request(request: Request) -> PublicLeadCaptureBody:
+    content_type = (request.headers.get("content-type") or "").lower()
+    payload: Mapping[str, object] | None = None
+
+    if "application/json" in content_type or not content_type:
+        try:
+            json_body = await request.json()
+        except (JSONDecodeError, ValueError, TypeError):
+            json_body = None
+        if isinstance(json_body, Mapping):
+            payload = json_body
+
+    if payload is None and (
+        "application/x-www-form-urlencoded" in content_type
+        or "multipart/form-data" in content_type
+        or not content_type
+    ):
+        form = await request.form()
+        payload = dict(form)
+
+    return normalize_public_lead_payload(payload)
 
 
 @router.post("/projects", response_model=BuilderProjectRead, status_code=status.HTTP_201_CREATED)
@@ -134,7 +161,10 @@ def update_project(
     if not project:
         raise NotFoundError("Builder project not found")
     data = body.model_dump(exclude_unset=True)
-    project = update(db, project, **data)
+    try:
+        project = update(db, project, **data)
+    except ValueError as exc:
+        raise BadRequestError(str(exc)) from exc
     return _project_response(project, include_published_files=True)
 
 
@@ -163,18 +193,27 @@ def publish_project(
     if not project:
         raise NotFoundError("Builder project not found")
     previous_subdomain_slug = project.subdomain_slug
+    pack = get_pack_for_user(db, project.pack_id, current_user.id)
+    if not pack:
+        raise NotFoundError("Pack not found")
     settings = get_settings()
     if settings.sites_domain and settings.sites_domain.strip():
-        pack = get_pack_for_user(db, project.pack_id, current_user.id)
-        if not pack:
-            raise NotFoundError("Pack not found")
         display_name = (pack.brand_name or pack.name or "").strip() or "site"
         base_slug = slug_from_name(display_name)
         project.subdomain_slug = ensure_unique_subdomain_slug(db, base_slug, project.id)
+
+    if project.subdomain_slug and settings.sites_domain and settings.sites_domain.strip():
         live_url = f"https://{project.subdomain_slug}.{settings.sites_domain.strip()}"
+        lead_url = "/lead"
     else:
         live_url = str(request.base_url).rstrip("/") + f"/p/{project_id}"
-    lead_url = "/lead" if project.subdomain_slug else f"/p/{project_id}/lead"
+        lead_url = f"/p/{project_id}/lead"
+
+    brand_context = load_generation_brand_context(db, project.pack_id, pack=pack)
+    site_meta = build_site_shell_meta(
+        brand_context,
+        fallback_title=(pack.brand_name or project.name or pack.name or "Website"),
+    )
     project = publish(
         db,
         project,
@@ -187,6 +226,7 @@ def publish_project(
             project,
             lead_url=lead_url,
             previous_subdomain_slug=previous_subdomain_slug,
+            site_meta=site_meta,
         )
     except Exception as exc:
         db.rollback()
@@ -248,6 +288,7 @@ async def generate_project(
             files=body.files,
             brand_context=brand_context,
             selected_style=body.selected_style,
+            assistant_mode=body.assistant_mode,
         )
     except RuntimeError as exc:
         message = str(exc)
@@ -281,9 +322,30 @@ def serve_published_site(project_id: UUID, db=Depends(get_db)):
     if not project:
         raise HTTPException(status_code=404, detail="Site not found or not yet published")
     files = load_published_snapshot(project) or dict(project.published_files or project.files or {})
-    html = build_deploy_html(files, project_id=str(project.id))
+    metadata = load_published_metadata(project_id=project_id) or {}
+    brand_context = load_generation_brand_context(db, project.pack_id)
+    site_meta = build_site_shell_meta(
+        brand_context,
+        fallback_title=(brand_context.brand_name or project.name or "Website"),
+    )
+    html = build_deploy_html(
+        files,
+        project_id=str(project.id),
+        lead_url=str(metadata.get("lead_url") or f"/p/{project_id}/lead"),
+        site_title=str(metadata.get("site_title") or site_meta["site_title"]),
+        favicon_href=str(metadata.get("favicon_href") or site_meta["favicon_href"] or ""),
+        theme_color=str(metadata.get("theme_color") or site_meta["theme_color"] or ""),
+    )
     try:
-        publish_project_artifacts(project, lead_url=f"/p/{project_id}/lead")
+        publish_project_artifacts(
+            project,
+            lead_url=str(metadata.get("lead_url") or f"/p/{project_id}/lead"),
+            site_meta={
+                "site_title": str(metadata.get("site_title") or site_meta["site_title"]),
+                "favicon_href": str(metadata.get("favicon_href") or site_meta["favicon_href"] or ""),
+                "theme_color": str(metadata.get("theme_color") or site_meta["theme_color"] or ""),
+            },
+        )
     except Exception:
         pass
     return HTMLResponse(
@@ -297,11 +359,14 @@ def serve_published_site(project_id: UUID, db=Depends(get_db)):
     response_model=PublicLeadCaptureResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def capture_builder_lead(project_id: UUID, body: PublicLeadCaptureBody, db=Depends(get_db)):
+async def capture_builder_lead(project_id: UUID, request: Request, db=Depends(get_db)):
     """Capture a lead submitted from a published builder site (no auth)."""
+    body = await _parse_public_lead_capture_request(request)
     # Honeypot: bots often fill every field
     if body.website and str(body.website).strip():
         raise HTTPException(status_code=400, detail="Invalid form submission")
+    if not (body.name and str(body.name).strip()):
+        raise HTTPException(status_code=400, detail="Please provide your name")
     if not (body.email and str(body.email).strip()) and not (body.phone and str(body.phone).strip()):
         raise HTTPException(status_code=400, detail="Please provide at least an email or phone number")
     pack_id: UUID | None = None
@@ -316,7 +381,7 @@ def capture_builder_lead(project_id: UUID, body: PublicLeadCaptureBody, db=Depen
         if not project:
             raise HTTPException(status_code=404, detail="Site not found or not yet published")
         pack_id = project.pack_id
-    lead = create_lead(
+    lead = create_lead_with_followups(
         db,
         pack_id=pack_id,
         name=body.name,

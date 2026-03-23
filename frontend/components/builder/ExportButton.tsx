@@ -37,6 +37,7 @@ export function ExportButton() {
     try {
       await builder.unpublish(projectId);
       useProjectStore.getState().setLiveUrl(null);
+      useProjectStore.getState().setPublishedFiles(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unpublish failed");
     } finally {

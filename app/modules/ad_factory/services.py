@@ -30,6 +30,9 @@ from app.modules.ad_factory.schemas import (
     AdFactoryCompileRead,
     AdFactoryLaunchResponse,
     BrandBrief,
+    BrandContextAudiencePersona,
+    BrandContextColorPalette,
+    BrandContextSnapshot,
     CTAResolved,
     CTADestination,
     ClaimGuardResult,
@@ -57,6 +60,7 @@ from app.modules.campaign.services import get_active_for_pack
 from app.modules.packs.models import Pack
 from app.modules.packs.services import get_pack_for_user
 from app.modules.sprint.services import get_active_sprint_for_pack
+from app.shared.services.generation_context import load_generation_brand_context
 
 CTA_ACTION_MAP = {
     "book": ["book", "schedule", "calendar"],
@@ -87,9 +91,153 @@ def _coalesce_text(*values: object | None, default: str = "") -> str:
     return default
 
 
+def _clean_list(values: list[str] | None, *, limit: int, item_limit: int) -> list[str]:
+    items: list[str] = []
+    for value in values or []:
+        text = str(value).strip()
+        if not text:
+            continue
+        items.append(text[:item_limit])
+        if len(items) >= limit:
+            break
+    return items
+
+
+def _infer_tone(pack: Pack, brand_context) -> str:
+    voice_tokens = [
+        getattr(brand_context, "voice_archetype", None),
+        *((getattr(brand_context, "voice_traits", None) or [])),
+        getattr(pack, "usp_category", None),
+    ]
+    text = " ".join(str(token or "").strip().lower() for token in voice_tokens if token)
+
+    if any(keyword in text for keyword in ("luxury", "premium", "elegant", "refined")):
+        return "luxury"
+    if any(keyword in text for keyword in ("playful", "fun", "joyful", "energetic")):
+        return "playful"
+    if any(keyword in text for keyword in ("friendly", "warm", "approachable", "human")):
+        return "friendly"
+    if any(keyword in text for keyword in ("bold", "confident", "assertive", "disruptive")):
+        return "bold"
+    if any(keyword in text for keyword in ("calm", "reassuring", "grounded", "trust")):
+        return "calm"
+    return "direct"
+
+
+def _build_brand_context_snapshot(brand_context) -> BrandContextSnapshot | None:
+    color_palette = getattr(brand_context, "color_palette", None)
+    color_snapshot = None
+    if color_palette and any(
+        (
+            getattr(color_palette, "primary", None),
+            getattr(color_palette, "secondary", None),
+            getattr(color_palette, "accent", None),
+        )
+    ):
+        color_snapshot = BrandContextColorPalette(
+            primary=_coalesce_text(getattr(color_palette, "primary", None)) or None,
+            secondary=_coalesce_text(getattr(color_palette, "secondary", None)) or None,
+            accent=_coalesce_text(getattr(color_palette, "accent", None)) or None,
+        )
+
+    audience_personas: list[BrandContextAudiencePersona] = []
+    for persona in getattr(brand_context, "audience_personas", None) or []:
+        persona_name = _coalesce_text(getattr(persona, "persona", None))
+        if not persona_name:
+            continue
+        audience_personas.append(
+            BrandContextAudiencePersona(
+                persona=persona_name[:120],
+                needs=_clean_list(getattr(persona, "needs", None), limit=4, item_limit=120),
+                pain_points=_clean_list(
+                    getattr(persona, "pain_points", None),
+                    limit=4,
+                    item_limit=120,
+                ),
+            )
+        )
+        if len(audience_personas) >= 3:
+            break
+
+    snapshot = BrandContextSnapshot(
+        industry=_coalesce_text(getattr(brand_context, "industry", None)) or None,
+        main_audience=_clean_list(
+            getattr(brand_context, "main_audience", None),
+            limit=4,
+            item_limit=140,
+        ),
+        primary_pain=_coalesce_text(getattr(brand_context, "primary_pain", None)) or None,
+        hero_angle=_coalesce_text(getattr(brand_context, "hero_angle", None)) or None,
+        usp_proof=_coalesce_text(getattr(brand_context, "usp_proof", None)) or None,
+        brand_purpose=_clean_list(
+            getattr(brand_context, "brand_purpose", None),
+            limit=4,
+            item_limit=120,
+        ),
+        mission=_coalesce_text(getattr(brand_context, "mission", None)) or None,
+        vision=_coalesce_text(getattr(brand_context, "vision", None)) or None,
+        promise=_coalesce_text(getattr(brand_context, "promise", None)) or None,
+        elevator_pitch=_coalesce_text(getattr(brand_context, "elevator_pitch", None)) or None,
+        proof_points=_clean_list(
+            getattr(brand_context, "proof_points", None),
+            limit=4,
+            item_limit=140,
+        ),
+        audience_personas=audience_personas,
+        voice_archetype=_coalesce_text(getattr(brand_context, "voice_archetype", None)) or None,
+        voice_traits=_clean_list(
+            getattr(brand_context, "voice_traits", None),
+            limit=5,
+            item_limit=80,
+        ),
+        design_cues=_clean_list(
+            getattr(brand_context, "design_cues", None),
+            limit=5,
+            item_limit=80,
+        ),
+        style_palette=_clean_list(
+            getattr(brand_context, "style_palette", None),
+            limit=5,
+            item_limit=80,
+        ),
+        typography_direction=(
+            _coalesce_text(getattr(brand_context, "typography_direction", None)) or None
+        ),
+        color_palette=color_snapshot,
+    )
+
+    if not any(
+        [
+            snapshot.industry,
+            snapshot.main_audience,
+            snapshot.primary_pain,
+            snapshot.hero_angle,
+            snapshot.usp_proof,
+            snapshot.brand_purpose,
+            snapshot.mission,
+            snapshot.vision,
+            snapshot.promise,
+            snapshot.elevator_pitch,
+            snapshot.proof_points,
+            snapshot.audience_personas,
+            snapshot.voice_archetype,
+            snapshot.voice_traits,
+            snapshot.design_cues,
+            snapshot.style_palette,
+            snapshot.typography_direction,
+            snapshot.color_palette,
+        ]
+    ):
+        return None
+
+    return snapshot
+
+
 def build_brand_brief_from_pack(db: Session, pack: Pack) -> BrandBrief:
     campaign = get_active_for_pack(db, pack.id)
     site = get_published_for_pack(db, pack.id)
+    generation_brand_context = load_generation_brand_context(db, pack.id, pack=pack)
+    brand_context_snapshot = _build_brand_context_snapshot(generation_brand_context)
 
     cta_raw = ((campaign.primary_cta if campaign else None) or pack.primary_cta or "Visit the link").strip()
     cta_action = _infer_cta_action(cta_raw)
@@ -127,16 +275,37 @@ def build_brand_brief_from_pack(db: Session, pack: Pack) -> BrandBrief:
     if pack.proof_text and not proof_assets:
         proof_assets.append(ProofAsset(asset_type="numbers", label="Results"))
 
-    tone = "direct"
-    if pack.usp_category and "friendly" in str(pack.usp_category).lower():
-        tone = "friendly"
+    tone = _infer_tone(pack, generation_brand_context)
 
     return BrandBrief(
-        business_name=pack.brand_name or pack.name or "Business",
-        offer=pack.offer_one_liner or "Our offer",
-        audience=pack.target_audience or "Your audience",
+        business_name=_coalesce_text(
+            pack.brand_name,
+            getattr(generation_brand_context, "brand_name", None),
+            pack.name,
+            default="Business",
+        ),
+        offer=_coalesce_text(
+            pack.offer_one_liner,
+            getattr(generation_brand_context, "core_offer", None),
+            default="Our offer",
+        ),
+        audience=_coalesce_text(
+            pack.target_audience,
+            getattr(generation_brand_context, "target_audience", None),
+            ", ".join(getattr(generation_brand_context, "main_audience", None) or []),
+            default="Your audience",
+        ),
         location=location,
-        primary_outcome=pack.primary_outcome or "Get results",
+        primary_pain=_coalesce_text(
+            pack.primary_pain,
+            getattr(generation_brand_context, "primary_pain", None),
+        )
+        or None,
+        primary_outcome=_coalesce_text(
+            pack.primary_outcome,
+            getattr(generation_brand_context, "primary_outcome", None),
+            default="Get results",
+        ),
         proof_assets=proof_assets,
         tone=tone,  # type: ignore[arg-type]
         face_on_camera=True,
@@ -146,8 +315,18 @@ def build_brand_brief_from_pack(db: Session, pack: Pack) -> BrandBrief:
             destination_type="landing_page",
             value=destination_value,
         ),
-        usp=pack.usp_statement,
-        core_concept=pack.core_concept,
+        usp=_coalesce_text(
+            pack.usp_statement,
+            getattr(generation_brand_context, "usp_statement", None),
+        )
+        or None,
+        core_concept=_coalesce_text(pack.core_concept) or None,
+        hero_angle=_coalesce_text(
+            pack.hero_angle,
+            getattr(generation_brand_context, "hero_angle", None),
+        )
+        or None,
+        brand_context=brand_context_snapshot,
     )
 
 

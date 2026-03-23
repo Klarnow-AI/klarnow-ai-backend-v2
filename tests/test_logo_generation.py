@@ -4,12 +4,14 @@ import json
 import os
 import unittest
 import base64
+from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test-logo-generation.db")
 
+from PIL import Image
 from fastapi.testclient import TestClient
 
 from app import main as main_module
@@ -48,7 +50,10 @@ class LogoGenerationServiceTests(unittest.TestCase):
         logo_generation._PROVIDER_FAILURE_STATE["reason"] = ""
 
     def test_generate_logo_with_openrouter_uploads_image_and_uses_configured_model(self) -> None:
-        encoded = "data:image/webp;base64," + base64.b64encode(b"webp-image").decode("ascii")
+        source = BytesIO()
+        Image.new("RGB", (8, 8), "white").save(source, format="PNG")
+        source_bytes = source.getvalue()
+        encoded = "data:image/webp;base64," + base64.b64encode(source_bytes).decode("ascii")
         fake_response = SimpleNamespace(
             choices=[
                 SimpleNamespace(
@@ -77,7 +82,10 @@ class LogoGenerationServiceTests(unittest.TestCase):
             patch.object(
                 logo_generation,
                 "get_asset_url",
-                return_value="https://cdn.example.com/generated-logo.webp",
+                side_effect=[
+                    "https://cdn.example.com/generated-logo.webp",
+                    "https://cdn.example.com/generated-logo-transparent.png",
+                ],
             ),
         ):
             result = logo_generation.generate_logo_with_openrouter("Make a bold logo", "pack-123")
@@ -86,7 +94,8 @@ class LogoGenerationServiceTests(unittest.TestCase):
             result,
             {
                 "logo_url": "https://cdn.example.com/generated-logo.webp",
-                "wordmark_svg_or_url": None,
+                "wordmark_svg_or_url": "https://cdn.example.com/generated-logo-transparent.png",
+                "transparent_logo_url": "https://cdn.example.com/generated-logo-transparent.png",
             },
         )
         generate_call = fake_client.chat.completions.create.call_args.kwargs
@@ -95,11 +104,15 @@ class LogoGenerationServiceTests(unittest.TestCase):
         self.assertEqual(generate_call["extra_body"]["modalities"], ["image", "text"])
         self.assertEqual(generate_call["extra_body"]["image_config"]["aspect_ratio"], "1:1")
         self.assertEqual(generate_call["extra_body"]["image_config"]["image_size"], "1K")
-        upload_call = mock_upload.call_args
-        self.assertTrue(upload_call.args[0].startswith("logos/pack-123/"))
-        self.assertTrue(upload_call.args[0].endswith(".webp"))
-        self.assertEqual(upload_call.args[1], b"webp-image")
-        self.assertEqual(upload_call.kwargs["content_type"], "image/webp")
+        self.assertEqual(mock_upload.call_count, 2)
+        default_upload_call = mock_upload.call_args_list[0]
+        transparent_upload_call = mock_upload.call_args_list[1]
+        self.assertTrue(default_upload_call.args[0].startswith("logos/pack-123/"))
+        self.assertTrue(default_upload_call.args[0].endswith(".webp"))
+        self.assertEqual(default_upload_call.args[1], source_bytes)
+        self.assertEqual(default_upload_call.kwargs["content_type"], "image/webp")
+        self.assertTrue(transparent_upload_call.args[0].endswith("_transparent.png"))
+        self.assertEqual(transparent_upload_call.kwargs["content_type"], "image/png")
 
     def test_generate_logo_with_openrouter_rejects_missing_image_parts(self) -> None:
         fake_response = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(images=[]))])
@@ -132,7 +145,10 @@ class LogoGenerationServiceTests(unittest.TestCase):
                     "{'error': {'message': 'No endpoints found that support the requested output modalities: image, text', 'code': 404}}"
                 )
 
-        encoded = "data:image/png;base64," + base64.b64encode(b"png-image").decode("ascii")
+        source = BytesIO()
+        Image.new("RGB", (8, 8), "white").save(source, format="PNG")
+        source_bytes = source.getvalue()
+        encoded = "data:image/png;base64," + base64.b64encode(source_bytes).decode("ascii")
         fake_response = SimpleNamespace(
             choices=[
                 SimpleNamespace(
@@ -162,7 +178,10 @@ class LogoGenerationServiceTests(unittest.TestCase):
             patch.object(
                 logo_generation,
                 "get_asset_url",
-                return_value="https://cdn.example.com/generated-logo.png",
+                side_effect=[
+                    "https://cdn.example.com/generated-logo.png",
+                    "https://cdn.example.com/generated-logo-transparent.png",
+                ],
             ),
         ):
             result = logo_generation.generate_logo_with_openrouter("Make a bold logo", "pack-123")
@@ -171,7 +190,8 @@ class LogoGenerationServiceTests(unittest.TestCase):
             result,
             {
                 "logo_url": "https://cdn.example.com/generated-logo.png",
-                "wordmark_svg_or_url": None,
+                "wordmark_svg_or_url": "https://cdn.example.com/generated-logo-transparent.png",
+                "transparent_logo_url": "https://cdn.example.com/generated-logo-transparent.png",
             },
         )
         self.assertEqual(create_mock.call_count, 2)
@@ -179,9 +199,9 @@ class LogoGenerationServiceTests(unittest.TestCase):
         second_call = create_mock.call_args_list[1].kwargs
         self.assertEqual(first_call["extra_body"]["modalities"], ["image", "text"])
         self.assertEqual(second_call["extra_body"]["modalities"], ["image"])
-        upload_call = mock_upload.call_args
-        self.assertEqual(upload_call.args[1], b"png-image")
-        self.assertEqual(upload_call.kwargs["content_type"], "image/png")
+        default_upload_call = mock_upload.call_args_list[0]
+        self.assertEqual(default_upload_call.args[1], source_bytes)
+        self.assertEqual(default_upload_call.kwargs["content_type"], "image/png")
 
     def test_generate_logo_with_openrouter_sets_cooldown_for_quota_errors(self) -> None:
         class FakeQuotaError(Exception):
@@ -234,7 +254,29 @@ class LogoGenerationServiceTests(unittest.TestCase):
                 strict=False,
             )
 
-        self.assertEqual(result, {"logo_url": None, "wordmark_svg_or_url": None})
+        self.assertEqual(
+            result,
+            {
+                "logo_url": None,
+                "wordmark_svg_or_url": None,
+                "transparent_logo_url": None,
+            },
+        )
+
+    def test_create_transparent_png_variant_removes_connected_background(self) -> None:
+        image = Image.new("RGB", (12, 12), "white")
+        for x in range(3, 9):
+            for y in range(3, 9):
+                image.putpixel((x, y), (0, 0, 0))
+
+        source = BytesIO()
+        image.save(source, format="PNG")
+
+        variant_bytes = logo_generation._create_transparent_png_variant(source.getvalue())
+        with Image.open(BytesIO(variant_bytes)) as variant_image:
+            rgba = variant_image.convert("RGBA")
+            self.assertEqual(rgba.getpixel((0, 0))[3], 0)
+            self.assertEqual(rgba.getpixel((5, 5))[3], 255)
 
     def test_build_logo_prompt_makes_brand_palette_a_hard_visual_constraint(self) -> None:
         prompt = logo_generation._build_logo_prompt(
@@ -279,7 +321,8 @@ class GenerateLogoRouteTests(unittest.TestCase):
                 "generate_logo",
                 return_value={
                     "logo_url": "https://cdn.example.com/generated-logo.png",
-                    "wordmark_svg_or_url": None,
+                    "wordmark_svg_or_url": "https://cdn.example.com/generated-logo-transparent.png",
+                    "transparent_logo_url": "https://cdn.example.com/generated-logo-transparent.png",
                 },
             ),
             TestClient(main_module.app, raise_server_exceptions=False) as client,
@@ -295,8 +338,23 @@ class GenerateLogoRouteTests(unittest.TestCase):
             "https://cdn.example.com/generated-logo.png",
         )
         self.assertEqual(
+            response.json()["transparent_logo_url"],
+            "https://cdn.example.com/generated-logo-transparent.png",
+        )
+        self.assertEqual(
             json.loads(pack.onboarding_answers["suggested_logos"]),
-            ["https://cdn.example.com/generated-logo.png"],
+            [
+                "https://cdn.example.com/generated-logo.png",
+                "https://cdn.example.com/generated-logo-transparent.png",
+            ],
+        )
+        self.assertEqual(
+            pack.onboarding_answers["generated_logo_url"],
+            "https://cdn.example.com/generated-logo.png",
+        )
+        self.assertEqual(
+            pack.onboarding_answers["transparent_logo_url"],
+            "https://cdn.example.com/generated-logo-transparent.png",
         )
         self.db.commit.assert_called_once()
 
@@ -321,7 +379,8 @@ class GenerateLogoRouteTests(unittest.TestCase):
                 "generate_logo",
                 return_value={
                     "logo_url": "https://cdn.example.com/generated-logo.png",
-                    "wordmark_svg_or_url": None,
+                    "wordmark_svg_or_url": "https://cdn.example.com/generated-logo-transparent.png",
+                    "transparent_logo_url": "https://cdn.example.com/generated-logo-transparent.png",
                 },
             ) as mock_generate_logo,
             TestClient(main_module.app, raise_server_exceptions=False) as client,
@@ -355,7 +414,8 @@ class StarterBrandGenerationTests(unittest.TestCase):
                 "app.modules.packs.logo_generation.generate_logo",
                 return_value={
                     "logo_url": "https://cdn.example.com/starter-logo.png",
-                    "wordmark_svg_or_url": None,
+                    "wordmark_svg_or_url": "https://cdn.example.com/starter-logo-transparent.png",
+                    "transparent_logo_url": "https://cdn.example.com/starter-logo-transparent.png",
                 },
             ) as mock_generate_logo,
         ):
@@ -366,8 +426,16 @@ class StarterBrandGenerationTests(unittest.TestCase):
                 pack_id="pack-123",
             )
 
-        self.assertEqual(result["wordmark_svg_or_url"], "https://cdn.example.com/starter-logo.png")
+        self.assertEqual(
+            result["wordmark_svg_or_url"],
+            "https://cdn.example.com/starter-logo-transparent.png",
+        )
         self.assertEqual(result["palette"], palette)
+        self.assertEqual(result["logo_url"], "https://cdn.example.com/starter-logo.png")
+        self.assertEqual(
+            result["transparent_logo_url"],
+            "https://cdn.example.com/starter-logo-transparent.png",
+        )
         self.assertEqual(mock_generate_logo.call_args.kwargs["pack_id"], "pack-123")
         self.assertFalse(mock_generate_logo.call_args.kwargs["strict"])
 
@@ -424,7 +492,8 @@ class OnboardingLogoStageTests(unittest.TestCase):
                 "app.modules.packs.logo_generation.generate_logo",
                 return_value={
                     "logo_url": "https://cdn.example.com/final-logo.png",
-                    "wordmark_svg_or_url": None,
+                    "wordmark_svg_or_url": "https://cdn.example.com/final-logo-transparent.png",
+                    "transparent_logo_url": "https://cdn.example.com/final-logo-transparent.png",
                 },
             ),
         ):
@@ -433,18 +502,32 @@ class OnboardingLogoStageTests(unittest.TestCase):
         self.assertIs(result, pack)
         self.assertEqual(
             pack.onboarding_answers["wordmark_svg_or_url"],
+            "https://cdn.example.com/final-logo-transparent.png",
+        )
+        self.assertEqual(
+            pack.onboarding_answers["generated_logo_url"],
             "https://cdn.example.com/final-logo.png",
+        )
+        self.assertEqual(
+            pack.onboarding_answers["transparent_logo_url"],
+            "https://cdn.example.com/final-logo-transparent.png",
         )
         self.assertEqual(pack.onboarding_answers["final_logo_job_id"], "job-123")
         self.assertTrue(pack.onboarding_answers["final_logo_completed_at"])
         self.assertEqual(
             json.loads(pack.onboarding_answers["suggested_logos"]),
-            ["https://cdn.example.com/final-logo.png"],
+            [
+                "https://cdn.example.com/final-logo.png",
+                "https://cdn.example.com/final-logo-transparent.png",
+            ],
         )
         self.assertEqual([status for status, _ in stage_calls], ["running", "completed"])
         self.assertEqual(
             stage_calls[-1][1],
-            {"logo_url": "https://cdn.example.com/final-logo.png"},
+            {
+                "logo_url": "https://cdn.example.com/final-logo.png",
+                "transparent_logo_url": "https://cdn.example.com/final-logo-transparent.png",
+            },
         )
 
 

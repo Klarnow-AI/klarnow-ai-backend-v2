@@ -169,6 +169,54 @@ def create_lead(
 
 
 @log_service_action()
+def create_lead_with_followups(
+    db: Session,
+    *,
+    pack_id: UUID,
+    name: str,
+    phone: str | None = None,
+    email: str | None = None,
+    source: str | None = None,
+    summary: str | None = None,
+    budget_range: str | None = None,
+    urgency: str | None = None,
+    client_id: UUID | None = None,
+    pipeline_stage: str | None = None,
+    due_date: date | None = None,
+    deal_value: Decimal | None = None,
+    assigned_user_id: UUID | None = None,
+) -> Lead:
+    lead = create_lead(
+        db,
+        pack_id=pack_id,
+        name=name,
+        phone=phone,
+        email=email,
+        source=source,
+        summary=summary,
+        budget_range=budget_range,
+        urgency=urgency,
+        client_id=client_id,
+        pipeline_stage=pipeline_stage,
+        due_date=due_date,
+        deal_value=deal_value,
+        assigned_user_id=assigned_user_id,
+    )
+    try:
+        from app.modules.tasks.services import create_new_lead_followup_tasks
+
+        create_new_lead_followup_tasks(
+            db,
+            pack_id=pack_id,
+            lead_id=lead.id,
+            lead_name=lead.name or "Lead",
+        )
+    except Exception:
+        pass
+    return lead
+
+
+@log_service_action()
 def update_lead(
     db: Session,
     lead: Lead,

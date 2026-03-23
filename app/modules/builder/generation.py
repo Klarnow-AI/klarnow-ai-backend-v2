@@ -1,6 +1,7 @@
 """Website generation helpers for builder projects."""
 
 from collections.abc import AsyncIterator
+from typing import Literal
 
 from app.shared.generation_schemas import GenerationBrandContext, GenerationMessage
 from app.shared.services.llm_streaming import create_text_stream
@@ -12,49 +13,49 @@ from app.shared.services.openai_compatible import (
 
 _DEFAULT_APP_MARKER = "Describe your website to get started"
 _MIN_COMPLETION_TOKENS = 2048
+BuilderAssistantMode = Literal["launch", "convert", "polish", "debug"]
 _DESIGN_SYSTEM_TOKENS = {
     "minimal": """
-- Background: white with light gray sections
-- Primary color: blue-600
-- Typography: sans serif, lighter weights
-- Corners: rounded-lg
-- Shadows: subtle only
-- Spacing: generous whitespace
+- Mood: editorial, calm, intentional, premium without feeling sterile
+- Background: warm neutrals, subtle panel layering, restrained gradients
+- Typography: elegant sans or serif pairing with generous spacing
+- Shapes: rounded-xl where useful, otherwise let whitespace do the work
+- Motion: subtle fades and hover shifts only
 """,
     "dark": """
-- Background: near-black with high contrast
-- Primary color: violet or brand accent
-- Typography: bold, oversized headings
-- Corners: rounded-xl
-- Shadows: deep but controlled
+- Mood: cinematic, high-contrast, immersive
+- Background: charcoal or ink with depth from glows, gradients, and overlays
+- Typography: oversized, dramatic, crisp
+- Shapes: strong cards, bold framing, clean spacing
+- Motion: tasteful reveal transitions and depth cues
 """,
     "playful": """
-- Background: soft pastels
-- Primary color: pink or purple accents
-- Typography: friendly medium weights
-- Corners: rounded-3xl
-- Shadows: soft colored shadows
+- Mood: bright, friendly, energetic, modern
+- Background: soft tints, layered gradients, unexpected accents
+- Typography: approachable with bold moments
+- Shapes: soft curves, pill controls, rounded-3xl moments
+- Motion: lively but not childish
 """,
     "corporate": """
-- Background: white with navy/slate accents
-- Primary color: blue-800 or slate-800
-- Typography: structured and trustworthy
-- Corners: rounded-md
-- Trust signals: stats, logos, testimonials
+- Mood: crisp, credible, executive, confident
+- Background: white, slate, or light neutral with strong structure
+- Typography: trustworthy, balanced, slightly condensed if it helps hierarchy
+- Shapes: precise grids, restrained rounding
+- Trust signals: logos, proof, process clarity, concise metrics
 """,
     "luxury": """
-- Background: black or off-black
-- Primary color: gold, amber, or warm neutrals
-- Typography: elegant with careful spacing
-- Corners: sharp or lightly rounded
-- Motion: restrained and premium
+- Mood: elevated, tactile, exclusive
+- Background: off-black, stone, espresso, or cream
+- Typography: refined contrast, careful letter spacing, gallery-like pacing
+- Shapes: sharp lines or lightly rounded premium framing
+- Motion: restrained, polished, expensive
 """,
     "vibrant": """
-- Background: bold gradients or color fields
-- Primary color: gradient-derived accent
-- Typography: expressive and high energy
-- Corners: rounded-2xl
-- Shadows: colorful but intentional
+- Mood: bold, graphic, creative-forward
+- Background: saturated fields, meshes, or contrast-heavy color blocking
+- Typography: expressive and assertive
+- Shapes: confident cards, oversized sections, energetic composition
+- Motion: bold reveals and hover treatments with restraint
 """,
 }
 
@@ -92,8 +93,14 @@ def _brand_section(brand: GenerationBrandContext | None) -> str:
         identity.append(f"Brand name: {brand.brand_name}")
     if brand.industry:
         identity.append(f"Industry: {brand.industry}")
+    if brand.target_audience:
+        identity.append(f"Target audience: {brand.target_audience}")
+    if brand.main_audience:
+        identity.append(f"Main audience signals: {', '.join(brand.main_audience)}")
     if brand.logo_url:
         identity.append(f"Logo URL: {brand.logo_url}")
+    if brand.logo_markup:
+        identity.append("Logo markup is available for inline SVG treatment.")
     if brand.color_palette:
         colors = [
             f"{name}: {value}"
@@ -119,12 +126,15 @@ def _brand_section(brand: GenerationBrandContext | None) -> str:
         ("Hero angle", brand.hero_angle),
         ("USP", brand.usp_statement),
         ("USP proof", brand.usp_proof),
+        ("Brand promise", brand.promise),
         ("Mission", brand.mission),
         ("Vision", brand.vision),
         ("Elevator pitch", brand.elevator_pitch),
     ):
         if value:
             messaging.append(f"{label}: {value}")
+    if brand.brand_purpose:
+        messaging.append("Brand purpose:\n- " + "\n- ".join(brand.brand_purpose))
     if brand.proof_points:
         messaging.append("Proof points:\n- " + "\n- ".join(brand.proof_points))
     if messaging:
@@ -143,8 +153,14 @@ def _brand_section(brand: GenerationBrandContext | None) -> str:
 
     if brand.voice_archetype:
         style.append(f"Voice archetype: {brand.voice_archetype}")
+    if brand.voice_traits:
+        style.append("Voice traits: " + ", ".join(brand.voice_traits))
     if brand.design_cues:
         style.append("Design cues: " + ", ".join(brand.design_cues))
+    if brand.style_palette:
+        style.append("Palette language: " + ", ".join(brand.style_palette))
+    if brand.typography_direction:
+        style.append(f"Typography direction: {brand.typography_direction}")
     if style:
         sections.append("VOICE AND STYLE:\n" + "\n".join(style))
 
@@ -202,11 +218,47 @@ def _design_system_section(selected_style: str | None) -> str:
     return "\n\nSELECTED DESIGN SYSTEM:\n" + tokens.strip()
 
 
+def _assistant_mode_section(assistant_mode: BuilderAssistantMode | None) -> str:
+    mode = (assistant_mode or "launch").strip().lower()
+    if mode == "convert":
+        return """
+
+ASSISTANT MODE: CONVERT
+- Prioritize clarity, trust, CTA visibility, and lead capture quality.
+- Tighten the funnel: objection handling, proof, and friction reduction.
+- Prefer stronger copy and cleaner conversion pathways over decorative extras.
+"""
+    if mode == "polish":
+        return """
+
+ASSISTANT MODE: POLISH
+- Prioritize visual refinement, spacing rhythm, typography, and premium finish.
+- Improve hierarchy and craft without losing clarity or conversion intent.
+- Make the page feel contemporary and intentional, not template-like.
+"""
+    if mode == "debug":
+        return """
+
+ASSISTANT MODE: DEBUG
+- Fix the specific issue with minimal disruption to the rest of the design.
+- Preserve working sections unless the bug requires structural changes.
+- Return a stable, corrected file without explaining internal debugging steps.
+"""
+    return """
+
+ASSISTANT MODE: LAUNCH
+- Make strong, opinionated product and design decisions without stalling.
+- Deliver the best credible first version you can from the available context.
+- When direction is partial, fill the gaps with tasteful, conversion-focused choices.
+"""
+
+
 def build_system_prompt(
     *,
     files: dict[str, str],
     brand_context: GenerationBrandContext | None,
     selected_style: str | None,
+    assistant_mode: BuilderAssistantMode | None,
 ) -> str:
     current_files = "\n\n".join(
         f'<file name="{name}">\n{content}\n</file>'
@@ -243,6 +295,7 @@ GOAL
 - Produce a polished, production-ready single-page website in /App.tsx.
 - Use clear hierarchy, strong conversion copy, and responsive layout.
 - Keep the page deployable inside the existing builder runtime.
+- Use the available brand context deeply so the page feels custom, not generic.
 
 OUTPUT RULES
 - Output ONLY XML tags. No markdown.
@@ -265,12 +318,15 @@ TECHNICAL RULES
 - Use emoji instead of icon packages when needed.
 - Defensive code only: avoid undefined.map(), use keys in every .map().
 - Always return the full file, never partial patches.
+- Prefer a layered, modern visual system over flat boilerplate.
+- Use CSS variables or small shared constants when it helps keep the design cohesive.
 
 LEAD CAPTURE RULES
 - Any contact, signup, booking, or enquiry form must submit to window.KLARO_LEAD_URL with fetch.
 - Collect name plus email or phone.
 - Include a hidden honeypot input named website.
 - Show success and error states.
+- Support JSON submission and keep field names predictable.
 
 QUALITY BAR
 - Clear value prop above the fold.
@@ -278,8 +334,12 @@ QUALITY BAR
 - Mobile-first layout.
 - Visible CTA.
 - Trust elements when relevant.
+- Avoid generic startup templates, repetitive card grids, and lifeless whitespace-only layouts.
+- Build a visual point of view: strong hero composition, contrast, and section-to-section rhythm.
+- Make typography, color, and spacing feel deliberate and current.
 
 {mode_block}
+{_assistant_mode_section(assistant_mode)}
 {_brand_section(brand_context)}
 {_industry_template(brand_context)}
 {_design_system_section(selected_style)}
@@ -295,12 +355,14 @@ async def create_website_generation_stream(
     files: dict[str, str],
     brand_context: GenerationBrandContext | None,
     selected_style: str | None,
+    assistant_mode: BuilderAssistantMode | None = None,
 ) -> AsyncIterator[str]:
     generation_mode = is_default_files(files)
     system_prompt = build_system_prompt(
         files=files,
         brand_context=brand_context,
         selected_style=selected_style,
+        assistant_mode=assistant_mode,
     )
     max_tokens = 8192
     primary_model = get_builder_model() if generation_mode else get_reasoning_model()
@@ -314,5 +376,4 @@ async def create_website_generation_stream(
         messages=messages_payload,
         model=primary_model,
         max_tokens=max_tokens,
-        prelude="<thinking>Reasoning about your website...</thinking>",
     )

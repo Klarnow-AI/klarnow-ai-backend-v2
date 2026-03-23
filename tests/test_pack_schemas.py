@@ -25,6 +25,8 @@ class PackReadSchemaTests(unittest.TestCase):
                 "onboarding_answers": {
                     "wordmark_svg_or_url": "https://cdn.klarnow.ai/logos/acme/logo.png",
                     "wordmark_result": "key:logos/acme/alt.png",
+                    "generated_logo_url": "key:logos/acme/default.webp",
+                    "transparent_logo_url": "key:logos/acme/transparent.png",
                     "suggested_logos": json.dumps(
                         [
                             "https://cdn.klarnow.ai/logos/acme/one.png",
@@ -44,6 +46,14 @@ class PackReadSchemaTests(unittest.TestCase):
             "resolved::https://cdn.klarnow.ai/logos/acme/logo.png",
         )
         self.assertEqual(onboarding["wordmark_result"], "resolved::key:logos/acme/alt.png")
+        self.assertEqual(
+            onboarding["generated_logo_url"],
+            "resolved::key:logos/acme/default.webp",
+        )
+        self.assertEqual(
+            onboarding["transparent_logo_url"],
+            "resolved::key:logos/acme/transparent.png",
+        )
         self.assertEqual(
             json.loads(onboarding["suggested_logos"]),
             [

@@ -37,10 +37,6 @@ export type CreativeFactoryLayoutProps = {
     display?: CreativeGenerationDisplay | null,
   ) => void;
   onDeleteAsset?: (assetId: string) => void | Promise<void>;
-  onCanvasSaveAsset?: (
-    asset: CreativeTemplateCardAsset,
-    code: string,
-  ) => void | Promise<void>;
 };
 
 export function CreativeFactoryLayout({
@@ -57,7 +53,6 @@ export function CreativeFactoryLayout({
   onFileGenerated,
   onGeneratingChange,
   onDeleteAsset,
-  onCanvasSaveAsset,
 }: CreativeFactoryLayoutProps) {
   const bottomPlaceholder = "Type to Generate";
   const isMobile = !useMediaQuery("(min-width: 1024px)");
@@ -118,11 +113,10 @@ export function CreativeFactoryLayout({
       {/* Preview modal */}
       <CreativePreviewModal
         open={selectedAsset !== null}
-  onOpenChange={(open) => !open && onAssetSelect(null)}
+        onOpenChange={(open) => !open && onAssetSelect(null)}
         asset={selectedAsset}
         variant={variant}
         onDelete={onDeleteAsset}
-        onCanvasSave={onCanvasSaveAsset}
       />
     </div>
   );
