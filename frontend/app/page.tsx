@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { PageLoader } from "@/components/ui/page-loader";
@@ -8,10 +9,14 @@ import { useAuth } from "@/contexts/auth-context";
 import { useLandingContext } from "@/hooks/use-landing-context";
 import { ComposeInput } from "@/components/ui/compose-input";
 import { Chip } from "@/components/ui/chip";
-import { AuthModal } from "@/components/auth-modal";
 import { PublicHeader } from "@/components/public-header";
 import { NotFoundView } from "@/components/not-found-view";
 import { MVP_QUESTIONS } from "@/components/onboarding-chat-steps";
+
+const AuthModal = dynamic(
+  () => import("@/components/auth-modal").then((mod) => mod.AuthModal),
+  { ssr: false },
+);
 
 const WHAT_DO_YOU_SELL_OFFERS = [
   "coaching service",

@@ -52,8 +52,7 @@
   h4,
   h5,
   h6 {
-    font-family:
-      var(--font-heading), var(--font-geist-sans), system-ui, sans-serif;
+    font-family: var(--font-heading), var(--font-sans), system-ui, sans-serif;
     letter-spacing: -0.025em;
   }
 }

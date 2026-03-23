@@ -1,7 +1,7 @@
 """
 Clear all data from the database (keeps schema).
 
-Run from project root:
+Run from backend/:
   uv run python scripts/clear_db.py --confirm
 """
 import argparse
@@ -9,7 +9,7 @@ import os
 import sys
 from pathlib import Path
 
-# Add project root so "app" is importable
+# Add the backend project root so "app" is importable.
 _root = Path(__file__).resolve().parent.parent
 if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))

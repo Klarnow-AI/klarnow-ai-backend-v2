@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import { Toaster } from "sonner";
 import "./globals.css";
@@ -8,13 +7,10 @@ import { ThemeProvider } from "@/contexts/theme-context";
 import { ConnectivityBanner } from "@/components/connectivity-banner";
 import { ErrorBoundary } from "@/components/error-boundary";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-geist-sans",
-});
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-geist-mono",
+const appSans = localFont({
+  src: "../fonts/GoogleSansFlex-VariableFont.ttf",
+  variable: "--font-sans",
+  display: "swap",
 });
 const googleSansFlex = localFont({
   src: "../fonts/GoogleSansFlex-VariableFont.ttf",
@@ -50,7 +46,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} ${googleSansFlex.variable} font-sans min-h-screen antialiased`}
+        className={`${appSans.variable} ${googleSansFlex.variable} font-sans min-h-screen antialiased`}
       >
         <ThemeProvider>
           <ConnectivityBanner />

@@ -21,7 +21,11 @@ from app.shared.services.openai_compatible import (
 )
 
 logger = get_logger("klarnow.reference_kb")
-ROOT_DIR = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[4]
+LEGACY_REFERENCE_DOC_PATHS = {
+    "app/core/reference/100M-Leads.md": "backend/app/core/docs/100M-Leads.md",
+    "app/core/docs/100M-Leads.md": "backend/app/core/docs/100M-Leads.md",
+}
 HEADING_RE = re.compile(r"^\s{0,3}(#{1,6})\s+(.*)$")
 
 
@@ -223,8 +227,22 @@ class MarkdownReferenceKB:
         if not self.reference_doc_path:
             return None
         path = Path(self.reference_doc_path).expanduser()
-        if not path.is_absolute():
-            path = ROOT_DIR / path
+        if path.is_absolute():
+            return path
+
+        repo_relative_path = REPO_ROOT / path
+        if repo_relative_path.exists():
+            return repo_relative_path
+
+        normalized = path.as_posix()
+        legacy_path = LEGACY_REFERENCE_DOC_PATHS.get(normalized)
+        if legacy_path:
+            return REPO_ROOT / legacy_path
+
+        if normalized.startswith("app/"):
+            return REPO_ROOT / "backend" / normalized
+
+        path = repo_relative_path
         return path
 
     def _get_client(self) -> OpenAI | None:

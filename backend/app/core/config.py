@@ -8,7 +8,8 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_REFERENCE_DOC_PATH = "backend/app/core/docs/100M-Leads.md"
 _LOCAL_DB_HOSTS = {"", "localhost", "127.0.0.1", "::1"}
 
 
@@ -29,7 +30,7 @@ def _database_uses_remote_host(database_url: str) -> bool:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         # Load backend env from repository root regardless of process working dir.
-        env_file=str(PROJECT_ROOT / ".env"),
+        env_file=str(REPO_ROOT / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -119,7 +120,7 @@ class Settings(BaseSettings):
 
     # Optional: Global reference markdown KB (RAG-lite for chat/proposals)
     reference_doc_enabled: bool = False
-    reference_doc_path: str = "app/core/reference/100M-Leads.md"
+    reference_doc_path: str = DEFAULT_REFERENCE_DOC_PATH
     reference_doc_chunk_chars: int = 1200
     reference_doc_chunk_overlap_chars: int = 200
     reference_doc_top_k: int = 5

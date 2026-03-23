@@ -1,5 +1,7 @@
 # Klarnow AI
 
+The repository is split into `frontend/` and `backend/`. The Python API, migrations, scripts, tests, and Supabase config now live under `backend/`.
+
 Agency replacement operating system for non-marketers. Generates and manages a complete campaign delivery pack end-to-end: Brand Strategy (Brand OS), Marketing Plan, Brand Identity, Conversion Page, Campaign Assets, Execution Tracking, Proposals and Invoices, and an exportable Launch Bundle.
 
 ## Vision
@@ -20,27 +22,27 @@ Enable small businesses to launch and execute professional marketing campaigns w
 1. Clone the repo and enter the project directory.
 2. Copy env and set values:
    ```bash
-   cp .env.example .env
+   cp backend/.env.example .env
    # Edit .env with your DATABASE_URL, SECRET_KEY, etc.
    ```
 3. Create venv and install dependencies:
    ```bash
    make install
-   # or: uv sync
+   # or: cd backend && uv sync
    ```
 4. Run migrations (you run these; see [docs/INSTRUCTIONS.md](docs/INSTRUCTIONS.md)):
    ```bash
-   alembic upgrade head
+   cd backend && alembic upgrade head
    ```
 5. Start the API:
    ```bash
    make start
-   # or: source .env && uvicorn app.main:app --reload
+   # or: cd backend && uvicorn app.main:app --reload
    ```
 6. Start the onboarding worker in a separate terminal:
    ```bash
    make worker
-   # or: source .env && python -m app.workers.onboarding_worker
+   # or: cd backend && python -m app.workers.onboarding_worker
    ```
 
 API: `http://localhost:8000`. Docs: `http://localhost:8000/docs`. Health: `http://localhost:8000/health`.
@@ -57,7 +59,7 @@ API: `http://localhost:8000`. Docs: `http://localhost:8000/docs`. Health: `http:
 
 ## Environment variables
 
-See [.env.example](.env.example). Required: `DATABASE_URL`, `SECRET_KEY`, and `REDIS_URL` for background onboarding. Optional: Resend, S3, Gemini, OpenAI, and Google sign-in.
+See [backend/.env.example](backend/.env.example). Required: `DATABASE_URL`, `SECRET_KEY`, and `REDIS_URL` for background onboarding. Optional: Resend, S3, Gemini, OpenAI, and Google sign-in.
 `CORS_ALLOW_ORIGINS` accepts a JSON list (recommended), comma-separated values, and bracketed forms that are normalized.
 
 Logo generation uses Gemini when `AI_LOGO_GENERATION_ENABLED=true` and `GEMINI_API_KEY` is set. `GOOGLE_API_KEY` is accepted as an alias for `GEMINI_API_KEY`.
