@@ -7,6 +7,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.errors import DomainNotFoundError
 from app.modules.brand_os.services import get_active_for_pack as get_active_brand_os
 from app.modules.builder.services import get_for_pack_any, get_published_for_pack
 from app.modules.campaign.services import get_active_for_pack as get_active_campaign
@@ -183,7 +184,7 @@ def get_pack_snapshot(
     pack_uuid = _safe_uuid(pack_id)
     pack = db.query(Pack).filter(Pack.id == pack_uuid).first()
     if not pack:
-        raise ValueError("Pack not found")
+        raise DomainNotFoundError("Pack not found")
 
     lead_limit = _normalize_limit(lead_limit, default=20, maximum=50)
     task_limit = _normalize_limit(task_limit, default=20, maximum=50)
@@ -289,7 +290,7 @@ def get_pack_followup_queue(
     pack_uuid = _safe_uuid(pack_id)
     pack = db.query(Pack).filter(Pack.id == pack_uuid).first()
     if not pack:
-        raise ValueError("Pack not found")
+        raise DomainNotFoundError("Pack not found")
 
     limit = _normalize_limit(limit, default=30, maximum=100)
     status = (status or "pending").lower().strip()

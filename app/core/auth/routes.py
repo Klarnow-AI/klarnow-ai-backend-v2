@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response, status
+from app.core.rate_limit import limiter
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -138,7 +139,9 @@ def _send_password_reset_email(to_email: str, token: str) -> bool:
 
 
 @router.post("/check-email", response_model=CheckEmailResponse)
+@limiter.limit("20/minute")
 def check_email(
+    request: Request,
     body: CheckEmailBody,
     db: Session = Depends(get_db),
 ):
@@ -148,7 +151,9 @@ def check_email(
 
 
 @router.post("/send-login-code", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("5/minute")
 def send_login_code(
+    request: Request,
     body: SendLoginCodeBody,
     db: Session = Depends(get_db),
 ):
@@ -169,9 +174,10 @@ def send_login_code(
 
 
 @router.post("/verify-login-code", response_model=TokenResponse)
+@limiter.limit("10/minute")
 def verify_login_code(
-    body: VerifyLoginCodeBody,
     request: Request,
+    body: VerifyLoginCodeBody,
     response: Response,
     db: Session = Depends(get_db),
 ):
@@ -208,9 +214,10 @@ def verify_login_code(
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
 def register(
-    body: RegisterBody,
     request: Request,
+    body: RegisterBody,
     response: Response,
     db: Session = Depends(get_db),
 ):
@@ -234,9 +241,10 @@ def register(
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("10/minute")
 def login(
-    body: LoginBody,
     request: Request,
+    body: LoginBody,
     response: Response,
     db: Session = Depends(get_db),
 ):
@@ -253,9 +261,10 @@ def login(
 
 
 @router.post("/google", response_model=TokenResponse)
+@limiter.limit("10/minute")
 def google_login(
-    body: GoogleLoginBody,
     request: Request,
+    body: GoogleLoginBody,
     response: Response,
     db: Session = Depends(get_db),
 ):
@@ -351,7 +360,9 @@ def logout(
 
 
 @router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("3/minute")
 def forgot_password(
+    request: Request,
     body: ForgotPasswordBody,
     db: Session = Depends(get_db),
 ):
@@ -373,7 +384,9 @@ def forgot_password(
 
 
 @router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("5/minute")
 def reset_password(
+    request: Request,
     body: ResetPasswordBody,
     db: Session = Depends(get_db),
 ):

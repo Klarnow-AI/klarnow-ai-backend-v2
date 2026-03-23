@@ -187,6 +187,29 @@ class GateBlockedError(AppError):
         )
 
 
+# ---------------------------------------------------------------------------
+# Typed ValueError subclasses — raise these instead of plain ValueError so
+# map_value_error_to_app_error can use isinstance checks rather than fragile
+# string matching.
+# ---------------------------------------------------------------------------
+
+
+class DomainNotFoundError(ValueError):
+    """Resource not found or access denied — maps to 404."""
+
+
+class DomainConflictError(ValueError):
+    """State conflict (duplicate, locked, already active) — maps to 409."""
+
+
+class DomainGateBlockedError(ValueError):
+    """Prerequisite not met — maps to 422."""
+
+
+class DomainServiceUnavailableError(ValueError):
+    """External service or integration not configured — maps to 503."""
+
+
 def _request_data(request: Request) -> dict[str, Any]:
     request_id = getattr(request.state, "request_id", None)
     return {"request_id": request_id} if request_id else {}
@@ -364,48 +387,16 @@ def request_validation_error_handler(
     )
 
 
-_SERVICE_UNAVAILABLE_MARKERS = (
-    "must be configured",
-    "not configured",
-)
-
-_CONFLICT_MARKERS = (
-    "already has an active",
-    "already active",
-    "already completed",
-    "cannot update locked",
-    "cannot be rendered; status=",
-)
-
-_NOT_FOUND_MARKERS = (
-    "not found",
-    "access denied",
-    "no active sprint",
-    "no day card",
-    "no response rules found",
-)
-
-_PRECONDITION_MARKERS = (
-    "before generating",
-    "before starting",
-    "before creating",
-    "before proceeding",
-    "before rendering",
-)
-
-
 def map_value_error_to_app_error(exc: ValueError) -> AppError:
     message = str(exc).strip() or "Invalid request"
-    lower = message.lower()
-
-    if any(marker in lower for marker in _SERVICE_UNAVAILABLE_MARKERS):
-        return ServiceUnavailableError(message)
-    if any(marker in lower for marker in _CONFLICT_MARKERS):
-        return ConflictError(message)
-    if any(marker in lower for marker in _NOT_FOUND_MARKERS):
+    if isinstance(exc, DomainNotFoundError):
         return NotFoundError(message)
-    if any(marker in lower for marker in _PRECONDITION_MARKERS):
+    if isinstance(exc, DomainConflictError):
+        return ConflictError(message)
+    if isinstance(exc, DomainGateBlockedError):
         return GateBlockedError(message)
+    if isinstance(exc, DomainServiceUnavailableError):
+        return ServiceUnavailableError(message)
     return BadRequestError(message)
 
 

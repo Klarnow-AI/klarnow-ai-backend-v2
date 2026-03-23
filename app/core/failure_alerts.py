@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import html
 import json
 import re
-import threading
 import time
 from collections import deque
 from dataclasses import dataclass
@@ -53,7 +53,7 @@ FAILURE_ALERT_MAX_RETRY_ATTEMPTS = 3
 FAILURE_ALERT_DEFAULT_RETRY_AFTER_SECONDS = 1.0
 FAILURE_ALERT_MAX_RETRY_AFTER_SECONDS = 30.0
 
-_FAILURE_ALERT_RATE_LIMIT_LOCK = threading.Lock()
+_FAILURE_ALERT_RATE_LIMIT_LOCK = asyncio.Lock()
 _FAILURE_ALERT_SCHEDULED_SEND_TIMES: deque[float] = deque(
     maxlen=FAILURE_ALERT_MAX_SENDS_PER_WINDOW
 )
@@ -185,7 +185,7 @@ def build_failure_alert(request: Request, response: Response) -> FailureAlert | 
     return FailureAlert(subject=subject, text=text, html=html_body, details=details)
 
 
-def send_failure_alert_email(alert: FailureAlert) -> bool:
+async def send_failure_alert_email(alert: FailureAlert) -> bool:
     settings = get_settings()
     to_email = (
         getattr(settings, "failure_alert_to_email", "") or getattr(settings, "support_email", "")
@@ -223,14 +223,14 @@ def send_failure_alert_email(alert: FailureAlert) -> bool:
     }
 
     for attempt in range(1, FAILURE_ALERT_MAX_RETRY_ATTEMPTS + 1):
-        _wait_for_failure_alert_send_slot()
+        await _wait_for_failure_alert_send_slot()
         try:
             resend.Emails.send(payload)
             return True
         except Exception as exc:
             if _is_failure_alert_rate_limit_error(exc) and attempt < FAILURE_ALERT_MAX_RETRY_ATTEMPTS:
                 retry_after_seconds = _resolve_failure_alert_retry_after_seconds(exc)
-                _set_failure_alert_provider_cooldown(retry_after_seconds)
+                await _set_failure_alert_provider_cooldown(retry_after_seconds)
                 logger.warning(
                     "Failure alert email rate limited request_id=%s status_code=%s attempt=%s retry_in_seconds=%.2f error=%s",
                     request_id,
@@ -251,15 +251,15 @@ def send_failure_alert_email(alert: FailureAlert) -> bool:
     return False
 
 
-def _wait_for_failure_alert_send_slot() -> None:
-    delay_seconds = _reserve_failure_alert_send_delay()
+async def _wait_for_failure_alert_send_slot() -> None:
+    delay_seconds = await _reserve_failure_alert_send_delay()
     if delay_seconds > 0:
-        time.sleep(delay_seconds)
+        await asyncio.sleep(delay_seconds)
 
 
-def _reserve_failure_alert_send_delay() -> float:
+async def _reserve_failure_alert_send_delay() -> float:
     now = time.monotonic()
-    with _FAILURE_ALERT_RATE_LIMIT_LOCK:
+    async with _FAILURE_ALERT_RATE_LIMIT_LOCK:
         scheduled_at = max(now, _FAILURE_ALERT_PROVIDER_COOLDOWN_UNTIL)
         if len(_FAILURE_ALERT_SCHEDULED_SEND_TIMES) >= FAILURE_ALERT_MAX_SENDS_PER_WINDOW:
             scheduled_at = max(
@@ -270,12 +270,12 @@ def _reserve_failure_alert_send_delay() -> float:
     return max(0.0, scheduled_at - now)
 
 
-def _set_failure_alert_provider_cooldown(retry_after_seconds: float) -> None:
+async def _set_failure_alert_provider_cooldown(retry_after_seconds: float) -> None:
     bounded_retry_after_seconds = max(
         FAILURE_ALERT_DEFAULT_RETRY_AFTER_SECONDS,
         min(retry_after_seconds, FAILURE_ALERT_MAX_RETRY_AFTER_SECONDS),
     )
-    with _FAILURE_ALERT_RATE_LIMIT_LOCK:
+    async with _FAILURE_ALERT_RATE_LIMIT_LOCK:
         global _FAILURE_ALERT_PROVIDER_COOLDOWN_UNTIL
         _FAILURE_ALERT_PROVIDER_COOLDOWN_UNTIL = max(
             _FAILURE_ALERT_PROVIDER_COOLDOWN_UNTIL,
@@ -367,8 +367,8 @@ def _parse_failure_alert_retry_after_seconds(value: Any) -> float | None:
     return max(0.0, (retry_after_at - datetime.now(timezone.utc)).total_seconds())
 
 
-def _reset_failure_alert_rate_limit_state() -> None:
-    with _FAILURE_ALERT_RATE_LIMIT_LOCK:
+async def _reset_failure_alert_rate_limit_state() -> None:
+    async with _FAILURE_ALERT_RATE_LIMIT_LOCK:
         _FAILURE_ALERT_SCHEDULED_SEND_TIMES.clear()
         global _FAILURE_ALERT_PROVIDER_COOLDOWN_UNTIL
         _FAILURE_ALERT_PROVIDER_COOLDOWN_UNTIL = 0.0

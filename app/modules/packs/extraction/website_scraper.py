@@ -1,5 +1,6 @@
 """Website scraping and metadata extraction."""
 
+import asyncio
 import colorsys
 import re
 from typing import Any, Dict, List, Optional, Tuple, cast
@@ -380,16 +381,22 @@ async def extract_color_candidates(
             headers=DEFAULT_HEADERS, timeout=timeout, follow_redirects=True
         )
 
+    async def _fetch_css_scores(css_url: str) -> Dict[str, float]:
+        try:
+            resp = await client.get(css_url)
+            if resp.status_code >= 400:
+                return {}
+            return _score_colors_from_css(resp.text)
+        except httpx.HTTPError:
+            return {}
+
     try:
-        for css_url in css_links[:MAX_CSS_FILES]:
-            try:
-                resp = await client.get(css_url)
-                if resp.status_code >= 400:
-                    continue
-                for color, score in _score_colors_from_css(resp.text).items():
-                    scores[color] = scores.get(color, 0) + score
-            except httpx.HTTPError:
-                continue
+        css_results = await asyncio.gather(
+            *[_fetch_css_scores(css_url) for css_url in css_links[:MAX_CSS_FILES]]
+        )
+        for css_scores in css_results:
+            for color, score in css_scores.items():
+                scores[color] = scores.get(color, 0) + score
     finally:
         if owns_client:
             await client.aclose()
@@ -480,19 +487,22 @@ async def extract_brand_from_website(
         # 1) Fetch main page
         html = await fetch_html(url, client=client)
 
-        # 2) Extract colors + meta from main HTML
-        color_candidates = await extract_color_candidates(url, html, client=client)
+        # 2) Extract colors and meta from main HTML in parallel (colors involves CSS fetches)
+        color_task = asyncio.create_task(extract_color_candidates(url, html, client=client))
         meta = extract_meta_and_links(url, html)
+        color_candidates = await color_task
 
-        # 3) Build clean text corpus (main + candidate pages)
-        texts = [html_to_clean_text(url, html)]
-
-        for page in pick_candidate_pages(url, html):
+        # 3) Build clean text corpus (main + candidate pages in parallel)
+        async def _fetch_page_text(page: str) -> Optional[str]:
             try:
                 page_html = await fetch_html(page, client=client)
-                texts.append(html_to_clean_text(page, page_html))
+                return html_to_clean_text(page, page_html)
             except Exception:
-                continue
+                return None
+
+        candidate_pages = pick_candidate_pages(url, html)
+        page_texts = await asyncio.gather(*[_fetch_page_text(p) for p in candidate_pages])
+        texts = [html_to_clean_text(url, html)] + [t for t in page_texts if t is not None]
 
     combined = "\n\n".join(texts)
 

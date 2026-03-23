@@ -2,6 +2,8 @@
 
 from typing import TypedDict
 
+from app.core.errors import DomainNotFoundError
+
 
 class DayContent(TypedDict):
     """Content for a day in a specific mode."""
@@ -389,7 +391,7 @@ def get_day_definition(day_number: int) -> DayDefinition:
     for day in DAY_DEFINITIONS:
         if day["day_number"] == day_number:
             return day
-    raise ValueError(f"Day {day_number} not found")
+    raise DomainNotFoundError(f"Day {day_number} not found")
 
 
 def get_day_content(day_number: int, mode: str) -> DayContent:

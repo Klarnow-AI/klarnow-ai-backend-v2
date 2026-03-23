@@ -4,6 +4,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.errors import DomainGateBlockedError, DomainNotFoundError
 from app.modules.sprint.services import get_active_sprint_for_pack, complete_day
 
 
@@ -42,7 +43,7 @@ def complete_sprint_day(
         pack_id = UUID(pack_id)
     sprint = get_active_sprint_for_pack(db, pack_id)
     if not sprint:
-        raise ValueError("No active sprint for this pack. Start a sprint from the plan tracker.")
+        raise DomainNotFoundError("No active sprint for this pack. Start a sprint from the plan tracker.")
 
     if day_number < 0 or day_number > 3:
         raise ValueError("day_number must be 0, 1, 2, or 3 for this flow")

@@ -9,13 +9,14 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.errors import AppError, build_error_payload, map_value_error_to_app_error
+from app.core.errors import AppError, DomainNotFoundError, build_error_payload, map_value_error_to_app_error
 from app.core.logging import get_logger
 from app.core.storage import get_asset_url
 from app.modules.agents.orchestrator import assemble_context, CHAT_CONTEXT_LAST_N_MESSAGES
 from app.modules.agents.registry import REGISTRY, execute
 from app.modules.packs.services import get_pack_for_user
 from app.shared.services.openai_compatible import (
+    create_async_openai_client,
     create_sync_openai_client,
     get_default_model,
     has_openai_compatible_provider,
@@ -172,7 +173,7 @@ def _resolve_attachment_snapshots(
     for attachment_id in ordered_ids:
         row = row_map.get(attachment_id)
         if not row:
-            raise ValueError("Attachment not found in this conversation")
+            raise DomainNotFoundError("Attachment not found in this conversation")
         snapshots.append(_serialize_attachment_snapshot(row, excerpt_chars=excerpt_chars))
     return snapshots
 
@@ -506,7 +507,7 @@ def run_chat_turn(
         Conversation.user_id == user_id,
     ).first()
     if not conv:
-        raise ValueError("Conversation not found")
+        raise DomainNotFoundError("Conversation not found")
 
     allow_account_scope = _wants_account_scope(user_content)
     settings = get_settings()
@@ -865,7 +866,7 @@ def _stream_error_payload(exc: Exception, request_id: str | None = None) -> dict
     )
 
 
-def run_chat_turn_stream(
+async def run_chat_turn_stream(
     db: Session,
     user_id: UUID,
     conversation_id: UUID,
@@ -877,7 +878,7 @@ def run_chat_turn_stream(
     request_id: str | None = None,
 ):
     """
-    Generator that yields SSE events:
+    Async generator that yields SSE events:
     - status: transient phase updates (thinking/tool execution/finalizing/responding)
     - chunk: incremental assistant text deltas
     - done: final payload with message metadata
@@ -1012,7 +1013,7 @@ def run_chat_turn_stream(
             )
             return
 
-        client = create_sync_openai_client()
+        client = create_async_openai_client()
         if not client:
             stub_msg = Message(
                 conversation_id=conversation_id,
@@ -1033,7 +1034,7 @@ def run_chat_turn_stream(
             )
             return
 
-        stream = client.chat.completions.create(
+        stream = await client.chat.completions.create(
             model=get_default_model(),
             messages=openai_messages,  # pyright: ignore[reportArgumentType]
             tools=openai_tools if openai_tools else None,  # pyright: ignore[reportArgumentType]
@@ -1046,7 +1047,7 @@ def run_chat_turn_stream(
         tool_calls_accum: dict[int, dict] = {}
         emitted_responding = False
 
-        for chunk in stream:
+        async for chunk in stream:
             if not chunk.choices:
                 continue
             delta = chunk.choices[0].delta
@@ -1139,14 +1140,14 @@ def run_chat_turn_stream(
                 )
 
             yield _sse_status("finalizing", "Finalizing answer...")
-            follow_up_stream = client.chat.completions.create(
+            follow_up_stream = await client.chat.completions.create(
                 model=get_default_model(),
                 messages=openai_messages,  # pyright: ignore[reportArgumentType]
                 stream=True,
             )
             follow_parts: list[str] = []
             follow_emitted_responding = False
-            for follow_chunk in follow_up_stream:
+            async for follow_chunk in follow_up_stream:
                 if not follow_chunk.choices:
                     continue
                 follow_delta = follow_chunk.choices[0].delta

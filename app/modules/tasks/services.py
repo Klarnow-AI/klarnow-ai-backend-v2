@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.errors import DomainNotFoundError
 from app.core.logging import log_service_action
 from app.modules.tasks.models import (
     CHANNEL_DM,
@@ -119,7 +120,7 @@ def complete_task(db: Session, task_id: UUID) -> FollowUpTask:
 
     task = db.query(FollowUpTask).filter(FollowUpTask.id == task_id).first()
     if not task:
-        raise ValueError(f"Task {task_id} not found")
+        raise DomainNotFoundError(f"Task {task_id} not found")
 
     task.status = TASK_STATUS_COMPLETED
     task.completed_at = utc_now()
@@ -155,7 +156,7 @@ def skip_task(db: Session, task_id: UUID) -> FollowUpTask:
     """Mark a task as skipped."""
     task = db.query(FollowUpTask).filter(FollowUpTask.id == task_id).first()
     if not task:
-        raise ValueError(f"Task {task_id} not found")
+        raise DomainNotFoundError(f"Task {task_id} not found")
     
     task.status = TASK_STATUS_SKIPPED
     db.commit()

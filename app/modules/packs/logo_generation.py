@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
-import threading
 import time
 import uuid
 from collections import deque
@@ -38,7 +38,7 @@ _IMAGE_EXTENSION_BY_MIME_TYPE = {
 }
 
 logger = get_logger("klarnow.services.logo_generation")
-_PROVIDER_FAILURE_LOCK = threading.Lock()
+_PROVIDER_FAILURE_LOCK = asyncio.Lock()
 _PROVIDER_FAILURE_STATE: dict[str, float | str] = {"until": 0.0, "reason": ""}
 
 
@@ -72,16 +72,16 @@ def get_logo_variant_urls(result: Mapping[str, object] | None) -> list[str]:
     return urls
 
 
-def _set_provider_cooldown(reason: str) -> None:
+async def _set_provider_cooldown(reason: str) -> None:
     """Temporarily suppress provider calls after known auth/quota failures."""
-    with _PROVIDER_FAILURE_LOCK:
+    async with _PROVIDER_FAILURE_LOCK:
         _PROVIDER_FAILURE_STATE["until"] = time.monotonic() + PROVIDER_COOLDOWN_SECONDS
         _PROVIDER_FAILURE_STATE["reason"] = reason
 
 
-def _get_provider_cooldown_reason() -> str | None:
+async def _get_provider_cooldown_reason() -> str | None:
     """Return active cooldown reason for provider, or None when provider is callable."""
-    with _PROVIDER_FAILURE_LOCK:
+    async with _PROVIDER_FAILURE_LOCK:
         until = float(_PROVIDER_FAILURE_STATE["until"] or 0.0)
         if until <= 0:
             return None
@@ -255,7 +255,7 @@ def _extension_for_mime_type(mime_type: str) -> str:
     return _IMAGE_EXTENSION_BY_MIME_TYPE.get(normalized, "png")
 
 
-def _upload_logo_variant(
+async def _upload_logo_variant(
     *,
     pack_id: str,
     asset_id: str,
@@ -266,7 +266,7 @@ def _upload_logo_variant(
 ) -> str:
     suffix = f"_{variant_name}" if variant_name else ""
     key = f"logos/{pack_id}/{asset_id}{suffix}.{extension}"
-    uploaded = upload_file(key, image_bytes, content_type=mime_type)
+    uploaded = await upload_file(key, image_bytes, content_type=mime_type)
     if not uploaded:
         logger.warning(
             "logo_generation: upload_file returned falsy for variant %s",
@@ -467,7 +467,7 @@ def _request_logo_image_generation(
     raise BadRequestError("Logo generation failed before any OpenRouter request was sent.")
 
 
-def generate_logo_with_openrouter(
+async def generate_logo_with_openrouter(
     prompt_text: str,
     pack_id: str,
 ) -> dict[str, str | None]:
@@ -483,7 +483,7 @@ def generate_logo_with_openrouter(
             "Logo image generation is disabled. "
             "Set OPENROUTER_API_KEY and AI_LOGO_GENERATION_ENABLED=true to generate logos."
         )
-    cooldown_reason = _get_provider_cooldown_reason()
+    cooldown_reason = await _get_provider_cooldown_reason()
     if cooldown_reason:
         raise BadRequestError(cooldown_reason)
 
@@ -505,7 +505,7 @@ def generate_logo_with_openrouter(
     except Exception as exc:
         if _is_provider_auth_or_quota_error(exc):
             reason = _build_provider_failure_reason(exc)
-            _set_provider_cooldown(reason)
+            await _set_provider_cooldown(reason)
             logger.warning(
                 "logo_generation: %s Skipping image generation for %ss.",
                 reason,
@@ -531,14 +531,14 @@ def generate_logo_with_openrouter(
         mime_type,
     )
     asset_id = uuid.uuid4().hex
-    default_logo_url = _upload_logo_variant(
+    default_logo_url = await _upload_logo_variant(
         pack_id=pack_id,
         asset_id=asset_id,
         image_bytes=image_bytes,
         mime_type=mime_type,
         extension=extension,
     )
-    transparent_logo_url = _upload_logo_variant(
+    transparent_logo_url = await _upload_logo_variant(
         pack_id=pack_id,
         asset_id=asset_id,
         image_bytes=_create_transparent_png_variant(image_bytes),
@@ -554,7 +554,7 @@ def generate_logo_with_openrouter(
 
 
 @log_service_action()
-def generate_logo(
+async def generate_logo(
     brand_name: str,
     prompt: str | None,
     pack_id: str,
@@ -583,7 +583,7 @@ def generate_logo(
     if has_openai_compatible_provider() and settings.ai_logo_generation_enabled:
         logger.info("logo_generation: using OpenRouter model %s", get_logo_model())
         try:
-            return generate_logo_with_openrouter(prompt_text, pack_id)
+            return await generate_logo_with_openrouter(prompt_text, pack_id)
         except BadRequestError as exc:
             if strict:
                 raise

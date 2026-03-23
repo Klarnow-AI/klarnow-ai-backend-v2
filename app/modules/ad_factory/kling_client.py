@@ -9,7 +9,7 @@ from typing import Any
 import jwt
 import requests
 
-from app.core.errors import BadGatewayError
+from app.core.errors import BadGatewayError, DomainServiceUnavailableError
 from app.core.config import get_settings
 
 
@@ -48,7 +48,7 @@ def _get_auth_header() -> str:
     """Build Authorization: Bearer <JWT> header."""
     _, ak, sk = _get_config()
     if not ak or not sk:
-        raise ValueError("KLING_ACCESS_KEY and KLING_SECRET_KEY must be configured")
+        raise DomainServiceUnavailableError("KLING_ACCESS_KEY and KLING_SECRET_KEY must be configured")
     token = _encode_jwt_token(ak, sk)
     return f"Bearer {token}"
 
@@ -180,7 +180,7 @@ def submit_text_to_video(
     """Submit text-to-video job. Returns task_id. Raises if credentials missing or request fails."""
     base, ak, sk = _get_config()
     if not ak or not sk:
-        raise ValueError("KLING_ACCESS_KEY and KLING_SECRET_KEY must be configured")
+        raise DomainServiceUnavailableError("KLING_ACCESS_KEY and KLING_SECRET_KEY must be configured")
 
     auth = _get_auth_header()
     payload = _build_text_to_video_payload(
@@ -227,7 +227,7 @@ def get_task_status(task_id: str) -> dict:
     """Get task status. Returns dict with status and video URL when complete."""
     base, ak, sk = _get_config()
     if not ak or not sk:
-        raise ValueError("KLING_ACCESS_KEY and KLING_SECRET_KEY must be configured")
+        raise DomainServiceUnavailableError("KLING_ACCESS_KEY and KLING_SECRET_KEY must be configured")
 
     auth = _get_auth_header()
     primary_url = f"{base}{KLING_TEXT_TO_VIDEO_ENDPOINT}/{task_id}"

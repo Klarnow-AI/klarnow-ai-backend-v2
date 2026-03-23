@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.errors import DomainNotFoundError
 from app.modules.brand_os.services import get_active_for_pack
 from app.modules.packs.models import Pack
 from app.shared.generation_schemas import (
@@ -180,7 +181,7 @@ def load_generation_brand_context(db: Session, pack_id: UUID, pack: Pack | None 
 
         pack_row = db.query(PackModel).filter(PackModel.id == pack_id).first()
         if pack_row is None:
-            raise ValueError("Pack not found")
+            raise DomainNotFoundError("Pack not found")
 
     active_brand_os = get_active_for_pack(db, pack_id)
     return build_generation_brand_context(pack_row, brand_os=active_brand_os)

@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.errors import DomainNotFoundError
 from app.modules.packs.models import Pack
 from app.modules.packs.services import merge_onboarding_answers
 
@@ -55,7 +56,7 @@ def extract_brand_from_url(db: Session, pack_id: UUID | str, *, url: str, **kwar
         pack_id = UUID(pack_id)
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
-        raise ValueError("Pack not found")
+        raise DomainNotFoundError("Pack not found")
     url = (url or "").strip()
     if not url:
         raise ValueError("URL is required")
@@ -126,7 +127,7 @@ def update_pack(
         pack_id = UUID(pack_id)
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
-        raise ValueError("Pack not found")
+        raise DomainNotFoundError("Pack not found")
 
     updates: dict = {}
 

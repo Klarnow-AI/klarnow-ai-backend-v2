@@ -1,15 +1,18 @@
 """Chat API: conversations, messages, Use / Preview / Apply."""
 
+import asyncio
 import uuid as uuid_lib
 from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.auth.deps import get_current_user
-from app.core.db.session import get_db
+from app.core.db.session import get_db, async_get_db
 from app.core.errors import BadRequestError, NotFoundError, map_value_error_to_app_error
 from app.core.storage import upload_file as storage_upload_file
 from app.modules.packs.models import User
@@ -97,12 +100,19 @@ def _extract_text_content(
 async def upload_attachment(
     conversation_id: UUID,
     file: UploadFile = File(...),
-    db=Depends(get_db),
+    db: AsyncSession = Depends(async_get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Upload one file for chat context and return attachment metadata."""
-    conv = get_conversation_for_user(db, conversation_id, current_user.id)
-    if not conv:
+    from app.modules.chat.models import Conversation
+
+    result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.user_id == current_user.id,
+        )
+    )
+    if result.scalar_one_or_none() is None:
         raise NotFoundError("Conversation not found")
 
     content = await file.read()
@@ -118,7 +128,8 @@ async def upload_attachment(
 
     safe_name = _safe_filename(file.filename)
     key = f"chat/attachments/{conversation_id}/{uuid_lib.uuid4().hex}_{safe_name}"
-    uploaded_key = storage_upload_file(key, content, content_type=file.content_type)
+
+    uploaded_key = await storage_upload_file(key, content, content_type=file.content_type)
     text_content = _extract_text_content(
         payload=content,
         file_name=safe_name,
@@ -136,8 +147,8 @@ async def upload_attachment(
         text_content=text_content,
     )
     db.add(attachment)
-    db.commit()
-    db.refresh(attachment)
+    await db.commit()
+    await db.refresh(attachment)
     return ChatAttachmentRead(
         id=attachment.id,
         conversation_id=attachment.conversation_id,
@@ -248,7 +259,7 @@ def list_messages(
 
 
 @router.post("/conversations/{conversation_id}/messages", response_model=SendMessageResponse)
-def send_message(
+async def send_message(
     conversation_id: UUID,
     request: Request,
     body: SendMessageBody,
@@ -270,8 +281,8 @@ def send_message(
     if not conv:
         raise NotFoundError("Conversation not found")
     if stream:
-        def sse_stream():
-            for chunk in run_chat_turn_stream(
+        async def sse_stream():
+            async for chunk in run_chat_turn_stream(
                 db=db,
                 user_id=current_user.id,
                 conversation_id=conversation_id,

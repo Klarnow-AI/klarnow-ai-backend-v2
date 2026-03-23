@@ -2,6 +2,7 @@ from logging.config import fileConfig
 
 from sqlalchemy import create_engine
 from sqlalchemy import pool
+from sqlalchemy.engine import make_url
 
 from alembic import context
 
@@ -40,6 +41,16 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
 
+
+def _migration_connect_args(database_url: str) -> dict[str, str]:
+    if make_url(database_url).get_backend_name() != "postgresql":
+        return {}
+    return {
+        # Let DDL wait for locks in maintenance runs.
+        "options": "-c statement_timeout=0 -c lock_timeout=0 -c idle_in_transaction_session_timeout=5min"
+    }
+
+
 def run_migrations_offline() -> None:
     url = get_settings().database_url
     context.configure(
@@ -54,14 +65,12 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    database_url = get_settings().database_url
     # Create engine directly from settings.database_url
     connectable = create_engine(
-        get_settings().database_url,
+        database_url,
         poolclass=pool.NullPool,
-        connect_args={
-            # Let DDL wait for locks in maintenance runs.
-            "options": "-c statement_timeout=0 -c lock_timeout=0 -c idle_in_transaction_session_timeout=5min"
-        },
+        connect_args=_migration_connect_args(database_url),
     )
 
     with connectable.connect() as connection:

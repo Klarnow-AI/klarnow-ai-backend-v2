@@ -98,22 +98,14 @@ def list_my_packs(
     active_pack_ids = set()
     packs_with_campaign = set()
     if pack_ids:
-        active_rows = (
-            db.query(Campaign.pack_id)
-            .filter(
-                Campaign.pack_id.in_(pack_ids),
-                Campaign.is_active.is_(True),
-            )
-            .all()
-        )
-        active_pack_ids = {r[0] for r in active_rows}
-        any_rows = (
-            db.query(Campaign.pack_id)
+        campaign_rows = (
+            db.query(Campaign.pack_id, func.bool_or(Campaign.is_active).label("has_active"))
             .filter(Campaign.pack_id.in_(pack_ids))
-            .distinct()
+            .group_by(Campaign.pack_id)
             .all()
         )
-        packs_with_campaign = {r[0] for r in any_rows}
+        active_pack_ids = {r.pack_id for r in campaign_rows if r.has_active}
+        packs_with_campaign = {r.pack_id for r in campaign_rows}
     items = []
     for p in packs:
         data = PackRead.model_validate(p).model_dump()
@@ -149,22 +141,87 @@ def get_pack_summary(
     if not pack:
         raise NotFoundError("Pack not found")
 
-    from app.modules.brand_os.services import get_active_for_pack as get_brand_os, get_summary_fields
-    from app.modules.campaign.services import get_active_for_pack as get_campaign
-    from app.modules.builder.services import get_published_for_pack as get_published_site
-    from app.modules.sprint.services import get_active_sprint_for_pack
+    from app.modules.brand_os.models import BrandOS
+    from app.modules.campaign.models import Campaign as CampaignModel
+    from app.modules.builder.models import BuilderProject
+    from app.modules.sprint.models import Sprint, SPRINT_STATUS_ACTIVE
     from app.modules.clients.models import LEAD_STATUS_QUALIFIED, Lead
     from app.modules.docs.models import Document
     from app.modules.proof_vault.models import Proof
     from app.modules.creative.models import Asset
 
-    brand_os = get_brand_os(db, pack_id)
-    mission, vision, has_positioning = (
-        get_summary_fields(brand_os) if brand_os else (None, None, False)
-    )
-    campaign = get_campaign(db, pack_id)
-    published_site = get_published_site(db, pack_id)
-    active_sprint = get_active_sprint_for_pack(db, pack_id)
+    meta = db.execute(
+        select(
+            select(BrandOS.id)
+                .where(BrandOS.pack_id == pack_id, BrandOS.is_active.is_(True))
+                .limit(1)
+                .scalar_subquery()
+                .label("brand_os_id"),
+            select(BrandOS.brand_strategy)
+                .where(BrandOS.pack_id == pack_id, BrandOS.is_active.is_(True))
+                .limit(1)
+                .scalar_subquery()
+                .label("brand_strategy"),
+            select(CampaignModel.id)
+                .where(CampaignModel.pack_id == pack_id, CampaignModel.is_active.is_(True))
+                .limit(1)
+                .scalar_subquery()
+                .label("campaign_id"),
+            select(CampaignModel.goal)
+                .where(CampaignModel.pack_id == pack_id, CampaignModel.is_active.is_(True))
+                .limit(1)
+                .scalar_subquery()
+                .label("campaign_goal"),
+            select(CampaignModel.primary_cta)
+                .where(CampaignModel.pack_id == pack_id, CampaignModel.is_active.is_(True))
+                .limit(1)
+                .scalar_subquery()
+                .label("campaign_cta"),
+            select(BuilderProject.live_url)
+                .where(
+                    BuilderProject.pack_id == pack_id,
+                    BuilderProject.published_at.isnot(None),
+                    BuilderProject.live_url.isnot(None),
+                )
+                .order_by(BuilderProject.published_at.desc())
+                .limit(1)
+                .scalar_subquery()
+                .label("site_live_url"),
+            select(BuilderProject.published_at)
+                .where(
+                    BuilderProject.pack_id == pack_id,
+                    BuilderProject.published_at.isnot(None),
+                    BuilderProject.live_url.isnot(None),
+                )
+                .order_by(BuilderProject.published_at.desc())
+                .limit(1)
+                .scalar_subquery()
+                .label("site_published_at"),
+            select(Sprint.current_day)
+                .where(Sprint.pack_id == pack_id, Sprint.status == SPRINT_STATUS_ACTIVE)
+                .order_by(Sprint.started_at.desc())
+                .limit(1)
+                .scalar_subquery()
+                .label("sprint_day"),
+        )
+    ).one()._mapping
+
+    has_brand_os = meta["brand_os_id"] is not None
+    brand_strategy = meta["brand_strategy"]
+    if has_brand_os and brand_strategy and isinstance(brand_strategy, dict):
+        bs = brand_strategy
+        mv = bs.get("mission_vision") or {}
+        mission = mv.get("mission")
+        vision = mv.get("vision")
+        pos = bs.get("positioning_differentiation") or {}
+        has_positioning = bool(pos.get("statement") or pos.get("unique_advantage"))
+    else:
+        mission, vision, has_positioning = None, None, False
+
+    has_campaign = meta["campaign_id"] is not None
+    has_site = meta["site_live_url"] is not None
+    sprint_day = meta["sprint_day"]
+    has_sprint = sprint_day is not None
     counts = (
         db.execute(
             select(
@@ -250,13 +307,11 @@ def get_pack_summary(
     )
 
     goal_summary = None
-    if campaign and campaign.goal:
-        g = campaign.goal if isinstance(campaign.goal, dict) else {}
+    if has_campaign and meta["campaign_goal"]:
+        g = meta["campaign_goal"] if isinstance(meta["campaign_goal"], dict) else {}
         goal_summary = (g.get("description") or g.get("title") or str(g))[:200]
 
     # Plan & Tracker = 14-day sprint (MVP)
-    sprint_day = active_sprint.current_day if active_sprint else None
-    has_sprint = active_sprint is not None
 
     return PackSummaryResponse(
         pack=PackRead.model_validate(pack),
@@ -264,15 +319,15 @@ def get_pack_summary(
             mission=mission,
             vision=vision,
             has_positioning=has_positioning,
-        ) if brand_os else None,
+        ) if has_brand_os else None,
         campaign=CampaignSummary(
-            primary_cta=campaign.primary_cta if campaign else None,
+            primary_cta=meta["campaign_cta"],
             goal_summary=goal_summary,
-        ) if campaign else None,
+        ) if has_campaign else None,
         website=WebsiteSummary(
-            live_url=published_site.live_url if published_site else None,
-            published_at=published_site.published_at.isoformat() if published_site and published_site.published_at else None,
-        ) if published_site else None,
+            live_url=meta["site_live_url"],
+            published_at=meta["site_published_at"].isoformat() if meta["site_published_at"] else None,
+        ) if has_site else None,
         plan_tracker=PlanTrackerSummary(
             horizon="14" if has_sprint else None,
             sprint_day=sprint_day,

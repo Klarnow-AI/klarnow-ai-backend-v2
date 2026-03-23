@@ -6,6 +6,7 @@ import unittest
 from app.core.config import Settings
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test-db-config.db")
+os.environ.setdefault("SECRET_KEY", "test-secret")
 
 from app.core.db import session as session_module
 

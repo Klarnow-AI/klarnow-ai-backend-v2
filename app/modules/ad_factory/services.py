@@ -8,6 +8,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.errors import DomainNotFoundError
 from app.core.gates import can_generate_assets
 from app.modules.ad_factory.claim_guard import run_claim_guard
 from app.modules.ad_factory.engines.engine0_pack_context import run as run_engine0
@@ -450,7 +451,7 @@ def generate_compile(
 ) -> AdFactoryCompileRead:
     pack = get_pack_for_user(db, pack_id, user_id)
     if not pack:
-        raise ValueError("Pack not found")
+        raise DomainNotFoundError("Pack not found")
     can_generate_assets(db, pack)
 
     brand_brief = build_brand_brief_from_pack(db, pack)
@@ -552,7 +553,7 @@ def mark_variant_live(
 ) -> AdFactoryLaunchResponse:
     compile_record = get_compile(db, compile_id, user_id)
     if not compile_record:
-        raise ValueError("Compile result not found")
+        raise DomainNotFoundError("Compile result not found")
     if slot not in {"A", "B", "C"}:
         raise ValueError("Variant slot must be A, B, or C")
 

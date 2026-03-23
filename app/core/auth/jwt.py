@@ -7,6 +7,8 @@ from pydantic import BaseModel
 from app.core.config import get_settings
 from app.core.errors import UnauthorizedError
 
+_JWT_CACHE_PREFIX = "jwt:payload:"
+
 
 class TokenPayload(BaseModel):
     sub: str  # user id
@@ -30,10 +32,32 @@ def create_access_token(user_id: UUID) -> str:
     )
 
 
+def _cache_key(token: str) -> str:
+    # Use last 16 chars as a cheap discriminator; full token is the cache value key
+    return f"{_JWT_CACHE_PREFIX}{token[-16:]}"
+
+
 def verify_token(token: str) -> TokenPayload:
     settings = get_settings()
     if not settings.secret_key:
         raise UnauthorizedError("Auth not configured")
+
+    # --- Redis cache lookup ---
+    redis = None
+    try:
+        from app.modules.packs.onboarding_queue import get_redis_client, redis_queue_enabled
+        if redis_queue_enabled():
+            redis = get_redis_client()
+            cached = redis.hgetall(_cache_key(token))
+            if cached and cached.get("token") == token:
+                return TokenPayload(
+                    sub=cached["sub"],
+                    exp=datetime.fromtimestamp(float(cached["exp"]), tz=timezone.utc),
+                )
+    except Exception:
+        redis = None  # cache unavailable — fall through to full decode
+
+    # --- Full decode ---
     try:
         payload = jwt.decode(
             token,
@@ -42,9 +66,27 @@ def verify_token(token: str) -> TokenPayload:
         )
         if payload.get("type") != "access":
             raise UnauthorizedError("Invalid token type")
-        return TokenPayload(
+        token_payload = TokenPayload(
             sub=payload["sub"],
             exp=datetime.fromtimestamp(payload["exp"], tz=timezone.utc),
         )
     except jwt.PyJWTError:
         raise UnauthorizedError("Invalid or expired token")
+
+    # --- Populate cache with TTL = remaining token lifetime ---
+    if redis is not None:
+        try:
+            now = datetime.now(timezone.utc)
+            ttl = int((token_payload.exp - now).total_seconds())
+            if ttl > 0:
+                key = _cache_key(token)
+                redis.hset(key, mapping={
+                    "token": token,
+                    "sub": token_payload.sub,
+                    "exp": str(payload["exp"]),
+                })
+                redis.expire(key, ttl)
+        except Exception:
+            pass  # cache write failure is non-fatal
+
+    return token_payload

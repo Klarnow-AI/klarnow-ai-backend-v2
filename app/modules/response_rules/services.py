@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.errors import DomainConflictError, DomainNotFoundError
 from app.core.logging import log_service_action
 from app.modules.response_rules.models import (
     TRIGGER_BOOKING_REQUEST,
@@ -61,10 +62,10 @@ def update_response_rule(db: Session, rule_id: UUID, response_template: str) -> 
     """Update a response rule template."""
     rule = db.query(ResponseRule).filter(ResponseRule.id == rule_id).first()
     if not rule:
-        raise ValueError(f"Rule {rule_id} not found")
-    
+        raise DomainNotFoundError(f"Rule {rule_id} not found")
+
     if rule.locked_at:
-        raise ValueError("Cannot update locked rule")
+        raise DomainConflictError("Cannot update locked rule")
     
     rule.response_template = response_template
     db.commit()
@@ -78,7 +79,7 @@ def lock_response_rules(db: Session, pack_id: UUID) -> list[ResponseRule]:
     rules = get_response_rules(db, pack_id)
     
     if not rules:
-        raise ValueError("No response rules found. Generate them first.")
+        raise DomainNotFoundError("No response rules found. Generate them first.")
     
     now = utc_now()
     for rule in rules:

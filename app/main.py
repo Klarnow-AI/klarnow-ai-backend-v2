@@ -3,15 +3,16 @@ import time
 import traceback
 import uuid
 from contextlib import asynccontextmanager
-
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import get_settings
 from app.core.db.observability import get_db_query_count, get_db_query_duration_ms, reset_db_query_stats
+from app.core.rate_limit import limiter
 from app.core.errors import (
     AppError,
     app_error_handler,
@@ -64,6 +65,21 @@ app = FastAPI(
 )
 
 settings = get_settings()
+app.state.limiter = limiter
+
+
+def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    return error_response(
+        request,
+        message="Too many requests. Please slow down and try again.",
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        category="rate_limit",
+        code="rate_limited",
+        retryable=True,
+    )
+
+
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)  # pyright: ignore[reportArgumentType]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allow_origins,

@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.governance import validate_no_revenue_guarantees, validate_one_cta
-from app.core.errors import AppError
+from app.core.errors import AppError, DomainNotFoundError
 from app.core.logging import log_service_action
 from app.modules.campaign.models import Campaign
 
@@ -54,12 +54,12 @@ def regenerate_campaign(db: Session, pack_id: UUID, campaign_id: UUID) -> Campai
 
     existing = get_by_id_and_pack(db, campaign_id, pack_id)
     if not existing:
-        raise ValueError("Campaign not found")
+        raise DomainNotFoundError("Campaign not found")
     existing_list = list_versions_for_pack(db, pack_id)
     version = _next_campaign_version(existing_list)
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
-        raise ValueError("Pack not found")
+        raise DomainNotFoundError("Pack not found")
     db.query(Campaign).filter(
         Campaign.pack_id == pack_id,
         Campaign.is_active.is_(True),

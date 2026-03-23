@@ -16,6 +16,7 @@ from app.core.db.observability import (
     get_db_query_duration_ms,
     reset_db_query_stats,
 )
+from app.core.errors import DomainNotFoundError
 from app.core.logging import get_logger
 from app.core.db.session import SessionLocal
 from app.modules.packs.models import Pack, utc_now
@@ -679,7 +680,7 @@ def _run_onboarding_pipeline(db: Session, pack_id: UUID, job_id: str) -> None:
 def enqueue_onboarding_job(db: Session, pack_id: UUID) -> dict[str, Any]:
     pack = db.get(Pack, pack_id)
     if not pack:
-        raise ValueError("Pack not found")
+        raise DomainNotFoundError("Pack not found")
     input_fingerprint = compute_onboarding_input_fingerprint(pack)
     job = {
         "job_id": str(uuid.uuid4()),

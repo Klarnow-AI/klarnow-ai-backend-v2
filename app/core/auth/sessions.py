@@ -110,6 +110,7 @@ def _get_refresh_token_session(
     session = (
         db.query(RefreshTokenSession)
         .filter(RefreshTokenSession.token_hash == token_hash)
+        .with_for_update()
         .first()
     )
     if not session:

@@ -70,13 +70,10 @@ class Settings(BaseSettings):
     failure_alert_to_email: str = ""
     waitlist_notification_to_email: str = "team@klarnow.co.uk"
 
-    # Optional: Storage (S3)
-    storage_provider: str = "s3"
-    storage_region: str = "us-east-1"
-    storage_bucket: str = ""
-    storage_access_key_id: str = ""
-    storage_secret_access_key: str = ""
-    storage_cdn_url: str = ""
+    # Optional: Storage (PocketBase)
+    pocketbase_url: str = ""
+    pocketbase_admin_email: str = ""
+    pocketbase_admin_password: str = ""
 
     # Optional: AI providers
     openrouter_api_key: str = ""
@@ -127,6 +124,7 @@ class Settings(BaseSettings):
     reference_doc_min_score: float = 0.2
     reference_doc_max_chars: int = 250000
     reference_doc_cache_ttl_seconds: int = 300
+    reference_doc_embedding_cache_ttl_seconds: int = 86400
 
     # Optional: Kling API (official - api-singapore.klingai.com, JWT auth)
     kling_access_key: str = ""
@@ -201,6 +199,9 @@ class Settings(BaseSettings):
         if not self.database_url:
             raise ValueError("DATABASE_URL is required")
 
+        if not self.secret_key:
+            raise ValueError("SECRET_KEY is required")
+
         if self.db_pool_pre_ping is None:
             self.db_pool_pre_ping = (
                 self.app_env in {"production", "staging"}
@@ -208,14 +209,15 @@ class Settings(BaseSettings):
             )
 
         if self.app_env in {"production", "staging"}:
-            missing: list[str] = []
-            if not self.secret_key:
-                missing.append("SECRET_KEY")
+            _localhost_origins = {"http://localhost:3000", "http://localhost:3001"}
             if not self.cors_allow_origins:
-                missing.append("CORS_ALLOW_ORIGINS")
-            if missing:
                 raise ValueError(
-                    f"Missing required settings for {self.app_env}: {', '.join(missing)}"
+                    f"CORS_ALLOW_ORIGINS is required for {self.app_env}"
+                )
+            if set(self.cors_allow_origins) <= _localhost_origins:
+                raise ValueError(
+                    f"CORS_ALLOW_ORIGINS must be explicitly configured for {self.app_env} "
+                    "(localhost origins are not valid in non-development environments)"
                 )
         return self
 

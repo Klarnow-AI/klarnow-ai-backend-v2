@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db.session import SessionLocal
+from app.core.errors import DomainNotFoundError, DomainServiceUnavailableError
 from app.core.storage import upload_file
 from app.modules.ad_factory.kling_adapter import build_kling_request
 from app.modules.ad_factory.kling_client import download_video, submit_text_to_video, wait_for_video
@@ -201,7 +202,7 @@ def finalize_render_storage(render_job_id: str, jobs: list[dict[str, str]]) -> N
                     cache_control=VIDEO_CACHE_CONTROL,
                 )
                 if not uploaded:
-                    raise ValueError("Storage is not configured for rendered video uploads")
+                    raise DomainServiceUnavailableError("Storage is not configured for rendered video uploads")
 
                 asset.output_key = uploaded
 
@@ -250,7 +251,7 @@ def create_render_job(
 ) -> AdFactoryRenderJobRead:
     compile_record = get_compile(db, compile_id, user_id)
     if not compile_record:
-        raise ValueError("Compile result not found")
+        raise DomainNotFoundError("Compile result not found")
 
     compile_payload = CompileResultPayload.model_validate(compile_record.compile_result)
     validator_status = str((compile_record.validator_result or {}).get("status") or "")

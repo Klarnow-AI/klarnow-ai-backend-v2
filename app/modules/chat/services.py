@@ -4,6 +4,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.errors import DomainNotFoundError
 from app.core.logging import log_service_action
 from app.modules.chat.models import Conversation, Message
 from app.modules.packs.services import get_pack_for_user
@@ -85,7 +86,7 @@ def create_conversation(
     if pack_id:
         pack = get_pack_for_user(db, pack_id, user_id)
         if not pack:
-            raise ValueError("Pack not found or access denied")
+            raise DomainNotFoundError("Pack not found or access denied")
     conv = Conversation(user_id=user_id, pack_id=pack_id, day_context=day_context)
     db.add(conv)
     db.commit()

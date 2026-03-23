@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.errors import DomainGateBlockedError, DomainNotFoundError
 from app.modules.brand_os.domain_schema import BrandOS as BrandOSDomain
 from app.modules.brand_os.models import BrandOS
 from app.modules.brand_os.services import get_active_for_pack, get_by_source_job_id, list_versions_for_pack
@@ -271,7 +272,7 @@ def generate_brand_os(
     pack_id = UUID(str(pack_id)) if isinstance(pack_id, str) else pack_id
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
-        raise ValueError("Pack not found")
+        raise DomainNotFoundError("Pack not found")
 
     if source_job_id:
         existing_for_job = get_by_source_job_id(db, pack_id, source_job_id)
@@ -285,7 +286,7 @@ def generate_brand_os(
     answers = onboarding_answers if onboarding_answers is not None else (pack.onboarding_answers or {})
     is_new_brand = answers.get("has_existing_brand") == "no"
     if is_new_brand and pack.onboarding_completed_at is None and not allow_without_onboarding_complete:
-        raise ValueError(
+        raise DomainGateBlockedError(
             "Complete Day 0 onboarding before generating Brand OS for new brands."
         )
 
@@ -348,10 +349,10 @@ def regenerate_brand_os(db: Session, pack_id: UUID, brand_os_id: UUID) -> BrandO
 
     existing = get_by_id_and_pack(db, brand_os_id, pack_id)
     if not existing:
-        raise ValueError("Brand OS not found")
+        raise DomainNotFoundError("Brand OS not found")
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
-        raise ValueError("Pack not found")
+        raise DomainNotFoundError("Pack not found")
     if existing.foundation and existing.brand_strategy:
         context = (
             f"Existing Brand OS (JSON): foundation={existing.foundation}, "

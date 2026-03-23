@@ -9,6 +9,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.errors import DomainNotFoundError
 from app.core.logging import get_logger
 from app.modules.agents.orchestrator import assemble_context
 from app.modules.landing.next_action import get_next_action
@@ -156,7 +157,7 @@ def suggest_pack_chat_prompts(
     """
     pack = get_pack_for_user(db, pack_id, user_id)
     if not pack:
-        raise ValueError("Pack not found")
+        raise DomainNotFoundError("Pack not found")
 
     pack_context = assemble_context(pack_id, db)
     next_action = get_next_action(db, user_id, pack_id)

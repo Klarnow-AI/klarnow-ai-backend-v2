@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.errors import DomainNotFoundError
 from app.core.governance import validate_no_revenue_guarantees
 from app.modules.campaign.services import get_active_for_pack
 from app.modules.creative.models import Asset
@@ -37,7 +38,7 @@ def _compliance_check(db: Session, pack_id: UUID, copy_text: str | None) -> None
         validate_no_revenue_guarantees(copy_text)
     campaign = get_active_for_pack(db, pack_id)
     if not campaign or not campaign.primary_cta:
-        raise ValueError("Campaign must have a primary CTA before rendering assets")
+        raise DomainGateBlockedError("Campaign must have a primary CTA before rendering assets")
 
 
 def render_poster(
@@ -50,7 +51,7 @@ def render_poster(
     pack_id = UUID(str(pack_id)) if isinstance(pack_id, str) else pack_id
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
-        raise ValueError("Pack not found")
+        raise DomainNotFoundError("Pack not found")
     from app.core.gates import can_generate_assets
     can_generate_assets(db, pack)
     _compliance_check(db, pack_id, pack.name)
@@ -81,7 +82,7 @@ def render_video(
     pack_id = UUID(str(pack_id)) if isinstance(pack_id, str) else pack_id
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
-        raise ValueError("Pack not found")
+        raise DomainNotFoundError("Pack not found")
     from app.core.gates import can_generate_assets
     can_generate_assets(db, pack)
     _compliance_check(db, pack_id, script or "")

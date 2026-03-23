@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import json
 import math
 import re
-import threading
 import time
 from dataclasses import dataclass
 from functools import lru_cache
@@ -51,36 +53,37 @@ class MarkdownReferenceKB:
         self.min_score = settings.reference_doc_min_score
         self.max_chars = settings.reference_doc_max_chars
         self.cache_ttl_seconds = settings.reference_doc_cache_ttl_seconds
+        self.embedding_cache_ttl_seconds = settings.reference_doc_embedding_cache_ttl_seconds
 
         self._client: OpenAI | None = None
-        self._lock = threading.Lock()
+        self._lock = asyncio.Lock()
         self._chunks: list[_Chunk] = []
         self._source_mtime: float | None = None
         self._source_path: str | None = None
         self._last_checked_at = 0.0
 
-    def warmup(self) -> None:
+    async def warmup(self) -> None:
         """Best-effort prewarm for startup; never raises."""
         if not self.enabled:
             logger.info("reference_kb_warmup_skip | enabled=false")
             return
         try:
-            self._maybe_refresh_index(force=True)
+            await self._maybe_refresh_index(force=True)
         except Exception as e:
             logger.warning("reference_kb_warmup_error | error=%s", e)
 
-    def retrieve(self, query: str) -> dict[str, Any]:
+    async def retrieve(self, query: str) -> dict[str, Any]:
         """Retrieve top-k markdown chunks relevant to the user query."""
         if not self.enabled or not query.strip():
             return {"context_text": "", "references": []}
 
         try:
-            self._maybe_refresh_index(force=False)
+            await self._maybe_refresh_index(force=False)
         except Exception as e:
             logger.warning("reference_kb_refresh_error | error=%s", e)
             return {"context_text": "", "references": []}
 
-        with self._lock:
+        async with self._lock:
             chunks = list(self._chunks)
         if not chunks:
             return {"context_text": "", "references": []}
@@ -122,9 +125,9 @@ class MarkdownReferenceKB:
         )
         return {"context_text": "\n\n---\n\n".join(context_parts), "references": references}
 
-    def _maybe_refresh_index(self, *, force: bool) -> None:
+    async def _maybe_refresh_index(self, *, force: bool) -> None:
         now = time.time()
-        with self._lock:
+        async with self._lock:
             if not force and (now - self._last_checked_at) < max(1, self.cache_ttl_seconds):
                 return
             self._last_checked_at = now
@@ -132,7 +135,7 @@ class MarkdownReferenceKB:
         path = self._resolve_path()
         if not path:
             logger.warning("reference_kb_disabled_or_missing_path")
-            with self._lock:
+            async with self._lock:
                 self._chunks = []
                 self._source_mtime = None
                 self._source_path = None
@@ -143,7 +146,7 @@ class MarkdownReferenceKB:
                 "reference_kb_invalid_extension | path=%s | expected=.md",
                 str(path),
             )
-            with self._lock:
+            async with self._lock:
                 self._chunks = []
                 self._source_mtime = None
                 self._source_path = str(path)
@@ -151,14 +154,14 @@ class MarkdownReferenceKB:
 
         if not path.exists() or not path.is_file():
             logger.warning("reference_kb_file_missing | path=%s", str(path))
-            with self._lock:
+            async with self._lock:
                 self._chunks = []
                 self._source_mtime = None
                 self._source_path = str(path)
             return
 
         mtime = path.stat().st_mtime
-        with self._lock:
+        async with self._lock:
             if not force and self._source_mtime == mtime and self._chunks:
                 return
 
@@ -176,7 +179,7 @@ class MarkdownReferenceKB:
         chunk_inputs = self._chunk_sections(sections)
         if not chunk_inputs:
             logger.warning("reference_kb_no_chunks | path=%s", str(path))
-            with self._lock:
+            async with self._lock:
                 self._chunks = []
                 self._source_mtime = mtime
                 self._source_path = str(path)
@@ -190,7 +193,7 @@ class MarkdownReferenceKB:
                 len(chunk_inputs),
                 len(embeddings),
             )
-            with self._lock:
+            async with self._lock:
                 self._chunks = []
                 self._source_mtime = mtime
                 self._source_path = str(path)
@@ -210,7 +213,7 @@ class MarkdownReferenceKB:
                 )
             )
 
-        with self._lock:
+        async with self._lock:
             self._chunks = indexed_chunks
             self._source_mtime = mtime
             self._source_path = str(path)
@@ -255,24 +258,94 @@ class MarkdownReferenceKB:
         self._client = client
         return self._client
 
+    def _get_redis(self):
+        """Return a Redis client if configured, else None."""
+        try:
+            from app.modules.packs.onboarding_queue import get_redis_client
+            return get_redis_client()
+        except Exception:
+            return None
+
+    def _embedding_cache_key(self, text: str) -> str:
+        digest = hashlib.sha256(text.encode()).hexdigest()[:32]
+        model_slug = re.sub(r"[^a-zA-Z0-9_-]", "_", self.embedding_model)[:40]
+        return f"klarnow:ref_emb:{model_slug}:{digest}"
+
     def _embed_texts(self, texts: list[str]) -> list[list[float]]:
         client = self._get_client()
         if not client or not texts:
             return []
 
-        vectors: list[list[float]] = []
-        batch_size = 64
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i : i + batch_size]
-            response = client.embeddings.create(
-                model=self.embedding_model,
-                input=batch,
+        redis = self._get_redis()
+        cache_keys = [self._embedding_cache_key(t) for t in texts]
+
+        # Bulk-fetch cached embeddings.
+        cached: list[list[float] | None] = [None] * len(texts)
+        if redis:
+            try:
+                raw_values = redis.mget(cache_keys)
+                for i, raw in enumerate(raw_values):
+                    if raw is not None:
+                        cached[i] = json.loads(raw)
+            except Exception as e:
+                logger.warning("reference_kb_redis_mget_error | error=%s", e)
+
+        # Only call the API for cache misses.
+        miss_indices = [i for i, v in enumerate(cached) if v is None]
+        miss_texts = [texts[i] for i in miss_indices]
+
+        if miss_texts:
+            batch_size = 64
+            fetched: list[list[float]] = []
+            for i in range(0, len(miss_texts), batch_size):
+                batch = miss_texts[i : i + batch_size]
+                response = client.embeddings.create(
+                    model=self.embedding_model,
+                    input=batch,
+                )
+                rows = sorted(response.data, key=lambda row: row.index)
+                fetched.extend([row.embedding for row in rows])
+
+            # Store new embeddings in cache and fill results.
+            if redis:
+                pipe = redis.pipeline(transaction=False)
+                for idx, embedding in zip(miss_indices, fetched):
+                    pipe.setex(
+                        cache_keys[idx],
+                        self.embedding_cache_ttl_seconds,
+                        json.dumps(embedding),
+                    )
+                try:
+                    pipe.execute()
+                except Exception as e:
+                    logger.warning("reference_kb_redis_setex_error | error=%s", e)
+
+            for idx, embedding in zip(miss_indices, fetched):
+                cached[idx] = embedding
+
+        cache_hits = len(texts) - len(miss_texts)
+        if cache_hits:
+            logger.debug(
+                "reference_kb_embed_texts_cache | total=%s | hits=%s | misses=%s",
+                len(texts),
+                cache_hits,
+                len(miss_texts),
             )
-            rows = sorted(response.data, key=lambda row: row.index)
-            vectors.extend([row.embedding for row in rows])
-        return vectors
+
+        return [v for v in cached if v is not None]
 
     def _embed_query(self, query: str) -> list[float] | None:
+        redis = self._get_redis()
+        cache_key = self._embedding_cache_key(query)
+
+        if redis:
+            try:
+                raw = redis.get(cache_key)
+                if raw is not None:
+                    return json.loads(raw)
+            except Exception as e:
+                logger.warning("reference_kb_redis_get_error | error=%s", e)
+
         client = self._get_client()
         if not client:
             return None
@@ -283,7 +356,17 @@ class MarkdownReferenceKB:
             )
             if not response.data:
                 return None
-            return response.data[0].embedding
+            embedding = response.data[0].embedding
+            if redis:
+                try:
+                    redis.setex(
+                        cache_key,
+                        self.embedding_cache_ttl_seconds,
+                        json.dumps(embedding),
+                    )
+                except Exception as e:
+                    logger.warning("reference_kb_redis_setex_error | error=%s", e)
+            return embedding
         except Exception as e:
             logger.warning("reference_kb_query_embedding_failed | error=%s", e)
             return None

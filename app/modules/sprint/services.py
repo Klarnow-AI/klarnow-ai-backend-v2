@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.errors import DomainConflictError, DomainGateBlockedError, DomainNotFoundError
 from app.core.logging import get_logger, log_service_action
 from app.modules.sprint.models import Sprint, DayCard, SPRINT_STATUS_ACTIVE, SPRINT_STATUS_COMPLETED
 from app.modules.sprint.mode_detection import detect_sprint_mode
@@ -338,13 +339,13 @@ def create_sprint_for_pack(
     If started_at is provided (e.g. pack.created_at), the sprint is anchored to that date; otherwise uses now."""
     existing = get_active_sprint_for_pack(db, pack_id)
     if existing:
-        raise ValueError("Pack already has an active sprint. Complete Day 14 check-in first.")
+        raise DomainConflictError("Pack already has an active sprint. Complete Day 14 check-in first.")
     
     # Get pack and detect mode
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
-        raise ValueError(f"Pack {pack_id} not found")
-    
+        raise DomainNotFoundError(f"Pack {pack_id} not found")
+
     mode = detect_sprint_mode(pack, db)
     sprint_start = started_at if started_at is not None else datetime.now(timezone.utc)
     
@@ -425,25 +426,25 @@ def complete_day(db: Session, sprint: Sprint, day_number: int, user_selections: 
     
     card = get_day_card(db, sprint.id, day_number)
     if not card:
-        raise ValueError(f"No day card for day {day_number}")
-    
+        raise DomainNotFoundError(f"No day card for day {day_number}")
+
     if card.completed_at is not None:
         return sprint
-    
+
     # Get pack for gate check
     pack = db.query(Pack).filter(Pack.id == sprint.pack_id).first()
     if not pack:
-        raise ValueError(f"Pack {sprint.pack_id} not found")
+        raise DomainNotFoundError(f"Pack {sprint.pack_id} not found")
 
     if day_number == 2 and pack.onboarding_completed_at is None:
-        raise ValueError(
+        raise DomainGateBlockedError(
             "Generate your Brand OS to complete Step 2 before moving to Step 3."
         )
-    
+
     # Check daily completion gate (Days 4-13)
     can_pass, blocker_msg = can_complete_day(db, card, day_number, pack)
     if not can_pass:
-        raise ValueError(blocker_msg)
+        raise DomainGateBlockedError(blocker_msg)
     
     now = datetime.now(timezone.utc)
     card.completed_at = now
@@ -488,9 +489,9 @@ def complete_sprint_and_reload(db: Session, pack_id: UUID, sprint_id: UUID) -> S
     """
     sprint = get_sprint_by_id(db, sprint_id, pack_id=pack_id)
     if not sprint:
-        raise ValueError("Sprint not found")
+        raise DomainNotFoundError("Sprint not found")
     if sprint.status == SPRINT_STATUS_COMPLETED:
-        raise ValueError("Sprint already completed")
+        raise DomainConflictError("Sprint already completed")
     # Mark day 14 complete and this sprint completed
     complete_day(db, sprint, 14)
     # Create next sprint
@@ -579,7 +580,7 @@ def get_or_generate_today_tasks(db: Session, pack_id: UUID) -> dict[str, Any]:
     day_title = str(day_def.get("title") or f"Day {day_number}")
     card = get_day_card(db, sprint.id, day_number)
     if not card:
-        raise ValueError(f"No day card for day {day_number}")
+        raise DomainNotFoundError(f"No day card for day {day_number}")
 
     cache = _get_cached_today_tasks(card, day_number)
     if not cache:
@@ -638,7 +639,7 @@ def toggle_today_task_check(
     """Toggle persisted checklist item for current sprint day."""
     sprint = get_active_sprint_for_pack(db, pack_id)
     if not sprint:
-        raise ValueError("No active sprint")
+        raise DomainNotFoundError("No active sprint")
     pack = db.query(Pack).filter(Pack.id == sprint.pack_id).first()
     effective_current_day = _effective_current_day(sprint, pack)
     if day_number != effective_current_day:
@@ -648,17 +649,17 @@ def toggle_today_task_check(
 
     card = get_day_card(db, sprint.id, day_number)
     if not card:
-        raise ValueError(f"No day card for day {day_number}")
+        raise DomainNotFoundError(f"No day card for day {day_number}")
 
     cache = _get_cached_today_tasks(card, day_number)
     if not cache:
         get_or_generate_today_tasks(db, pack_id)
         card = get_day_card(db, sprint.id, day_number)
         if not card:
-            raise ValueError(f"No day card for day {day_number}")
+            raise DomainNotFoundError(f"No day card for day {day_number}")
         cache = _get_cached_today_tasks(card, day_number)
     if not cache:
-        raise ValueError("Checklist unavailable")
+        raise DomainNotFoundError("Checklist unavailable")
 
     task_found = False
     for task in cache["tasks"]:
@@ -667,7 +668,7 @@ def toggle_today_task_check(
             task_found = True
             break
     if not task_found:
-        raise ValueError("Task not found")
+        raise DomainNotFoundError("Task not found")
 
     ai_output = card.ai_output if isinstance(card.ai_output, dict) else {}
     ai_output = dict(ai_output)

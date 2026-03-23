@@ -1,50 +1,27 @@
 SHELL := /bin/bash
 VENV := $(abspath .venv)
-UVICORN := $(VENV)/bin/uvicorn
 PYTHON := $(VENV)/bin/python
-UV := uv
-ALEMBIC := $(VENV)/bin/alembic
-export UV_PROJECT_ENVIRONMENT := $(VENV)
+UVICORN := $(PYTHON) -m uvicorn
+ALEMBIC := $(PYTHON) -m alembic
+PIP := $(VENV)/bin/pip
 
 # Migration message (can be overridden: make migrate message="your message")
 message ?= auto migration
 
-.PHONY: init create install update sync run activate clean import start worker serve migrate upgrade-migration build-frontend build
-
-init:
-	$(UV) init
+.PHONY: create install update run activate clean start worker serve migrate upgrade-migration build-frontend build
 
 create:
 	@if [ ! -d "$(VENV)" ]; then \
-		$(UV) venv "$(VENV)"; \
+		python3 -m venv "$(VENV)"; \
 	fi
-
-sync: create
-	$(UV) sync
-
-import:
-	$(UV) add -r requirements.txt
-	$(UV) sync
 
 install: create
-	@if [ -f pyproject.toml ]; then \
-		$(UV) sync; \
-	elif [ -f requirements.txt ]; then \
-		$(UV) pip install --python "$(PYTHON)" -r requirements.txt; \
-	else \
-		echo "No pyproject.toml or requirements.txt found."; \
-		exit 1; \
-	fi
+	$(PIP) install --upgrade pip
+	$(PIP) install -r requirements.txt
 
 update: create
-	@if [ -f pyproject.toml ]; then \
-		$(UV) sync; \
-	elif [ -f requirements.txt ]; then \
-		$(UV) pip install --python "$(PYTHON)" -U -r requirements.txt; \
-	else \
-		echo "No pyproject.toml or requirements.txt found."; \
-		exit 1; \
-	fi
+	$(PIP) install --upgrade pip
+	$(PIP) install -U -r requirements.txt
 
 run: start
 
