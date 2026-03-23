@@ -27,6 +27,4 @@ wheels/
 node_modules
 .next
 
-supabase/
-
 .pytest_cache/

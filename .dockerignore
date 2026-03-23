@@ -12,6 +12,9 @@
 .venv
 __pycache__
 *.py[oc]
+.pytest_cache
+.mypy_cache
+.ruff_cache
 build/
 dist/
 wheels/
@@ -20,7 +23,14 @@ wheels/
 # Frontend build artifacts (recreated in Docker)
 frontend/.next
 frontend/node_modules
+.next
+node_modules
 
-# Docs and misc (not copied by either Dockerfile)
+# Backend-only local artifacts
+tests
+scripts
+supabase/.temp
+
+# Docs and misc
 docs
 *.md

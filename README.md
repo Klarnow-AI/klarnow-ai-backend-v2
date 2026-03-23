@@ -1,6 +1,6 @@
 # Klarnow AI
 
-The repository is split into `frontend/` and `backend/`. The Python API, migrations, scripts, tests, and Supabase config now live under `backend/`.
+The Python API, migrations, scripts, tests, and Supabase config live at the repository root.
 
 Agency replacement operating system for non-marketers. Generates and manages a complete campaign delivery pack end-to-end: Brand Strategy (Brand OS), Marketing Plan, Brand Identity, Conversion Page, Campaign Assets, Execution Tracking, Proposals and Invoices, and an exportable Launch Bundle.
 
@@ -22,27 +22,27 @@ Enable small businesses to launch and execute professional marketing campaigns w
 1. Clone the repo and enter the project directory.
 2. Copy env and set values:
    ```bash
-   cp backend/.env.example .env
+   cp .env.example .env
    # Edit .env with your DATABASE_URL, SECRET_KEY, etc.
    ```
 3. Create venv and install dependencies:
    ```bash
    make install
-   # or: cd backend && uv sync
+   # or: uv sync
    ```
-4. Run migrations (you run these; see [docs/INSTRUCTIONS.md](docs/INSTRUCTIONS.md)):
+4. Run migrations:
    ```bash
-   cd backend && alembic upgrade head
+   alembic upgrade head
    ```
 5. Start the API:
    ```bash
    make start
-   # or: cd backend && uvicorn app.main:app --reload
+   # or: uvicorn app.main:app --reload
    ```
 6. Start the onboarding worker in a separate terminal:
    ```bash
    make worker
-   # or: cd backend && python -m app.workers.onboarding_worker
+   # or: python -m app.workers.onboarding_worker
    ```
 
 API: `http://localhost:8000`. Docs: `http://localhost:8000/docs`. Health: `http://localhost:8000/health`.
@@ -59,7 +59,7 @@ API: `http://localhost:8000`. Docs: `http://localhost:8000/docs`. Health: `http:
 
 ## Environment variables
 
-See [backend/.env.example](backend/.env.example). Required: `DATABASE_URL`, `SECRET_KEY`, and `REDIS_URL` for background onboarding. Optional: Resend, S3, Gemini, OpenAI, and Google sign-in.
+See [.env.example](.env.example). Required: `DATABASE_URL`, `SECRET_KEY`, and `REDIS_URL` for background onboarding. Optional: Resend, S3, Gemini, OpenAI, and Google sign-in.
 `CORS_ALLOW_ORIGINS` accepts a JSON list (recommended), comma-separated values, and bracketed forms that are normalized.
 
 Logo generation uses Gemini when `AI_LOGO_GENERATION_ENABLED=true` and `GEMINI_API_KEY` is set. `GOOGLE_API_KEY` is accepted as an alias for `GEMINI_API_KEY`.
@@ -118,6 +118,4 @@ To serve published sites at brand-name subdomains (e.g. `acme.klarnow.ai`) inste
 
 ## Documentation
 
-- [docs/INSTRUCTIONS.md](docs/INSTRUCTIONS.md) – Implementation instructions (e.g. who runs migrations).
-- [docs/ACCEPTANCE_CRITERIA.md](docs/ACCEPTANCE_CRITERIA.md) – Phase checklists.
-- Product and agentic architecture are defined in the PRD and A-PRD (referenced in the build plan).
+- [docs/PRD.md](docs/PRD.md) – Current product requirements and implementation-aligned scope.
