@@ -5,6 +5,7 @@ import logging
 import mimetypes
 import time
 from pathlib import PurePosixPath
+from urllib.parse import quote
 
 import httpx
 import requests
@@ -17,20 +18,23 @@ _TOKEN_LOCK = asyncio.Lock()
 _cached_token: str | None = None
 _token_expires_at: float = 0.0
 _TOKEN_TTL_SECONDS = 43200  # 12 hours
+CDN_PROBE_TIMEOUT_SECONDS = 3
+_CDN_FAILURE_TTL_SECONDS = 60
+_CDN_FAILURE_UNTIL_BY_BASE: dict[str, float] = {}
 
 
 def storage_enabled() -> bool:
-    return bool(get_settings().pocketbase_url)
+    return bool(getattr(get_settings(), "pocketbase_url", ""))
 
 
 def _pb_base() -> str:
-    return get_settings().pocketbase_url.rstrip("/")
+    return str(getattr(get_settings(), "pocketbase_url", "") or "").rstrip("/")
 
 
 async def _get_pb_token() -> str | None:
     global _cached_token, _token_expires_at
     s = get_settings()
-    if not s.pocketbase_url:
+    if not getattr(s, "pocketbase_url", ""):
         return None
     async with _TOKEN_LOCK:
         if _cached_token and time.monotonic() < _token_expires_at:
@@ -56,6 +60,31 @@ def _parse_key(key: str) -> tuple[str, str] | tuple[None, None]:
     if len(parts) != 2 or not parts[0] or not parts[1]:
         return None, None
     return parts[0], parts[1]
+
+
+def _normalize_key(key: str) -> str:
+    return str(key or "").strip().lstrip("/")
+
+
+def _quote_key_path(key: str) -> str:
+    return quote(_normalize_key(key), safe="/")
+
+
+def _build_cdn_asset_url(cdn_base: str, key: str) -> str:
+    return f"{cdn_base.rstrip('/')}/{_quote_key_path(key)}"
+
+
+def _build_public_asset_url(key: str) -> str | None:
+    normalized_key = _normalize_key(key)
+    if not normalized_key or not storage_enabled():
+        return None
+    record_id, filename = _parse_key(normalized_key)
+    if not record_id:
+        return None
+    return (
+        f"{_pb_base()}/api/files/storage_files/"
+        f"{quote(record_id, safe='')}/{quote(filename, safe='/')}"
+    )
 
 
 async def upload_file(
@@ -136,18 +165,38 @@ def download_file(key: str) -> bytes | None:
 
 
 def get_asset_url(key: str, expires_in: int = 3600) -> str | None:
-    """Return a public PocketBase file URL. expires_in is unused (PocketBase URLs don't expire)."""
-    if not key or not storage_enabled():
+    """Return a CDN URL when available, otherwise fall back to the backing store URL."""
+    normalized_key = _normalize_key(key)
+    if not normalized_key:
         return None
-    record_id, filename = _parse_key(key)
-    if not record_id:
-        return None
-    return f"{_pb_base()}/api/files/storage_files/{record_id}/{filename}"
+
+    settings = get_settings()
+    cdn_base = str(getattr(settings, "storage_cdn_url", "") or "").strip().rstrip("/")
+    if cdn_base:
+        failure_until = _CDN_FAILURE_UNTIL_BY_BASE.get(cdn_base, 0.0)
+        now = time.monotonic()
+        if failure_until <= now:
+            candidate_url = _build_cdn_asset_url(cdn_base, normalized_key)
+            try:
+                response = requests.head(
+                    candidate_url,
+                    allow_redirects=True,
+                    timeout=CDN_PROBE_TIMEOUT_SECONDS,
+                )
+            except Exception:
+                _CDN_FAILURE_UNTIL_BY_BASE[cdn_base] = now + _CDN_FAILURE_TTL_SECONDS
+            else:
+                if 200 <= response.status_code < 400:
+                    _CDN_FAILURE_UNTIL_BY_BASE.pop(cdn_base, None)
+                    return candidate_url
+                _CDN_FAILURE_UNTIL_BY_BASE[cdn_base] = now + _CDN_FAILURE_TTL_SECONDS
+
+    return get_presigned_url(normalized_key, expires_in=expires_in)
 
 
 def get_presigned_url(key: str, expires_in: int = 3600) -> str | None:
-    """PocketBase files are public — alias for get_asset_url."""
-    return get_asset_url(key)
+    """PocketBase files are public, so the backing-store URL is returned directly."""
+    return _build_public_asset_url(key)
 
 
 def extract_storage_key(value: str | None) -> str | None:

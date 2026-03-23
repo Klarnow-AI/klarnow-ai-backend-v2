@@ -52,7 +52,7 @@ def _json_dict(raw: object) -> dict:
 
 
 def build_generation_brand_context(pack: Pack, brand_os=None) -> GenerationBrandContext:
-    onboarding = _as_dict(pack.onboarding_answers)
+    onboarding = _as_dict(getattr(pack, "onboarding_answers", None))
     if brand_os is None:
         foundation = {}
         strategy = {}
@@ -144,17 +144,17 @@ def build_generation_brand_context(pack: Pack, brand_os=None) -> GenerationBrand
         color_palette = palette
 
     return GenerationBrandContext(
-        brand_name=pack.brand_name or foundation.get("brand_name"),
+        brand_name=getattr(pack, "brand_name", None) or foundation.get("brand_name"),
         industry=foundation.get("brand_industry"),
-        target_audience=pack.target_audience,
+        target_audience=getattr(pack, "target_audience", None),
         main_audience=main_audience or None,
-        core_offer=pack.offer_one_liner or foundation.get("one_line_offer"),
-        primary_cta=pack.primary_cta,
-        primary_pain=pack.primary_pain,
-        primary_outcome=pack.primary_outcome,
-        hero_angle=pack.hero_angle,
-        usp_statement=pack.usp_statement,
-        usp_proof=pack.usp_proof,
+        core_offer=getattr(pack, "offer_one_liner", None) or foundation.get("one_line_offer"),
+        primary_cta=getattr(pack, "primary_cta", None),
+        primary_pain=getattr(pack, "primary_pain", None),
+        primary_outcome=getattr(pack, "primary_outcome", None),
+        hero_angle=getattr(pack, "hero_angle", None),
+        usp_statement=getattr(pack, "usp_statement", None),
+        usp_proof=getattr(pack, "usp_proof", None),
         logo_url=logo_url,
         logo_markup=logo_markup,
         color_palette=color_palette,

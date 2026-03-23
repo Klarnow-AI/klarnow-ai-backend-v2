@@ -31,6 +31,7 @@ class SettingsAliasTests(unittest.TestCase):
             os.environ,
             {
                 "DATABASE_URL": "sqlite:///./settings-alias-test.db",
+                "SECRET_KEY": "test-secret",
                 "OPENROUTER_API_KEY": "router-key",
             },
             clear=True,
