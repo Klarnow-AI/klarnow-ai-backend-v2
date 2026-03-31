@@ -33,7 +33,6 @@ class PackRead(PackBase):
     created_at: datetime
     updated_at: datetime
     created_by_user_id: UUID
-    client_id: UUID | None = None
     brand_name: str | None = None
     primary_cta: str | None = None
     usp_category: str | None = None
@@ -91,10 +90,9 @@ class PackRead(PackBase):
 
 
 class PackPatch(BaseModel):
-    """Partial update: name, client_id, pack_type, core_concept; Day 0: brand_name, primary_cta, USP, proof; Day 1-3: offer_one_liner, target_audience, primary_pain, primary_outcome, hero_angle."""
+    """Partial update for project foundation and onboarding fields."""
 
     name: str | None = None
-    client_id: UUID | None = None
     pack_type: str | None = None
     core_concept: str | None = None
     brand_name: str | None = None
@@ -122,9 +120,7 @@ class DayReadinessResponse(BaseModel):
 
 
 class PackListItem(PackRead):
-    """Pack with campaign status for list views."""
-
-    campaign_is_active: bool | None = None
+    """Project list item."""
 
 
 class PackList(BaseModel):
@@ -274,6 +270,49 @@ class OnboardingStageStatus(BaseModel):
     last_error: str | None = None
 
 
+class OnboardingJobEvent(BaseModel):
+    timestamp: str
+    level: str = "info"
+    message: str
+    stage: str | None = None
+
+
+class OnboardingArtifactStatus(BaseModel):
+    artifact_type: str
+    version: int
+    schema_version: int = 1
+    source_stage: str
+    job_id: str | None = None
+    input_fingerprint: str | None = None
+    created_at: str
+    updated_at: str
+    summary: dict[str, object] | None = None
+
+
+class OnboardingArtifactLineageResponse(BaseModel):
+    items: list[OnboardingArtifactStatus] = Field(default_factory=list)
+
+
+class OnboardingRepairRequest(BaseModel):
+    stage: Literal[
+        "normalize_input",
+        "brand_os",
+        "brand_identity",
+        "website",
+        "poster_flyers",
+        "video_briefs",
+        "video_render",
+        "qa_review",
+    ]
+    include_downstream: bool = True
+    reason: str | None = None
+
+
+class OnboardingRepairFromQARequest(BaseModel):
+    include_downstream: bool = True
+    reason: str | None = None
+
+
 class OnboardingJobStatusResponse(BaseModel):
     """Current state of the durable onboarding background job."""
 
@@ -285,8 +324,21 @@ class OnboardingJobStatusResponse(BaseModel):
     started_at: str | None = None
     completed_at: str | None = None
     last_error: str | None = None
+    pause_requested: bool = False
+    paused_at: str | None = None
     current_stage: str | None = None
+    mode: str = "full_run"
+    requested_stage: str | None = None
+    selected_stages: list[str] | None = None
+    repair_reason: str | None = None
+    qa_overall_status: str | None = None
+    qa_consistency_score: int | None = None
+    qa_recommended_repair_stage: str | None = None
+    qa_recommended_repair_reason: str | None = None
+    qa_auto_repairable: bool = False
     stages: dict[str, OnboardingStageStatus] | None = None
+    events: list[OnboardingJobEvent] | None = None
+    artifacts: list[OnboardingArtifactStatus] | None = None
 
 
 # --- Pack summary (overview from Brand OS → Proof Vault) ---
@@ -310,8 +362,6 @@ class WebsiteSummary(BaseModel):
 
 class PlanTrackerSummary(BaseModel):
     horizon: str | None = None
-    sprint_day: int | None = None  # 1-7 for 7-day sprint
-    has_sprint: bool = False
 
 
 class LeadsSummary(BaseModel):
@@ -342,28 +392,4 @@ class PackSummaryResponse(BaseModel):
     leads: LeadsSummary = Field(default_factory=LeadsSummary)
     proposals: ProposalsSummary = Field(default_factory=ProposalsSummary)
     invoices: InvoicesSummary = Field(default_factory=InvoicesSummary)
-    proofs_count: int = 0
     assets_count: int = 0
-
-
-# --- Pack gates (section unlock status) ---
-
-
-class GateStatus(BaseModel):
-    passed: bool
-    message: str | None = None
-
-
-class SectionUnlock(BaseModel):
-    unlocked: bool
-    reason: str | None = None
-
-
-class PackGatesResponse(BaseModel):
-    pack_gate: GateStatus
-    paywall_gate: GateStatus
-    day7_gate: GateStatus
-    day8_gate: GateStatus
-    current_day: int | None = None
-    has_sprint: bool = False
-    sections: dict[str, SectionUnlock]

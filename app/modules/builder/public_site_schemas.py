@@ -18,7 +18,8 @@ class PublicLeadCaptureBody(BaseModel):
 
 
 class PublicLeadCaptureResponse(BaseModel):
-    lead_id: str
+    submission_id: str
+    lead_id: str | None = None
 
 
 def _stringify(value: Any) -> str | None:

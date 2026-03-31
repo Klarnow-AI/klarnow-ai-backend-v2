@@ -9,7 +9,7 @@ from redis.exceptions import RedisError
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
-from app.modules.packs.onboarding_jobs import run_onboarding_job
+from app.modules.packs.onboarding.service import run_onboarding_job
 from app.modules.packs.onboarding_queue import (
     ack_onboarding_message,
     build_onboarding_consumer_name,

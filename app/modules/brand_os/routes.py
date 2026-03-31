@@ -34,7 +34,7 @@ def _ensure_pack_access(db, pack_id: UUID, user_id: UUID) -> None:
         raise NotFoundError("Pack not found")
 
 
-@router.get("/packs/{pack_id}/brand-os/active", response_model=BrandOSRead | None)
+@router.get("/projects/{pack_id}/brand-os/active", response_model=BrandOSRead | None)
 def get_active_brand_os(
     pack_id: UUID,
     db=Depends(get_db),
@@ -46,7 +46,7 @@ def get_active_brand_os(
     return brand_os_read_from_orm(brand_os) if brand_os else None
 
 
-@router.get("/packs/{pack_id}/brand-os", response_model=BrandOSList)
+@router.get("/projects/{pack_id}/brand-os", response_model=BrandOSList)
 def list_brand_os_versions(
     pack_id: UUID,
     db=Depends(get_db),
@@ -61,7 +61,7 @@ def list_brand_os_versions(
     )
 
 
-@router.get("/packs/{pack_id}/brand-os/version/{version}", response_model=BrandOSRead)
+@router.get("/projects/{pack_id}/brand-os/version/{version}", response_model=BrandOSRead)
 def get_brand_os_by_version(
     pack_id: UUID,
     version: str,
@@ -77,7 +77,7 @@ def get_brand_os_by_version(
 
 
 @router.post(
-    "/packs/{pack_id}/brand-os/suggest",
+    "/projects/{pack_id}/brand-os/suggest",
     response_model=BrandOSSuggestResponse,
 )
 def suggest_brand_os_field(
@@ -97,7 +97,7 @@ def suggest_brand_os_field(
     return BrandOSSuggestResponse(suggestion=suggestion)
 
 
-@router.patch("/packs/{pack_id}/brand-os/active", response_model=BrandOSRead)
+@router.patch("/projects/{pack_id}/brand-os/active", response_model=BrandOSRead)
 def update_active_brand_os_route(
     pack_id: UUID,
     body: BrandOSUpdate,
@@ -118,7 +118,7 @@ def update_active_brand_os_route(
 
 
 @router.post(
-    "/packs/{pack_id}/brand-os/{brand_os_id}/regenerate",
+    "/projects/{pack_id}/brand-os/{brand_os_id}/regenerate",
     response_model=BrandOSRead,
     status_code=status.HTTP_201_CREATED,
 )

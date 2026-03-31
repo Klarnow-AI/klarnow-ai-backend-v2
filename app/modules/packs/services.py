@@ -16,9 +16,17 @@ STEP_2_FINALIZATION_CACHE_KEY = "_step_2_finalization"
 _STEP_2_FINALIZATION_IGNORED_ANSWER_KEYS = {
     STEP_2_FINALIZATION_CACHE_KEY,
     "_onboarding_job",
+    "_onboarding_artifacts",
+    "_normalize_input_fingerprint",
     "_starter_brand_input_fingerprint",
+    "_brand_identity_input_fingerprint",
     "_onboarding_brand_os_input_fingerprint",
     "_final_logo_input_fingerprint",
+    "_website_input_fingerprint",
+    "_poster_flyers_input_fingerprint",
+    "_video_briefs_input_fingerprint",
+    "_video_render_input_fingerprint",
+    "_qa_review_input_fingerprint",
     "generated_logo_url",
     "transparent_logo_url",
     "wordmark_svg_or_url",
@@ -31,11 +39,24 @@ _STEP_2_FINALIZATION_IGNORED_ANSWER_KEYS = {
     "onboarding_brand_os_completed_at",
     "final_logo_job_id",
     "final_logo_completed_at",
+    "onboarding_website_project_id",
+    "onboarding_website_generated_at",
+    "onboarding_poster_flyers_generated_at",
+    "onboarding_videos_generated_at",
 }
 
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _text_or_none(value: Any, *, limit: int | None = None) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if limit is not None:
+        return text[:limit]
+    return text
 
 
 def _normalize_hash_value(value: Any) -> Any:
@@ -94,7 +115,7 @@ def resolve_pack_target_audience(pack: Pack) -> str | None:
         return audience
 
     answers = pack.onboarding_answers or {}
-    for key in ("who_is_it_for", "target_audience", "q1"):
+    for key in ("who_are_your_customers", "who_is_it_for", "target_audience", "q1"):
         raw = answers.get(key)
         if isinstance(raw, str) and raw.strip():
             return raw.strip()
@@ -141,11 +162,77 @@ def extract_palette_from_answers(answers: dict | None) -> dict[str, str] | None:
     return None
 
 
+def _extract_brand_name_from_answers(answers: dict[str, Any] | None) -> str | None:
+    if not isinstance(answers, dict):
+        return None
+
+    brand_name = _text_or_none(answers.get("brand_name"), limit=255)
+    if brand_name:
+        return brand_name
+
+    raw_extracted = answers.get("extracted_brand")
+    extracted: dict[str, Any] | None = None
+    if isinstance(raw_extracted, dict):
+        extracted = raw_extracted
+    elif isinstance(raw_extracted, str):
+        try:
+            parsed = json.loads(raw_extracted)
+        except (json.JSONDecodeError, TypeError):
+            parsed = None
+        extracted = parsed if isinstance(parsed, dict) else None
+
+    if isinstance(extracted, dict):
+        return _text_or_none(extracted.get("brand_name"), limit=255)
+    return None
+
+
+def _generate_pack_name_from_business_description(raw_value: Any) -> str | None:
+    text = _text_or_none(raw_value, limit=255)
+    if not text:
+        return None
+
+    normalized = text.strip()
+    lower = normalized.lower()
+    prefixes = (
+        "i run ",
+        "we run ",
+        "i own ",
+        "we own ",
+        "i'm ",
+        "im ",
+        "i am ",
+        "we're ",
+        "we are ",
+        "i help ",
+        "we help ",
+        "i provide ",
+        "we provide ",
+    )
+    for prefix in prefixes:
+        if lower.startswith(prefix):
+            normalized = normalized[len(prefix) :].strip(" .,-")
+            break
+
+    for article in ("a ", "an ", "the "):
+        if normalized.lower().startswith(article):
+            normalized = normalized[len(article) :].strip(" .,-")
+            break
+
+    normalized = normalized[:255].strip(" .,-")
+    if not normalized:
+        normalized = text
+
+    return normalized[:1].upper() + normalized[1:]
+
+
 def build_onboarding_context(pack: Pack) -> dict[str, Any] | None:
     answers = pack.onboarding_answers or {}
     onboarding_context: dict[str, Any] = {}
     if (pack.offer_one_liner or "").strip():
         onboarding_context["offer"] = (pack.offer_one_liner or "").strip()
+    why_started = _text_or_none(answers.get("why_started"), limit=1000)
+    if why_started:
+        onboarding_context["why_started"] = why_started
     if (pack.usp_statement or "").strip():
         onboarding_context["usp"] = (pack.usp_statement or "").strip()
     audience = resolve_pack_target_audience(pack)
@@ -178,6 +265,7 @@ def build_step_2_finalization_payload(pack: Pack) -> dict[str, Any]:
         "pack_type": (pack.pack_type or "").strip(),
         "has_existing_brand": answers.get("has_existing_brand"),
         "brand_name": (pack.brand_name or "").strip(),
+        "why_started": _text_or_none(answers.get("why_started")) or "",
         "primary_cta": (pack.primary_cta or "").strip(),
         "usp_category": (pack.usp_category or "").strip(),
         "usp_statement": (pack.usp_statement or "").strip(),
@@ -230,9 +318,6 @@ def create_pack(
     )
     db.add(pack)
     db.flush()
-    # Start sprint on pack creation day so "Day 0" = when the pack was created
-    from app.modules.sprint.services import create_sprint_for_pack
-    create_sprint_for_pack(db, pack.id, started_at=pack.created_at, commit=False)
     if commit:
         db.commit()
     return pack
@@ -262,8 +347,43 @@ def delete_pack(db: Session, pack: Pack) -> None:
 
 @log_service_action()
 def submit_onboarding(db: Session, pack: Pack, answers: dict) -> Pack:
-    pack.onboarding_answers = answers
+    cleaned_answers = dict(answers or {})
+    pack.onboarding_answers = cleaned_answers
     pack.status = "onboarding"
+    generated_name = _generate_pack_name_from_business_description(
+        cleaned_answers.get("what_do_you_do")
+    )
+    if generated_name:
+        pack.name = generated_name
+    resolved_brand_name = _extract_brand_name_from_answers(cleaned_answers)
+    if resolved_brand_name:
+        pack.brand_name = resolved_brand_name
+    elif generated_name and not (pack.brand_name or "").strip():
+        pack.brand_name = generated_name
+
+    offer_one_liner = _text_or_none(cleaned_answers.get("what_do_you_do"), limit=500)
+    if offer_one_liner:
+        pack.offer_one_liner = offer_one_liner
+
+    target_audience = _text_or_none(
+        cleaned_answers.get("who_are_your_customers"),
+        limit=500,
+    )
+    if target_audience:
+        pack.target_audience = target_audience
+
+    primary_cta = _text_or_none(cleaned_answers.get("primary_cta"), limit=255)
+    pack.primary_cta = primary_cta
+
+    proof_text = _text_or_none(cleaned_answers.get("proof_text"))
+    pack.proof_text = proof_text
+
+    brand_url = _text_or_none(cleaned_answers.get("brand_url"), limit=512)
+    if brand_url:
+        pack.website_url = brand_url
+
+    if cleaned_answers.get("pack_type") in {PACK_TYPE_ENQUIRIES, "quotes", "sales"}:
+        pack.pack_type = str(cleaned_answers["pack_type"])
     db.commit()
     return pack
 

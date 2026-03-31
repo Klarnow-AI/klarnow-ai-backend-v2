@@ -27,22 +27,10 @@ from app.core.request_context import set_correlation_id
 from app.core.auth.routes import router as auth_router
 from app.modules.packs.routes import router as packs_router
 from app.modules.brand_os.routes import router as brand_os_router
-from app.modules.campaign.routes import router as campaign_router
-from app.modules.sprint.routes import router as sprint_router
-from app.modules.clients.routes import router as clients_router
-from app.modules.revenue.routes import router as revenue_router
-from app.modules.proof_vault.routes import router as proof_vault_router
-from app.modules.chat.routes import router as chat_router
 from app.modules.creative.routes import router as creative_router
 from app.modules.docs.routes import router as docs_router
-from app.modules.operations.routes import router as operations_router
-from app.modules.landing.routes import router as landing_router
-from app.modules.agents.routes import router as agents_router
-from app.modules.tasks.routes import router as tasks_router
-from app.modules.response_rules.routes import router as response_rules_router
 from app.modules.builder.routes import router as builder_router, public_router as builder_public_router
 from app.modules.builder.subdomain_routes import router as builder_subdomain_router
-from app.modules.feedback.routes import router as feedback_router
 from app.modules.ad_factory.routes import router as ad_factory_router
 from app.modules.waitlist.routes import router as waitlist_router
 
@@ -179,24 +167,12 @@ def metrics():
 
 
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
-app.include_router(packs_router, prefix="/api/v1/packs", tags=["packs"])
+app.include_router(packs_router, prefix="/api/v1/projects", tags=["projects"])
 app.include_router(brand_os_router, prefix="/api/v1", tags=["brand-os"])
-app.include_router(campaign_router, prefix="/api/v1", tags=["campaign"])
-app.include_router(sprint_router, prefix="/api/v1", tags=["sprint"])
-app.include_router(clients_router, prefix="/api/v1/clients", tags=["clients"])
-app.include_router(revenue_router, prefix="/api/v1/revenue", tags=["revenue"])
-app.include_router(proof_vault_router, prefix="/api/v1", tags=["proof-vault"])
-app.include_router(chat_router, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(creative_router, prefix="/api/v1/creative", tags=["creative"])
-app.include_router(docs_router, prefix="/api/v1/packs/{pack_id}/docs", tags=["docs"])
-app.include_router(operations_router, prefix="/api/v1", tags=["operations"])
-app.include_router(landing_router, prefix="/api/v1/me", tags=["me"])
-app.include_router(agents_router, prefix="/api/v1/agents", tags=["agents"])
-app.include_router(tasks_router, tags=["tasks"])
-app.include_router(response_rules_router, tags=["response-rules"])
+app.include_router(docs_router, prefix="/api/v1/projects/{pack_id}/docs", tags=["docs"])
 app.include_router(builder_router, prefix="/api/v1/builder", tags=["builder"])
 app.include_router(builder_public_router, prefix="/p", tags=["sites"])
-app.include_router(feedback_router, tags=["feedback"])
 app.include_router(ad_factory_router, prefix="/api/v1/ad-factory", tags=["ad-factory"])
 app.include_router(waitlist_router)
 # Subdomain site serving: GET / and POST /lead when Host is *.sites_domain

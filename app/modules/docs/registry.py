@@ -103,7 +103,7 @@ TEMPLATE_REGISTRY: dict[str, DocumentTemplateDefinition] = {
     DOCUMENT_TYPE_PROPOSAL: _template(
         type=DOCUMENT_TYPE_PROPOSAL,
         label="Proposal",
-        category="Sprint-critical",
+        category="Pack-critical",
         purpose="Move a qualified lead to agreement with a structured proposal.",
         use_cases=("Qualified lead", "Warm deal stage", "Client-ready offer"),
         required_fields=(
@@ -141,7 +141,7 @@ TEMPLATE_REGISTRY: dict[str, DocumentTemplateDefinition] = {
     DOCUMENT_TYPE_INVOICE: _template(
         type=DOCUMENT_TYPE_INVOICE,
         label="Invoice",
-        category="Sprint-critical",
+        category="Pack-critical",
         purpose="Move an accepted proposal to payment.",
         use_cases=("Accepted proposal", "Payment request", "Client billing"),
         required_fields=(
@@ -187,7 +187,7 @@ TEMPLATE_REGISTRY: dict[str, DocumentTemplateDefinition] = {
     DOCUMENT_TYPE_COMPANY_PROFILE: _template(
         type=DOCUMENT_TYPE_COMPANY_PROFILE,
         label="Company Profile",
-        category="Sprint-critical",
+        category="Pack-critical",
         purpose="Create a reusable credibility document from company context.",
         use_cases=("Outreach support", "Trust-building", "Client introduction"),
         required_fields=(
@@ -228,7 +228,7 @@ TEMPLATE_REGISTRY: dict[str, DocumentTemplateDefinition] = {
     DOCUMENT_TYPE_MEETING_SUMMARY: _template(
         type=DOCUMENT_TYPE_MEETING_SUMMARY,
         label="Meeting Summary",
-        category="Sprint-critical",
+        category="Pack-critical",
         purpose="Turn notes into a clean post-meeting document.",
         use_cases=("Post-call summary", "Review notes", "Action-item capture"),
         required_fields=(
@@ -261,7 +261,7 @@ TEMPLATE_REGISTRY: dict[str, DocumentTemplateDefinition] = {
     DOCUMENT_TYPE_FOLLOW_UP_SUMMARY: _template(
         type=DOCUMENT_TYPE_FOLLOW_UP_SUMMARY,
         label="Follow-up Summary",
-        category="Sprint-critical",
+        category="Pack-critical",
         purpose="Capture progression and generate the next follow-up move.",
         use_cases=("Lead progression", "Follow-up queue", "Client handoff"),
         required_fields=(

@@ -7,26 +7,23 @@ from app.modules.packs.tools import (
     UPDATE_PACK_SCHEMA,
     extract_brand_from_url,
     EXTRACT_BRAND_SCHEMA,
+    get_onboarding_artifact_lineage,
+    GET_ONBOARDING_ARTIFACT_LINEAGE_SCHEMA,
+    rerun_onboarding_stage,
+    RERUN_ONBOARDING_STAGE_SCHEMA,
+    rerun_onboarding_from_qa,
+    RERUN_ONBOARDING_FROM_QA_SCHEMA,
 )
-from app.modules.sprint.tools import complete_sprint_day, COMPLETE_SPRINT_DAY_SCHEMA
 from app.modules.creative.tools import (
     render_poster,
     render_video,
     RENDER_POSTER_SCHEMA,
     RENDER_VIDEO_SCHEMA,
 )
-from app.modules.revenue.tools import (
-    create_proposal,
-    create_invoice,
-    CREATE_PROPOSAL_SCHEMA,
-    CREATE_INVOICE_SCHEMA,
-)
 from app.modules.packs.read_tools import (
     get_pack_snapshot,
-    get_pack_followup_queue,
     get_account_snapshot,
     GET_PACK_SNAPSHOT_SCHEMA,
-    GET_PACK_FOLLOWUP_QUEUE_SCHEMA,
     GET_ACCOUNT_SNAPSHOT_SCHEMA,
 )
 
@@ -45,21 +42,11 @@ def register_all_tools() -> None:
     register(
         ToolDef(
             name="update_pack",
-            description="Save pack fields from Day 0-3 (has_existing_brand, brand_url, brand_name, primary_cta, usp_statement, pitch_script, voice_notes_sent, etc). For brand_url with has_existing_brand=yes, triggers extraction. Call before complete_sprint_day.",
+            description="Save pack and onboarding fields such as has_existing_brand, brand_url, brand_name, primary_cta, proof_text, and related business context.",
             parameters_schema=UPDATE_PACK_SCHEMA,
             fn=update_pack,
             allowed_agents=["orchestrator"],
-            side_effects="Updates Pack fields, sets day_0_completed_at when Day 0 complete",
-        )
-    )
-    register(
-        ToolDef(
-            name="complete_sprint_day",
-            description="Mark sprint day 0-3 as complete and advance. Call after update_pack has saved the required fields.",
-            parameters_schema=COMPLETE_SPRINT_DAY_SCHEMA,
-            fn=complete_sprint_day,
-            allowed_agents=["orchestrator"],
-            side_effects="Marks DayCard complete, advances sprint.current_day",
+            side_effects="Updates Pack fields and onboarding context",
         )
     )
     register(
@@ -70,6 +57,36 @@ def register_all_tools() -> None:
             fn=generate_brand_os,
             allowed_agents=["orchestrator", "strategy"],
             side_effects="Creates BrandOS row, sets pack.active_brand_os_id",
+        )
+    )
+    register(
+        ToolDef(
+            name="get_onboarding_artifact_lineage",
+            description="Read the latest onboarding artifacts, their versions, and source stages for a project.",
+            parameters_schema=GET_ONBOARDING_ARTIFACT_LINEAGE_SCHEMA,
+            fn=get_onboarding_artifact_lineage,
+            allowed_agents=["orchestrator", "strategy", "creative", "video"],
+            side_effects="read-only",
+        )
+    )
+    register(
+        ToolDef(
+            name="rerun_onboarding_stage",
+            description="Queue a bounded onboarding repair from a named stage, optionally including downstream stages and QA.",
+            parameters_schema=RERUN_ONBOARDING_STAGE_SCHEMA,
+            fn=rerun_onboarding_stage,
+            allowed_agents=["orchestrator", "strategy", "creative", "video"],
+            side_effects="Queues a selective onboarding regeneration job",
+        )
+    )
+    register(
+        ToolDef(
+            name="rerun_onboarding_from_qa",
+            description="Use the latest QA report to queue the smallest repairable onboarding rerun.",
+            parameters_schema=RERUN_ONBOARDING_FROM_QA_SCHEMA,
+            fn=rerun_onboarding_from_qa,
+            allowed_agents=["orchestrator", "strategy", "creative", "video"],
+            side_effects="Queues a QA-driven selective onboarding regeneration job",
         )
     )
     register(
@@ -94,28 +111,8 @@ def register_all_tools() -> None:
     )
     register(
         ToolDef(
-            name="create_proposal",
-            description="Create a draft proposal for a pack (revenue).",
-            parameters_schema=CREATE_PROPOSAL_SCHEMA,
-            fn=create_proposal,
-            allowed_agents=["orchestrator", "revenue"],
-            side_effects="Creates Proposal row (draft)",
-        )
-    )
-    register(
-        ToolDef(
-            name="create_invoice",
-            description="Create a draft invoice for a pack (revenue).",
-            parameters_schema=CREATE_INVOICE_SCHEMA,
-            fn=create_invoice,
-            allowed_agents=["orchestrator", "revenue"],
-            side_effects="Creates Invoice row (draft)",
-        )
-    )
-    register(
-        ToolDef(
             name="get_pack_snapshot",
-            description="Read-only snapshot of pack execution state: campaign, website, Brand OS, leads, follow-up queue, proposals, invoices.",
+            description="Read-only snapshot of project execution state: strategy, CTA, website, proposals, invoices, and assets.",
             parameters_schema=GET_PACK_SNAPSHOT_SCHEMA,
             fn=get_pack_snapshot,
             allowed_agents=["orchestrator"],
@@ -124,18 +121,8 @@ def register_all_tools() -> None:
     )
     register(
         ToolDef(
-            name="get_pack_followup_queue",
-            description="Read-only follow-up queue for a pack (pending or overdue).",
-            parameters_schema=GET_PACK_FOLLOWUP_QUEUE_SCHEMA,
-            fn=get_pack_followup_queue,
-            allowed_agents=["orchestrator"],
-            side_effects="read-only",
-        )
-    )
-    register(
-        ToolDef(
             name="get_account_snapshot",
-            description="Read-only account-wide summary across the user's packs.",
+            description="Read-only account-wide summary across the user's projects.",
             parameters_schema=GET_ACCOUNT_SNAPSHOT_SCHEMA,
             fn=get_account_snapshot,
             allowed_agents=["orchestrator"],

@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     # Optional: Resend
     resend_api_key: str = ""
     resend_from_email: str = ""
-    support_email: str = "sooreoluwaa@gmail.com"
+    support_email: str = "sooreoluwa@klarnow.co.uk"
     failure_alert_to_email: str = ""
     waitlist_notification_to_email: str = "team@klarnow.co.uk"
 
@@ -87,11 +87,10 @@ class Settings(BaseSettings):
     ai_logo_model: str = "google/gemini-2.5-flash-image-preview"
     ai_poster_flyer_model: str = "anthropic/claude-sonnet-4.6"
     poster_max_output_tokens: int = 16384
+    brand_os_request_timeout_seconds: int = 90
     
     # Cost guards: keep non-essential AI features opt-in.
     ai_chat_prompt_suggestions_enabled: bool = False
-    ai_sprint_today_tasks_enabled: bool = False
-    ai_sprint_field_suggestions_enabled: bool = False
     ai_brand_identity_suggestions_enabled: bool = False
     ai_logo_generation_enabled: bool = False
     ai_brand_os_reasoning_enabled: bool = False
@@ -102,7 +101,7 @@ class Settings(BaseSettings):
     onboarding_queue_consumer_group: str = "onboarding-workers"
     onboarding_queue_delayed_key: str = "klarnow:onboarding:delayed"
     onboarding_queue_block_ms: int = 5000
-    onboarding_queue_claim_idle_ms: int = 60000
+    onboarding_queue_claim_idle_ms: int = 1800000
     onboarding_queue_batch_size: int = 1
     onboarding_queue_stream_maxlen: int = 1000
     onboarding_queue_dispatch_ttl_seconds: int = 86400

@@ -45,6 +45,33 @@ Enable small businesses to launch and execute professional marketing campaigns w
    # or: python -m app.workers.onboarding_worker
    ```
 
+### Run onboarding directly without HTTP
+
+If you want to test the onboarding pipeline against an existing project without
+going through the API or frontend, use:
+
+```bash
+make onboarding-flow pack_id=<project-uuid> args='--show-artifacts'
+```
+
+Useful options:
+- `args='--status-only --show-artifacts'` to inspect the latest job/artifact state
+- `args='--stage website'` to run a bounded repair from a stage
+- `args='--repair-from-qa'` to rerun the smallest repair recommended by QA
+
+If you want a true end-to-end local demo that creates its own project first, use:
+
+```bash
+make onboarding-demo
+```
+
+Useful options:
+- `make onboarding-demo args='--show-artifacts'`
+- `make onboarding-demo args='--project-name "My Demo" --brand-name "Acme Studio"'`
+- `make onboarding-demo args='--existing-brand --brand-url https://example.com --show-artifacts'`
+
+There is also a notebook version at `notebooks/onboarding_demo.ipynb`.
+
 API: `http://localhost:8000`. Docs: `http://localhost:8000/docs`. Health: `http://localhost:8000/health`.
 
 ### Make targets
@@ -54,6 +81,8 @@ API: `http://localhost:8000`. Docs: `http://localhost:8000/docs`. Health: `http:
 | `make install`  | Create venv and sync deps        |
 | `make start`    | Run API with reload (loads .env) |
 | `make worker`   | Run Redis onboarding worker      |
+| `make onboarding-flow pack_id=<uuid>` | Run onboarding directly for an existing project |
+| `make onboarding-demo` | Create a demo project and run onboarding end-to-end |
 | `make serve`    | Run API production-style         |
 | `make activate` | Print command to activate venv   |
 

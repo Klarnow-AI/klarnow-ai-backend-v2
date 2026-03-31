@@ -9,7 +9,6 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.errors import DomainNotFoundError
-from app.core.gates import can_generate_assets
 from app.modules.ad_factory.claim_guard import run_claim_guard
 from app.modules.ad_factory.engines.engine0_pack_context import run as run_engine0
 from app.modules.ad_factory.engines.engine1_context_builder import run as run_engine1
@@ -57,10 +56,8 @@ from app.modules.ad_factory.schemas import (
 )
 from app.modules.ad_factory.validation import validate_variants
 from app.modules.builder.services import get_published_for_pack
-from app.modules.campaign.services import get_active_for_pack
 from app.modules.packs.models import Pack
 from app.modules.packs.services import get_pack_for_user
-from app.modules.sprint.services import get_active_sprint_for_pack
 from app.shared.services.generation_context import load_generation_brand_context
 
 CTA_ACTION_MAP = {
@@ -235,12 +232,11 @@ def _build_brand_context_snapshot(brand_context) -> BrandContextSnapshot | None:
 
 
 def build_brand_brief_from_pack(db: Session, pack: Pack) -> BrandBrief:
-    campaign = get_active_for_pack(db, pack.id)
     site = get_published_for_pack(db, pack.id)
     generation_brand_context = load_generation_brand_context(db, pack.id, pack=pack)
     brand_context_snapshot = _build_brand_context_snapshot(generation_brand_context)
 
-    cta_raw = ((campaign.primary_cta if campaign else None) or pack.primary_cta or "Visit the link").strip()
+    cta_raw = (pack.primary_cta or "Visit the link").strip()
     cta_action = _infer_cta_action(cta_raw)
 
     if site and site.live_url:
@@ -332,28 +328,24 @@ def build_brand_brief_from_pack(db: Session, pack: Pack) -> BrandBrief:
 
 
 def build_pack_snapshot(db: Session, pack: Pack) -> PackSnapshot:
-    sprint = get_active_sprint_for_pack(db, pack.id)
-    day = sprint.current_day if sprint else 1
-    sprint_id = str(sprint.id) if sprint else str(pack.id)
-
-    if day <= 2:
+    if pack.onboarding_completed_at is None:
+        day = 1
         stage = "clarity"
-    elif day <= 4:
+    elif pack.onboarding_background_completed_at is None:
+        day = 3
         stage = "setup"
-    elif day <= 7:
+    elif get_published_for_pack(db, pack.id) is None:
+        day = 6
         stage = "publish"
-    elif day <= 10:
-        stage = "traffic"
-    elif day <= 13:
-        stage = "follow_up"
     else:
-        stage = "close"
+        day = 9
+        stage = "traffic"
 
     return PackSnapshot(
         pack_id=str(pack.id),
         pack_name=pack.name or "Pack",
-        sprint_id=sprint_id,
-        day=max(1, day),
+        sprint_id=str(pack.id),
+        day=day,
         stage=stage,  # type: ignore[arg-type]
         traffic_source="unknown",
     )
@@ -452,8 +444,6 @@ def generate_compile(
     pack = get_pack_for_user(db, pack_id, user_id)
     if not pack:
         raise DomainNotFoundError("Pack not found")
-    can_generate_assets(db, pack)
-
     brand_brief = build_brand_brief_from_pack(db, pack)
     pack_snapshot = build_pack_snapshot(db, pack)
     selection = CompileSelection(

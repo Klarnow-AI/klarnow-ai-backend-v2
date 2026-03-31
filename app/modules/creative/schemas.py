@@ -75,6 +75,10 @@ class PosterGenerateRequest(BaseModel):
         default=None,
         alias="editVariant",
     )
+    slot_id: Literal["v1", "v2", "v3", "v4"] | None = Field(
+        default=None,
+        alias="slotId",
+    )
     existing_files: list[PosterExistingFileInput] = Field(
         default_factory=list,
         alias="existingFiles",

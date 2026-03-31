@@ -5,9 +5,8 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.core.errors import DomainNotFoundError
+from app.core.errors import DomainGateBlockedError, DomainNotFoundError
 from app.core.governance import validate_no_revenue_guarantees
-from app.modules.campaign.services import get_active_for_pack
 from app.modules.creative.models import Asset
 from app.modules.packs.models import Pack
 
@@ -36,9 +35,16 @@ def _compliance_check(db: Session, pack_id: UUID, copy_text: str | None) -> None
     """Ensure no revenue guarantees and CTA alignment. Called before render."""
     if copy_text:
         validate_no_revenue_guarantees(copy_text)
-    campaign = get_active_for_pack(db, pack_id)
-    if not campaign or not campaign.primary_cta:
-        raise DomainGateBlockedError("Campaign must have a primary CTA before rendering assets")
+    pack = db.query(Pack).filter(Pack.id == pack_id).first()
+    if not pack:
+        raise DomainNotFoundError("Pack not found")
+    resolved_cta = pack.primary_cta
+    if not str(resolved_cta or "").strip():
+        from app.shared.services.generation_context import load_generation_brand_context
+
+        resolved_cta = load_generation_brand_context(db, pack_id, pack=pack).primary_cta
+    if not str(resolved_cta or "").strip():
+        raise DomainGateBlockedError("Set a primary CTA before rendering assets")
 
 
 def render_poster(
@@ -52,8 +58,6 @@ def render_poster(
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
         raise DomainNotFoundError("Pack not found")
-    from app.core.gates import can_generate_assets
-    can_generate_assets(db, pack)
     _compliance_check(db, pack_id, pack.name)
     if sprint_day is not None and (sprint_day < 1 or sprint_day > 7):
         sprint_day = None
@@ -83,8 +87,6 @@ def render_video(
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
         raise DomainNotFoundError("Pack not found")
-    from app.core.gates import can_generate_assets
-    can_generate_assets(db, pack)
     _compliance_check(db, pack_id, script or "")
     if sprint_day is not None and (sprint_day < 1 or sprint_day > 7):
         sprint_day = None

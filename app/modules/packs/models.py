@@ -106,18 +106,12 @@ class Pack(Base):
     active_brand_os_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("brand_os.id", ondelete="SET NULL"), nullable=True
     )
-    active_campaign_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("campaign.id", ondelete="SET NULL"), nullable=True
-    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
     created_by_user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False
-    )
-    client_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("client.id", ondelete="SET NULL"), nullable=True
     )
     # MVP Pack fields (FINAL MVP §9)
     brand_name: Mapped[str | None] = mapped_column(String(255), nullable=True)

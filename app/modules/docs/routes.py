@@ -1,4 +1,4 @@
-"""Pack-scoped API routes for Klarnow Docs."""
+"""Project-scoped API routes for Klarnow Docs."""
 
 from __future__ import annotations
 

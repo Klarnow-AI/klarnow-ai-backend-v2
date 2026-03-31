@@ -1,6 +1,6 @@
 """Routes for subdomain-based site serving. Mount at prefix '' so GET / and POST /lead work for builder subdomains."""
 
-from uuid import UUID
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
@@ -19,7 +19,6 @@ from app.modules.builder.services import (
     load_published_snapshot,
     publish_project_artifacts,
 )
-from app.modules.clients.services import create_lead_with_followups
 from app.shared.services.generation_context import load_generation_brand_context
 
 router = APIRouter()
@@ -115,7 +114,7 @@ async def capture_lead_by_subdomain(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Capture a lead from a subdomain-served builder site (no auth)."""
+    """Capture a contact submission from a subdomain-served builder site (no auth)."""
     body = await _parse_public_lead_capture_request(request)
     if body.website and str(body.website).strip():
         raise HTTPException(status_code=400, detail="Invalid form submission")
@@ -129,22 +128,5 @@ async def capture_lead_by_subdomain(
     project, host_kind, host_value = _resolve_host_site(request, db)
     if not project or not host_kind or not host_value:
         raise HTTPException(status_code=404, detail="Not found")
-    pack_id = None
-    metadata = load_published_metadata(subdomain=host_value)
-    if metadata and metadata.get("pack_id"):
-        try:
-            pack_id = UUID(str(metadata["pack_id"]))
-        except (TypeError, ValueError):
-            pack_id = None
-    if pack_id is None:
-        pack_id = project.pack_id
-    lead = create_lead_with_followups(
-        db,
-        pack_id=pack_id,
-        name=body.name,
-        email=body.email,
-        phone=body.phone,
-        summary=body.summary,
-        source="builder_site",
-    )
-    return PublicLeadCaptureResponse(lead_id=str(lead.id))
+    submission_id = str(uuid4())
+    return PublicLeadCaptureResponse(submission_id=submission_id, lead_id=submission_id)

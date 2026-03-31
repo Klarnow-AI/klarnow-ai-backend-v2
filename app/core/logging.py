@@ -3,7 +3,7 @@
 import functools
 import logging
 import time
-from typing import Any
+from typing import Any, Callable
 
 from sqlalchemy.orm import Session
 
@@ -11,6 +11,8 @@ from app.core.request_context import get_correlation_id
 
 # Logger used for all service action events
 SERVICE_LOGGER_NAME = "klarnow.services"
+LOGGER_PREFIX = "klarnow"
+_LOGGER_FORMATTER_FACTORY: Callable[[], logging.Formatter] | None = None
 
 
 class CorrelationIdFilter(logging.Filter):
@@ -21,17 +23,53 @@ class CorrelationIdFilter(logging.Filter):
         return True
 
 
+def _default_formatter() -> logging.Formatter:
+    return logging.Formatter(
+        "%(asctime)s | %(levelname)-5s | %(name)s | corr=%(correlation_id)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+
+def _build_formatter() -> logging.Formatter:
+    if _LOGGER_FORMATTER_FACTORY is not None:
+        return _LOGGER_FORMATTER_FACTORY()
+    return _default_formatter()
+
+
+def _iter_application_loggers(*, logger_prefix: str = LOGGER_PREFIX) -> list[logging.Logger]:
+    manager = logging.Logger.manager
+    loggers: list[logging.Logger] = []
+    for name, candidate in manager.loggerDict.items():
+        if not isinstance(candidate, logging.Logger):
+            continue
+        if name == logger_prefix or name.startswith(f"{logger_prefix}."):
+            loggers.append(candidate)
+    root_logger = logging.getLogger(logger_prefix)
+    if root_logger not in loggers:
+        loggers.append(root_logger)
+    return loggers
+
+
+def set_logger_formatter_factory(
+    factory: Callable[[], logging.Formatter] | None,
+    *,
+    logger_prefix: str = LOGGER_PREFIX,
+) -> None:
+    """Override log formatting for application loggers and update existing handlers."""
+    global _LOGGER_FORMATTER_FACTORY
+    _LOGGER_FORMATTER_FACTORY = factory
+    formatter = _build_formatter()
+    for logger in _iter_application_loggers(logger_prefix=logger_prefix):
+        for handler in logger.handlers:
+            handler.setFormatter(formatter)
+
+
 def get_logger(name: str = SERVICE_LOGGER_NAME) -> logging.Logger:
     """Return the application logger. Use SERVICE_LOGGER_NAME for service actions."""
     logger = logging.getLogger(name)
     if not logger.handlers:
         handler = logging.StreamHandler()
-        handler.setFormatter(
-            logging.Formatter(
-                "%(asctime)s | %(levelname)-5s | %(name)s | corr=%(correlation_id)s | %(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S",
-            )
-        )
+        handler.setFormatter(_build_formatter())
         handler.addFilter(CorrelationIdFilter())
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)

@@ -15,9 +15,9 @@ from app.modules.agents.models import DecisionLog
 # Orchestrator can call any tool; specialists are restricted per A-PRD
 PERMISSION_MATRIX = {
     "orchestrator": None,  # None = all tools
-    "strategy": ["generate_brand_os"],
-    "creative": ["render_poster"],
-    "video": ["render_video"],
+    "strategy": ["generate_brand_os", "get_onboarding_artifact_lineage", "rerun_onboarding_stage", "rerun_onboarding_from_qa"],
+    "creative": ["render_poster", "get_onboarding_artifact_lineage", "rerun_onboarding_stage", "rerun_onboarding_from_qa"],
+    "video": ["render_video", "get_onboarding_artifact_lineage", "rerun_onboarding_stage", "rerun_onboarding_from_qa"],
     "revenue": ["create_proposal", "create_invoice"],
 }
 

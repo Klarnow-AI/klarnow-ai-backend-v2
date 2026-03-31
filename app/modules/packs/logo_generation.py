@@ -14,6 +14,7 @@ from io import BytesIO
 from typing import Mapping
 
 from PIL import Image
+import requests
 
 from app.core.config import get_settings
 from app.core.errors import BadRequestError
@@ -30,6 +31,7 @@ from app.shared.services.openai_compatible import (
 OPENROUTER_IMAGE_ASPECT_RATIO = "1:1"
 OPENROUTER_IMAGE_SIZE = "1K"
 LOGO_PROMPT_MAX_LENGTH = 1000
+LOGO_RETRY_PROMPT_MAX_LENGTH = 600
 PROVIDER_COOLDOWN_SECONDS = 600
 _IMAGE_EXTENSION_BY_MIME_TYPE = {
     "image/gif": "gif",
@@ -44,11 +46,46 @@ _PROVIDER_FAILURE_LOCK = threading.Lock()
 _PROVIDER_FAILURE_STATE: dict[str, float | str] = {"until": 0.0, "reason": ""}
 
 
+def _prompt_text_or_none(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        return text or None
+    if isinstance(value, (list, tuple, set)):
+        parts = [_prompt_text_or_none(item) for item in value]
+        cleaned_parts = [part for part in parts if part]
+        if not cleaned_parts:
+            return None
+        return ", ".join(cleaned_parts)
+    text = str(value).strip()
+    return text or None
+
+
 def _clean_logo_url(value: object) -> str | None:
     if not isinstance(value, str):
         return None
     text = value.strip()
     return text or None
+
+
+def _normalize_image_mime_type(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = value.strip().lower()
+    if not text:
+        return None
+    if text.startswith("data:"):
+        text = text[5:].split(";", 1)[0].strip()
+    if text.startswith("image/"):
+        return text.split(";", 1)[0].strip()
+    return {
+        "gif": "image/gif",
+        "jpeg": "image/jpeg",
+        "jpg": "image/jpeg",
+        "png": "image/png",
+        "webp": "image/webp",
+    }.get(text)
 
 
 def get_logo_primary_asset_url(result: Mapping[str, object] | None) -> str | None:
@@ -166,21 +203,22 @@ def _build_logo_prompt(
     color_palette: dict | None = None,
 ) -> str:
     """Build the text prompt for logo generation."""
-    style_description = (prompt or "").strip() or "simple and professional"
-    scheme = (color_scheme or "").strip() or "versatile, modern color scheme"
-    context = (brand_os_summary or "").strip()
+    brand_label = _prompt_text_or_none(brand_name) or "My Brand"
+    style_description = _prompt_text_or_none(prompt) or "simple and professional"
+    scheme = _prompt_text_or_none(color_scheme) or "versatile, modern color scheme"
+    context = _prompt_text_or_none(brand_os_summary)
     user_content = (
-        f"Create a logo for {brand_name}. "
+        f"Create a logo for {brand_label}. "
         f"The design should be {style_description}, with a {scheme}."
     )
     if context:
         user_content = f"Brand context: {context}. " + user_content
     if color_palette and isinstance(color_palette, dict):
-        parts = [
-            f"{key} {value}"
-            for key, value in color_palette.items()
-            if value and isinstance(value, str) and str(value).strip()
-        ]
+        parts: list[str] = []
+        for key, value in color_palette.items():
+            cleaned_value = _prompt_text_or_none(value)
+            if cleaned_value:
+                parts.append(f"{key} {cleaned_value}")
         if parts:
             user_content += (
                 " Infuse these exact brand colors into the logo as the dominant visual system: "
@@ -197,14 +235,28 @@ def _build_logo_prompt(
 
 
 def _truncate_logo_prompt(prompt_text: str) -> str:
-    if len(prompt_text) <= LOGO_PROMPT_MAX_LENGTH:
+    return _truncate_logo_prompt_to_limit(
+        prompt_text,
+        max_length=LOGO_PROMPT_MAX_LENGTH,
+    )
+
+
+def _truncate_logo_prompt_to_limit(prompt_text: str, *, max_length: int) -> str:
+    if len(prompt_text) <= max_length:
         return prompt_text
+    separator = " ... "
+    tail_budget = min(320, max(160, max_length // 3))
+    head_budget = max_length - tail_budget - len(separator)
+    if head_budget <= 0:
+        return prompt_text[:max_length]
+    head = prompt_text[:head_budget].rstrip()
+    tail = prompt_text[-tail_budget:].lstrip()
     logger.info(
         "logo_generation: OpenRouter prompt truncated from %s to %s chars",
         len(prompt_text),
-        LOGO_PROMPT_MAX_LENGTH,
+        max_length,
     )
-    return prompt_text[:LOGO_PROMPT_MAX_LENGTH]
+    return f"{head}{separator}{tail}"
 
 
 def _get_attr_or_key(value: object, *names: str) -> object | None:
@@ -224,19 +276,149 @@ def _get_attr_or_key(value: object, *names: str) -> object | None:
 
 
 def _extract_generated_image_data_url(response: object) -> str | None:
-    choices = _get_attr_or_key(response, "choices")
-    if not isinstance(choices, list):
+    payload = _extract_generated_image_payload(response)
+    if not payload:
         return None
-    for choice in choices:
-        message = _get_attr_or_key(choice, "message")
-        images = _get_attr_or_key(message, "images")
-        if not isinstance(images, list):
+    kind, value, _mime_type = payload
+    if kind != "data_url":
+        return None
+    return value
+
+
+def _iter_generated_image_parts(response: object) -> list[object]:
+    parts: list[object] = []
+    _extend_image_parts(parts, _get_attr_or_key(response, "data"))
+    _extend_image_parts(parts, _get_attr_or_key(response, "images"))
+    _extend_image_parts(parts, _get_attr_or_key(response, "image", "output_image", "outputImage"))
+
+    choices = _get_attr_or_key(response, "choices")
+    _extend_parts_from_choice_collection(parts, choices)
+
+    candidates = _get_attr_or_key(response, "candidates")
+    _extend_parts_from_choice_collection(parts, candidates)
+    return parts
+
+
+def _iter_image_payload_candidates(payload: object) -> list[tuple[str, str, str | None]]:
+    candidates: list[tuple[str, str, str | None]] = []
+    direct_value = _clean_logo_url(payload)
+    if direct_value:
+        if direct_value.startswith("data:image/") or direct_value.startswith(("http://", "https://")):
+            candidates.append(("url", direct_value, None))
+        elif _looks_like_base64_image_data(direct_value):
+            candidates.append(("base64", direct_value, None))
+    nested_payloads = [
+        payload,
+        _get_attr_or_key(payload, "image_url", "imageUrl"),
+        _get_attr_or_key(payload, "image"),
+        _get_attr_or_key(payload, "output_image", "outputImage"),
+        _get_attr_or_key(payload, "inline_data", "inlineData"),
+    ]
+    for current in nested_payloads:
+        if current is None:
             continue
-        for image in images:
-            image_url = _get_attr_or_key(image, "image_url", "imageUrl")
-            url = _get_attr_or_key(image_url, "url")
-            if isinstance(url, str) and url.startswith("data:image/"):
-                return url
+        current_direct_value = _clean_logo_url(current)
+        if current_direct_value:
+            if current_direct_value.startswith("data:image/") or current_direct_value.startswith(("http://", "https://")):
+                candidates.append(("url", current_direct_value, None))
+            elif _looks_like_base64_image_data(current_direct_value):
+                candidates.append(("base64", current_direct_value, None))
+        mime_type = (
+            _normalize_image_mime_type(
+                _get_attr_or_key(
+                    current,
+                    "mime_type",
+                    "mimeType",
+                    "media_type",
+                    "mediaType",
+                    "content_type",
+                    "contentType",
+                    "format",
+                )
+            )
+            or _normalize_image_mime_type(_get_attr_or_key(payload, "mime_type", "mimeType", "format"))
+        )
+        url = _clean_logo_url(_get_attr_or_key(current, "url", "source_url", "sourceUrl"))
+        if url:
+            candidates.append(("url", url, mime_type))
+        for key in ("b64_json", "b64Json", "base64", "image_base64", "imageBase64", "data"):
+            raw = _get_attr_or_key(current, key)
+            if isinstance(raw, str) and raw.strip():
+                candidates.append(("base64", raw.strip(), mime_type))
+    return candidates
+
+
+def _extend_image_parts(parts: list[object], value: object) -> None:
+    if value is None:
+        return
+    if isinstance(value, (list, tuple)):
+        parts.extend(item for item in value if item is not None)
+        return
+    parts.append(value)
+
+
+def _extend_parts_from_choice_collection(parts: list[object], values: object) -> None:
+    if not isinstance(values, (list, tuple)):
+        return
+    for value in values:
+        message = _get_attr_or_key(value, "message")
+        if message is not None:
+            parts.append(message)
+            _extend_image_parts(parts, _get_attr_or_key(message, "images"))
+            _extend_image_parts(parts, _get_attr_or_key(message, "image", "output_image", "outputImage"))
+            _extend_image_parts(parts, _get_attr_or_key(message, "content", "content_parts", "contentParts"))
+            _extend_image_parts(parts, _get_attr_or_key(message, "parts"))
+        content = _get_attr_or_key(value, "content")
+        if content is not None:
+            parts.append(content)
+            _extend_image_parts(parts, _get_attr_or_key(content, "parts"))
+        _extend_image_parts(parts, _get_attr_or_key(value, "images"))
+        _extend_image_parts(parts, _get_attr_or_key(value, "parts"))
+
+
+def _looks_like_base64_image_data(value: str) -> bool:
+    trimmed = value.strip()
+    if len(trimmed) < 128:
+        return False
+    allowed = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\n\r"
+    return all(char in allowed for char in trimmed)
+
+
+def _decode_base64_image(raw_value: str, mime_type: str | None) -> tuple[bytes, str]:
+    value = str(raw_value or "").strip()
+    if value.startswith("data:image/"):
+        return _decode_data_url_image(value)
+    normalized_mime_type = _normalize_image_mime_type(mime_type) or "image/png"
+    try:
+        image_bytes = base64.b64decode(value)
+    except Exception as exc:
+        raise BadRequestError("Logo generation returned invalid base64 image data.") from exc
+    return image_bytes, normalized_mime_type
+
+
+def _download_generated_image(url: str, mime_type: str | None = None) -> tuple[bytes, str]:
+    try:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        raise BadRequestError("Logo generation returned an image URL that could not be downloaded.") from exc
+    content_type = _normalize_image_mime_type(response.headers.get("content-type")) or _normalize_image_mime_type(
+        mime_type
+    )
+    return response.content, content_type or "image/png"
+
+
+def _extract_generated_image_payload(
+    response: object,
+) -> tuple[str, str, str | None] | None:
+    for part in _iter_generated_image_parts(response):
+        for kind, value, mime_type in _iter_image_payload_candidates(part):
+            if kind == "url" and value.startswith("data:image/"):
+                return ("data_url", value, mime_type)
+            if kind == "url" and (value.startswith("http://") or value.startswith("https://")):
+                return ("remote_url", value, mime_type)
+            if kind == "base64":
+                return ("base64", value, mime_type)
     return None
 
 
@@ -430,6 +612,52 @@ def _create_transparent_png_variant(image_bytes: bytes) -> bytes:
     return output.getvalue()
 
 
+def _preview_logo_response_text(response: object, *, limit: int = 180) -> str | None:
+    preview_sources: list[object] = []
+    choices = _get_attr_or_key(response, "choices")
+    if isinstance(choices, list):
+        for choice in choices[:2]:
+            message = _get_attr_or_key(choice, "message")
+            if message is not None:
+                preview_sources.append(_get_attr_or_key(message, "content"))
+                preview_sources.append(_get_attr_or_key(message, "text"))
+    for source in preview_sources + _iter_generated_image_parts(response)[:6]:
+        text = _prompt_text_or_none(_get_attr_or_key(source, "text")) or _prompt_text_or_none(source)
+        if not text or text.startswith(("data:image/", "http://", "https://")):
+            continue
+        if len(text) <= limit:
+            return text
+        return text[: limit - 3].rstrip() + "..."
+    return None
+
+
+def _summarize_generated_image_response(response: object) -> str:
+    parts = _iter_generated_image_parts(response)
+    part_descriptions: list[str] = []
+    for part in parts[:6]:
+        if isinstance(part, str):
+            kind = "str"
+        else:
+            kind = _prompt_text_or_none(_get_attr_or_key(part, "type")) or part.__class__.__name__
+        part_descriptions.append(kind)
+    text_preview = _preview_logo_response_text(response)
+    summary = f"parts={len(parts)} part_types={part_descriptions}"
+    if text_preview:
+        summary += f" text_preview={text_preview!r}"
+    return summary
+
+
+def _build_logo_retry_prompt(prompt_text: str) -> str:
+    retry_instruction = (
+        " Return exactly one logo image as the assistant output. "
+        "Do not answer with text-only content."
+    )
+    return _truncate_logo_prompt_to_limit(
+        f"{prompt_text.strip()}{retry_instruction}",
+        max_length=LOGO_RETRY_PROMPT_MAX_LENGTH,
+    )
+
+
 def _request_logo_image_generation(
     client: object,
     *,
@@ -470,6 +698,35 @@ def _request_logo_image_generation(
     raise BadRequestError("Logo generation failed before any OpenRouter request was sent.")
 
 
+def _request_logo_generation_response(
+    client: object,
+    *,
+    model_name: str,
+    prompt_for_model: str,
+) -> object:
+    try:
+        return _request_logo_image_generation(
+            client,
+            model_name=model_name,
+            prompt_for_model=prompt_for_model,
+        )
+    except Exception as exc:
+        if _is_provider_auth_or_quota_error(exc):
+            reason = _build_provider_failure_reason(exc)
+            _set_provider_cooldown(reason)
+            logger.warning(
+                "logo_generation: %s Skipping image generation for %ss.",
+                reason,
+                PROVIDER_COOLDOWN_SECONDS,
+            )
+            raise BadRequestError(reason) from None
+        logger.warning("logo_generation: OpenRouter image call failed: %s", exc, exc_info=True)
+        raise BadRequestError(
+            "Logo generation failed: "
+            f"{exc!s}. Check OPENROUTER_API_KEY and that your selected model supports image generation."
+        ) from exc
+
+
 def generate_logo_with_openrouter(
     prompt_text: str,
     pack_id: str,
@@ -499,34 +756,46 @@ def generate_logo_with_openrouter(
 
     model_name = get_logo_model()
     prompt_for_model = _truncate_logo_prompt(prompt_text)
-    try:
-        response = _request_logo_image_generation(
+    response = _request_logo_generation_response(
+        client,
+        model_name=model_name,
+        prompt_for_model=prompt_for_model,
+    )
+
+    image_payload = _extract_generated_image_payload(response)
+    if not image_payload:
+        logger.warning(
+            "logo_generation: OpenRouter response had no image payload; %s",
+            _summarize_generated_image_response(response),
+        )
+        retry_prompt = _build_logo_retry_prompt(prompt_text)
+        logger.info("logo_generation: retrying OpenRouter image generation with simplified prompt")
+        retry_response = _request_logo_generation_response(
             client,
             model_name=model_name,
-            prompt_for_model=prompt_for_model,
+            prompt_for_model=retry_prompt,
         )
-    except Exception as exc:
-        if _is_provider_auth_or_quota_error(exc):
-            reason = _build_provider_failure_reason(exc)
-            _set_provider_cooldown(reason)
+        image_payload = _extract_generated_image_payload(retry_response)
+        if not image_payload:
             logger.warning(
-                "logo_generation: %s Skipping image generation for %ss.",
-                reason,
-                PROVIDER_COOLDOWN_SECONDS,
+                "logo_generation: OpenRouter retry response had no image payload; %s",
+                _summarize_generated_image_response(retry_response),
             )
-            raise BadRequestError(reason) from None
-        logger.warning("logo_generation: OpenRouter image call failed: %s", exc, exc_info=True)
-        raise BadRequestError(
-            "Logo generation failed: "
-            f"{exc!s}. Check OPENROUTER_API_KEY and that your selected model supports image generation."
-        ) from exc
-
-    data_url = _extract_generated_image_data_url(response)
-    if not data_url:
-        logger.warning("logo_generation: OpenRouter response had no image payload")
-        raise BadRequestError("Logo generation did not return an image.")
-
-    image_bytes, mime_type = _decode_data_url_image(data_url)
+            raise BadRequestError("Logo generation did not return an image.")
+        response = retry_response
+    payload_kind, payload_value, payload_mime_type = image_payload
+    if payload_kind == "data_url":
+        image_bytes, mime_type = _decode_data_url_image(payload_value)
+    elif payload_kind == "remote_url":
+        image_bytes, mime_type = _download_generated_image(
+            payload_value,
+            payload_mime_type,
+        )
+    else:
+        image_bytes, mime_type = _decode_base64_image(
+            payload_value,
+            payload_mime_type,
+        )
     extension = _extension_for_mime_type(mime_type)
     logger.info(
         "logo_generation: OpenRouter image decoded (%s bytes, %s), uploading to storage",

@@ -42,6 +42,62 @@ EXTRACT_BRAND_SCHEMA = {
     "required": ["pack_id", "url"],
 }
 
+GET_ONBOARDING_ARTIFACT_LINEAGE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "pack_id": {"type": "string", "format": "uuid", "description": "Project id"},
+    },
+    "required": ["pack_id"],
+}
+
+RERUN_ONBOARDING_STAGE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "pack_id": {"type": "string", "format": "uuid", "description": "Project id"},
+        "stage_name": {
+            "type": "string",
+            "enum": [
+                "normalize_input",
+                "brand_os",
+                "brand_identity",
+                "website",
+                "poster_flyers",
+                "video_briefs",
+                "video_render",
+                "qa_review",
+            ],
+            "description": "Pipeline stage to repair",
+        },
+        "include_downstream": {
+            "type": "boolean",
+            "default": True,
+            "description": "Whether to rerun downstream dependent stages too",
+        },
+        "reason": {
+            "type": "string",
+            "description": "Short explanation of why the repair is needed",
+        },
+    },
+    "required": ["pack_id", "stage_name"],
+}
+
+RERUN_ONBOARDING_FROM_QA_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "pack_id": {"type": "string", "format": "uuid", "description": "Project id"},
+        "include_downstream": {
+            "type": "boolean",
+            "default": True,
+            "description": "Whether to rerun the recommended downstream dependency chain too",
+        },
+        "reason": {
+            "type": "string",
+            "description": "Short operator note for the QA-driven repair",
+        },
+    },
+    "required": ["pack_id"],
+}
+
 
 def extract_brand_from_url(db: Session, pack_id: UUID | str, *, url: str, **kwargs: object) -> dict:
     """
@@ -93,6 +149,127 @@ def extract_brand_from_url(db: Session, pack_id: UUID | str, *, url: str, **kwar
         "tagline": extracted.get("tagline"),
         "industry": extracted.get("industry"),
         "description": (extracted.get("description") or "")[:500],
+    }
+
+
+def get_onboarding_artifact_lineage(
+    db: Session,
+    pack_id: UUID | str,
+    **kwargs: object,
+) -> dict:
+    from app.modules.packs.onboarding.public import get_onboarding_artifact_lineage as _get_lineage
+
+    del kwargs
+    if isinstance(pack_id, str):
+        pack_id = UUID(pack_id)
+    pack = db.query(Pack).filter(Pack.id == pack_id).first()
+    if not pack:
+        raise DomainNotFoundError("Pack not found")
+    return {
+        "pack_id": str(pack.id),
+        "artifacts": _get_lineage(pack),
+    }
+
+
+def rerun_onboarding_stage(
+    db: Session,
+    pack_id: UUID | str,
+    *,
+    stage_name: str,
+    include_downstream: bool = True,
+    reason: str | None = None,
+    **kwargs: object,
+) -> dict:
+    from app.modules.packs.onboarding.public import (
+        dispatch_onboarding_job_from_api,
+        enqueue_onboarding_stage_repair,
+        get_onboarding_job_status,
+        run_onboarding_job,
+    )
+
+    del kwargs
+    if isinstance(pack_id, str):
+        pack_id = UUID(pack_id)
+    pack = db.query(Pack).filter(Pack.id == pack_id).first()
+    if not pack:
+        raise DomainNotFoundError("Pack not found")
+
+    job = enqueue_onboarding_stage_repair(
+        db,
+        pack_id,
+        stage_name=stage_name,
+        include_downstream=include_downstream,
+        reason=reason,
+    )
+    db.commit()
+    db.refresh(pack)
+
+    job_id = str(job.get("job_id") or "")
+    dispatched = False
+    if job_id:
+        try:
+            dispatched = dispatch_onboarding_job_from_api(pack_id, job_id)
+        except Exception:
+            result = run_onboarding_job(pack_id, job_id)
+            while result.retry:
+                result = run_onboarding_job(pack_id, job_id)
+        db.refresh(pack)
+
+    return {
+        "queued": True,
+        "dispatched": dispatched,
+        "job_id": job_id or None,
+        "status": get_onboarding_job_status(pack),
+    }
+
+
+def rerun_onboarding_from_qa(
+    db: Session,
+    pack_id: UUID | str,
+    *,
+    include_downstream: bool = True,
+    reason: str | None = None,
+    **kwargs: object,
+) -> dict:
+    from app.modules.packs.onboarding.public import (
+        dispatch_onboarding_job_from_api,
+        enqueue_onboarding_qa_repair,
+        get_onboarding_job_status,
+        run_onboarding_job,
+    )
+
+    del kwargs
+    if isinstance(pack_id, str):
+        pack_id = UUID(pack_id)
+    pack = db.query(Pack).filter(Pack.id == pack_id).first()
+    if not pack:
+        raise DomainNotFoundError("Pack not found")
+
+    job = enqueue_onboarding_qa_repair(
+        db,
+        pack_id,
+        include_downstream=include_downstream,
+        reason=reason,
+    )
+    db.commit()
+    db.refresh(pack)
+
+    job_id = str(job.get("job_id") or "")
+    dispatched = False
+    if job_id:
+        try:
+            dispatched = dispatch_onboarding_job_from_api(pack_id, job_id)
+        except Exception:
+            result = run_onboarding_job(pack_id, job_id)
+            while result.retry:
+                result = run_onboarding_job(pack_id, job_id)
+        db.refresh(pack)
+
+    return {
+        "queued": True,
+        "dispatched": dispatched,
+        "job_id": job_id or None,
+        "status": get_onboarding_job_status(pack),
     }
 
 
@@ -183,30 +360,6 @@ def update_pack(
     if voice_notes_sent is not None:
         merge_onboarding_answers(db, pack, {"voice_notes_sent": (voice_notes_sent or "").strip() or ""})
         updates["voice_notes_sent"] = voice_notes_sent
-
-    if pack.primary_cta and not pack.active_campaign_id:
-        from app.modules.campaign.services import get_active_for_pack as get_active_campaign
-        from app.core.governance import validate_one_cta
-        from app.modules.campaign.models import Campaign
-
-        cta = (pack.primary_cta or "").strip()
-        if cta:
-            validate_one_cta(cta)
-            active_campaign = get_active_campaign(db, pack_id)
-            if active_campaign:
-                pack.active_campaign_id = active_campaign.id
-            else:
-                campaign = Campaign(
-                    pack_id=pack_id,
-                    version="A",
-                    primary_cta=cta,
-                    goal=None,
-                    angles=[],
-                    is_active=True,
-                )
-                db.add(campaign)
-                db.flush()
-                pack.active_campaign_id = campaign.id
 
     if pack.day_0_completed_at is None:
         bn = (pack.brand_name or "").strip()

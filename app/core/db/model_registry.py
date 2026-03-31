@@ -7,18 +7,9 @@ _MODEL_MODULES = (
     "app.modules.agents.models",
     "app.modules.brand_os.models",
     "app.modules.builder.models",
-    "app.modules.campaign.models",
-    "app.modules.chat.models",
-    "app.modules.clients.models",
     "app.modules.creative.models",
     "app.modules.docs.models",
-    "app.modules.operations.models",
     "app.modules.packs.models",
-    "app.modules.proof_vault.models",
-    "app.modules.response_rules.models",
-    "app.modules.revenue.models",
-    "app.modules.sprint.models",
-    "app.modules.tasks.models",
     "app.modules.waitlist.models",
 )
 

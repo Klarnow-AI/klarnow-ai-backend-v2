@@ -33,6 +33,6 @@ class Asset(Base):
     preview_image_key: Mapped[str | None] = mapped_column(String(512), nullable=True)  # S3 key
     script: Mapped[str | None] = mapped_column(String(8000), nullable=True)  # video script
     srt_key: Mapped[str | None] = mapped_column(String(512), nullable=True)  # S3 key for subtitles
-    sprint_day: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 1-7 for 7-day sprint
+    sprint_day: Mapped[int | None] = mapped_column(Integer, nullable=True)  # legacy progression marker
     chat_messages: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # [{role, content}] for poster/flyer
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

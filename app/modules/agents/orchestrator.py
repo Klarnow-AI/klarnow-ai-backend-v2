@@ -7,25 +7,64 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.modules.agents.registry import REGISTRY, execute
 from app.modules.brand_os.services import get_active_for_pack
-from app.modules.campaign.services import get_active_for_pack as get_campaign_for_pack
+from app.modules.builder.services import get_for_pack_any, get_published_for_pack
 from app.modules.packs.models import Pack
 
 CHAT_CONTEXT_LAST_N_MESSAGES = 20
+
+ONBOARDING_DAY_CONTEXT: dict[int, dict[str, object]] = {
+    0: {
+        "title": "Business foundations",
+        "playbook": "Capture what the business does, why it exists, and the action you want customers to take.",
+        "tasks": [
+            "Describe the business clearly",
+            "Explain why it started",
+            "Define the main call-to-action",
+        ],
+        "win_condition": "Business foundations captured",
+        "steps": ["what_do_you_do", "why_started", "primary_cta"],
+    },
+    1: {
+        "title": "Audience clarity",
+        "playbook": "Clarify who the business serves and what matters most to them.",
+        "tasks": [
+            "Describe the target customer",
+            "Capture the main pain or desired outcome",
+        ],
+        "win_condition": "Audience captured",
+        "steps": ["who_are_your_customers"],
+    },
+    2: {
+        "title": "Brand assets",
+        "playbook": "Collect existing brand assets or define a new brand direction.",
+        "tasks": [
+            "Share a website or logo if one exists",
+            "Otherwise choose a brand name and vibe",
+        ],
+        "win_condition": "Brand input captured",
+        "steps": ["has_existing_brand", "brand_url", "brand_name", "vibe_chips"],
+    },
+    3: {
+        "title": "Proof and trust",
+        "playbook": "Capture wins, testimonials, and credibility signals that strengthen copy.",
+        "tasks": [
+            "Share testimonials, outcomes, or milestones",
+        ],
+        "win_condition": "Proof captured",
+        "steps": ["proof_text"],
+    },
+}
 
 
 def assemble_context(
     pack_id: UUID, db: Session, day_context: int | None = None
 ) -> dict:
-    """Load pack, onboarding, active Brand OS, Campaign, website status, plan horizon.
-    When day_context is 0-3, include day playbook, tasks, win_condition for the Day 0-3 flow."""
+    """Load project, onboarding, active Brand OS, CTA context, and website status."""
     pack = db.query(Pack).filter(Pack.id == pack_id).first()
     if not pack:
         return {}
     brand_os = get_active_for_pack(db, pack_id)
-    campaign = get_campaign_for_pack(db, pack_id)
 
-    website_status = None
-    from app.modules.builder.services import get_for_pack_any, get_published_for_pack
     draft_site = get_for_pack_any(db, pack_id)
     published_site = get_published_for_pack(db, pack_id)
     if published_site:
@@ -35,41 +74,28 @@ def assemble_context(
     else:
         website_status = "none"
 
-    plan_horizon = None
-    mode = "build"
-    from app.modules.sprint.services import get_active_sprint_for_pack
-    from app.modules.sprint.day_definitions import get_day_definition, get_day_content, get_day_conversation_steps
-
-    active_sprint = get_active_sprint_for_pack(db, pack_id)
-    if active_sprint:
-        plan_horizon = "14"
-        mode = active_sprint.mode or "build"
-
     ctx: dict = {
         "pack_id": str(pack_id),
         "pack_name": pack.name,
         "onboarding_answers": pack.onboarding_answers,
         "onboarding_completed": pack.onboarding_completed_at is not None,
+        "onboarding_background_completed": pack.onboarding_background_completed_at is not None,
         "active_brand_os_version": brand_os.version if brand_os else None,
-        "campaign_goal": campaign.goal if campaign else None,
-        "campaign_primary_cta": campaign.primary_cta if campaign else None,
-        "campaign_angles": campaign.angles if campaign else None,
+        "campaign_goal": pack.core_concept,
+        "campaign_primary_cta": pack.primary_cta,
+        "campaign_angles": None,
         "website_status": website_status,
-        "plan_horizon": plan_horizon,
+        "plan_horizon": "growth" if pack.onboarding_completed_at else "onboarding",
     }
 
-    if day_context is not None and 0 <= day_context <= 3:
-        try:
-            day_def = get_day_definition(day_context)
-            day_content = get_day_content(day_context, mode)
-            ctx["day_context"] = day_context
-            ctx["day_title"] = day_def["title"]
-            ctx["day_playbook"] = day_content["playbook"]
-            ctx["day_tasks"] = day_content["tasks"]
-            ctx["day_win_condition"] = day_def["win_condition"]
-            ctx["day_conversation_steps"] = get_day_conversation_steps(day_context)
-        except ValueError:
-            pass
+    context = ONBOARDING_DAY_CONTEXT.get(day_context or -1)
+    if context:
+        ctx["day_context"] = day_context
+        ctx["day_title"] = context["title"]
+        ctx["day_playbook"] = context["playbook"]
+        ctx["day_tasks"] = context["tasks"]
+        ctx["day_win_condition"] = context["win_condition"]
+        ctx["day_conversation_steps"] = context["steps"]
 
     return ctx
 

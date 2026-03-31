@@ -176,22 +176,24 @@ def resolve_poster_prompt_brief(
     brand_context: GenerationBrandContext | None,
 ) -> PosterPromptBrief:
     business_name = _coalesce_text(
+        getattr(brand_context, "brand_name", None) if brand_context else None,
         getattr(pack, "brand_name", None),
         getattr(pack, "name", None),
         default="Business",
     )
     offer = _coalesce_text(
-        getattr(pack, "offer_one_liner", None),
         getattr(brand_context, "core_offer", None) if brand_context else None,
+        getattr(pack, "offer_one_liner", None),
         default="Our offer",
     )
     usp = _coalesce_text(
+        getattr(brand_context, "usp_statement", None) if brand_context else None,
         getattr(pack, "usp_locked_line", None),
         getattr(pack, "usp_statement", None),
-        getattr(brand_context, "usp_statement", None) if brand_context else None,
         default="",
     )
     cta = _coalesce_text(
+        getattr(brand_context, "primary_cta", None) if brand_context else None,
         getattr(pack, "primary_cta", None),
         default="Learn more",
     )
@@ -206,8 +208,8 @@ def resolve_poster_prompt_brief(
         else PROOF_FALLBACK
     )
     business_type = _coalesce_text(
-        getattr(pack, "business_type", None),
         getattr(brand_context, "industry", None) if brand_context else None,
+        getattr(pack, "business_type", None),
         default="business",
     )
     tone = _coalesce_text(
@@ -226,8 +228,28 @@ def resolve_poster_prompt_brief(
     )
 
 
-def get_poster_slot_configs(generation_mode: PosterGenerationMode) -> tuple[PosterSlotConfig, ...]:
-    return AUTO_SLOT_CONFIGS if generation_mode == "auto" else MANUAL_SLOT_CONFIGS
+def get_poster_slot_configs(
+    generation_mode: PosterGenerationMode,
+    *,
+    slot_id: PosterSlotId | None = None,
+    edit_variant: PosterSlotId | None = None,
+) -> tuple[PosterSlotConfig, ...]:
+    if generation_mode == "edit":
+        if edit_variant is None:
+            raise ValueError("Edit mode requires an edit variant.")
+        return (_edit_slot_config(edit_variant),)
+
+    if generation_mode == "auto":
+        if slot_id is None:
+            return AUTO_SLOT_CONFIGS
+        for slot in AUTO_SLOT_CONFIGS:
+            if slot.slot_id == slot_id:
+                return (slot,)
+        raise ValueError(f"Unknown auto slot: {slot_id}.")
+
+    if slot_id and slot_id != "v1":
+        raise ValueError("Manual mode only supports slot v1.")
+    return MANUAL_SLOT_CONFIGS
 
 
 def _brand_section(brand: GenerationBrandContext | None) -> str:
@@ -435,6 +457,7 @@ def build_poster_system_prompt(
     brand_context: GenerationBrandContext | None,
     generation_mode: PosterGenerationMode = "manual",
     edit_variant: PosterSlotId | None = None,
+    slot_id: PosterSlotId | None = None,
     existing_files: list[dict[str, str]] | None = None,
 ) -> str:
     if generation_mode == "edit":
@@ -443,8 +466,10 @@ def build_poster_system_prompt(
         current_files = _build_existing_files_context(existing_files or [])
         if not current_files:
             raise ValueError("Edit mode requires existing files.")
-        slot_config = _edit_slot_config(edit_variant)
-        slot_configs = (slot_config,)
+        slot_configs = get_poster_slot_configs(
+            generation_mode,
+            edit_variant=edit_variant,
+        )
         filenames = _build_required_filenames(slot_configs)
         size_rules = _build_size_rules(slot_configs)
         brief = resolve_poster_prompt_brief(pack=pack, brand_context=brand_context)
@@ -511,7 +536,10 @@ CURRENT FILES TO EDIT
 {current_files}
 """
 
-    slot_configs = get_poster_slot_configs(generation_mode)
+    slot_configs = get_poster_slot_configs(
+        generation_mode,
+        slot_id=slot_id,
+    )
     filenames = _build_required_filenames(slot_configs)
     size_rules = _build_size_rules(slot_configs)
     slot_mapping = _build_slot_mapping(slot_configs)
@@ -609,6 +637,7 @@ async def create_poster_generation_stream(
     reference_images: list[dict[str, str]],
     generation_mode: PosterGenerationMode,
     edit_variant: PosterSlotId | None = None,
+    slot_id: PosterSlotId | None = None,
     existing_files: list[dict[str, str]] | None = None,
 ) -> AsyncIterator[str]:
     settings = get_settings()
@@ -618,6 +647,7 @@ async def create_poster_generation_stream(
         brand_context=brand_context,
         generation_mode=generation_mode,
         edit_variant=edit_variant,
+        slot_id=slot_id,
         existing_files=existing_files,
     )
     return await create_text_stream(

@@ -20,11 +20,37 @@ class OpenAICompatibleProvider:
     api_key: str
     base_url: str
 
-    def create_sync_client(self) -> OpenAI:
-        return OpenAI(api_key=self.api_key, base_url=self.base_url)
+    def create_sync_client(
+        self,
+        *,
+        timeout: float | None = None,
+        max_retries: int | None = None,
+    ) -> OpenAI:
+        kwargs: dict[str, Any] = {
+            "api_key": self.api_key,
+            "base_url": self.base_url,
+        }
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        if max_retries is not None:
+            kwargs["max_retries"] = max_retries
+        return OpenAI(**kwargs)
 
-    def create_async_client(self) -> AsyncOpenAI:
-        return AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+    def create_async_client(
+        self,
+        *,
+        timeout: float | None = None,
+        max_retries: int | None = None,
+    ) -> AsyncOpenAI:
+        kwargs: dict[str, Any] = {
+            "api_key": self.api_key,
+            "base_url": self.base_url,
+        }
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        if max_retries is not None:
+            kwargs["max_retries"] = max_retries
+        return AsyncOpenAI(**kwargs)
 
 
 def _clean_text(value: str | None) -> str:
@@ -75,14 +101,30 @@ def has_openai_compatible_provider() -> bool:
     return get_openai_compatible_provider() is not None
 
 
-def create_sync_openai_client() -> OpenAI | None:
+def create_sync_openai_client(
+    *,
+    timeout: float | None = None,
+    max_retries: int | None = None,
+) -> OpenAI | None:
     provider = get_openai_compatible_provider()
-    return provider.create_sync_client() if provider else None
+    return (
+        provider.create_sync_client(timeout=timeout, max_retries=max_retries)
+        if provider
+        else None
+    )
 
 
-def create_async_openai_client() -> AsyncOpenAI | None:
+def create_async_openai_client(
+    *,
+    timeout: float | None = None,
+    max_retries: int | None = None,
+) -> AsyncOpenAI | None:
     provider = get_openai_compatible_provider()
-    return provider.create_async_client() if provider else None
+    return (
+        provider.create_async_client(timeout=timeout, max_retries=max_retries)
+        if provider
+        else None
+    )
 
 
 def is_unsupported_output_modalities_error(exc: Exception) -> bool:

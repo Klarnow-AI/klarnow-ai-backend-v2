@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.errors import BadRequestError, NotFoundError
 from app.core.logging import log_service_action
 from app.modules.brand_os.services import get_active_for_pack
-from app.modules.clients.models import LEAD_STATUS_QUALIFIED, Lead
 from app.modules.docs.composer import (
     apply_section_action,
     compose_document,
@@ -36,9 +35,7 @@ from app.modules.docs.models import (
 from app.modules.docs.pdf import build_document_pdf
 from app.modules.docs.registry import get_template_definition, list_template_definitions
 from app.modules.packs.models import Pack, User
-from app.modules.revenue.stripe_invoice import create_invoice_on_connected_account
-from app.modules.sprint.services import get_active_sprint_for_pack
-from app.modules.tasks.models import FollowUpTask, TASK_STATUS_PENDING
+from app.modules.docs.stripe_invoice import create_invoice_on_connected_account
 from app.shared.services.generation_context import build_generation_brand_context
 
 
@@ -190,33 +187,20 @@ def list_documents_for_pack(
 
 
 def _document_source_context(db: Session, pack: Pack, document: Document | None = None) -> dict[str, object]:
-    active_sprint = get_active_sprint_for_pack(db, pack.id)
-    qualified_lead = (
-        db.query(Lead)
-        .filter(Lead.pack_id == pack.id, Lead.status == LEAD_STATUS_QUALIFIED)
-        .order_by(Lead.updated_at.desc())
-        .first()
-    )
-    pending_followup = (
-        db.query(FollowUpTask)
-        .filter(FollowUpTask.pack_id == pack.id, FollowUpTask.status == TASK_STATUS_PENDING)
-        .order_by(FollowUpTask.due_date.asc())
-        .first()
-    )
     linked = document.linked_document if document else None
     brand_os = get_active_for_pack(db, pack.id)
     brand_context = build_generation_brand_context(pack, brand_os=brand_os)
     context = {
         "pack_name": pack.name,
         "brand_name": brand_context.brand_name or pack.brand_name or pack.name,
-        "lead_name": qualified_lead.name if qualified_lead else None,
-        "lead_summary": qualified_lead.summary if qualified_lead else None,
+        "lead_name": None,
+        "lead_summary": None,
         "client_name": document.inputs_json.get("client_name") if document and isinstance(document.inputs_json, dict) else None,
         "client_company": document.inputs_json.get("client_company") if document and isinstance(document.inputs_json, dict) else None,
         "owner_name": pack.name,
-        "sprint_day": active_sprint.current_day if active_sprint else None,
-        "sprint_mode": active_sprint.mode if active_sprint else None,
-        "pending_followup_task": pending_followup.message_template if pending_followup else None,
+        "onboarding_completed": pack.onboarding_completed_at is not None,
+        "automation_ready": pack.onboarding_background_completed_at is not None,
+        "pending_followup_task": None,
         "linked_document_title": linked.title if linked else None,
         "linked_document_status": linked.status if linked else None,
         "brand_voice": brand_context.voice_archetype,
@@ -473,11 +457,6 @@ def build_docs_home(db: Session, *, pack: Pack) -> dict[str, object]:
     recent_documents = list_documents_for_pack(db, pack.id)[:8]
     counts = Counter(item.type for item in recent_documents)
     suggestions: list[dict[str, object]] = []
-    qualified_lead_count = (
-        db.query(Lead)
-        .filter(Lead.pack_id == pack.id, Lead.status == LEAD_STATUS_QUALIFIED)
-        .count()
-    )
     accepted_proposal = (
         db.query(Document)
         .filter(
@@ -498,18 +477,13 @@ def build_docs_home(db: Session, *, pack: Pack) -> dict[str, object]:
         .first()
         is not None
     )
-    pending_followup = (
-        db.query(FollowUpTask)
-        .filter(FollowUpTask.pack_id == pack.id, FollowUpTask.status == TASK_STATUS_PENDING)
-        .first()
-    )
-    if qualified_lead_count:
+    if pack.onboarding_completed_at is not None:
         suggestions.append(
             {
                 "type": DOCUMENT_TYPE_PROPOSAL,
                 "label": "Create proposal",
-                "reason": "Qualified or warm leads are ready for a structured proposal.",
-                "href": f"/packs/{pack.id}/docs/new?{urlencode({'type': DOCUMENT_TYPE_PROPOSAL, 'startMode': 'suggested'})}",
+                "reason": "Your strategy context is ready to turn into a structured proposal.",
+                "href": f"/projects/{pack.id}/docs/new?{urlencode({'type': DOCUMENT_TYPE_PROPOSAL, 'startMode': 'suggested'})}",
                 "priority": 10,
             }
         )
@@ -519,28 +493,18 @@ def build_docs_home(db: Session, *, pack: Pack) -> dict[str, object]:
                 "type": DOCUMENT_TYPE_INVOICE,
                 "label": "Generate invoice",
                 "reason": "An accepted proposal is ready to move to payment.",
-                "href": f"/packs/{pack.id}/docs/new?{urlencode({'type': DOCUMENT_TYPE_INVOICE, 'startMode': 'suggested', 'linkedDocumentId': str(accepted_proposal.id)})}",
+                "href": f"/projects/{pack.id}/docs/new?{urlencode({'type': DOCUMENT_TYPE_INVOICE, 'startMode': 'suggested', 'linkedDocumentId': str(accepted_proposal.id)})}",
                 "priority": 20,
             }
         )
-    if not has_company_profile and qualified_lead_count:
+    if not has_company_profile:
         suggestions.append(
             {
                 "type": DOCUMENT_TYPE_COMPANY_PROFILE,
                 "label": "Build company profile",
-                "reason": "A reusable company profile helps with outreach and trust.",
-                "href": f"/packs/{pack.id}/docs/new?{urlencode({'type': DOCUMENT_TYPE_COMPANY_PROFILE, 'startMode': 'suggested'})}",
+                "reason": "A reusable company profile strengthens downstream brand and sales assets.",
+                "href": f"/projects/{pack.id}/docs/new?{urlencode({'type': DOCUMENT_TYPE_COMPANY_PROFILE, 'startMode': 'suggested'})}",
                 "priority": 30,
-            }
-        )
-    if pending_followup:
-        suggestions.append(
-            {
-                "type": DOCUMENT_TYPE_FOLLOW_UP_SUMMARY,
-                "label": "Create follow-up summary",
-                "reason": "There is pending follow-up context to capture and move forward.",
-                "href": f"/packs/{pack.id}/docs/new?{urlencode({'type': DOCUMENT_TYPE_FOLLOW_UP_SUMMARY, 'startMode': 'suggested'})}",
-                "priority": 40,
             }
         )
     suggestions.append(
@@ -548,8 +512,8 @@ def build_docs_home(db: Session, *, pack: Pack) -> dict[str, object]:
             "type": DOCUMENT_TYPE_MEETING_SUMMARY,
             "label": "Turn notes into summary",
             "reason": "Use the notes-to-structure flow for meetings or review notes.",
-            "href": f"/packs/{pack.id}/docs/new?{urlencode({'type': DOCUMENT_TYPE_MEETING_SUMMARY, 'startMode': 'notes'})}",
-            "priority": 50,
+            "href": f"/projects/{pack.id}/docs/new?{urlencode({'type': DOCUMENT_TYPE_MEETING_SUMMARY, 'startMode': 'notes'})}",
+            "priority": 40,
         }
     )
     return {

@@ -2,6 +2,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -23,9 +24,6 @@ from app.modules.packs.schemas import (
     PackPatch,
     PackRead,
     PackSummaryResponse,
-    PackGatesResponse,
-    GateStatus,
-    SectionUnlock,
     BrandOSSummary,
     CampaignSummary,
     WebsiteSummary,
@@ -34,8 +32,11 @@ from app.modules.packs.schemas import (
     ProposalsSummary,
     InvoicesSummary,
     OnboardingSubmit,
-    OnboardingCompleteResponse,
+    OnboardingCompleteAccepted,
+    OnboardingArtifactLineageResponse,
     OnboardingJobStatusResponse,
+    OnboardingRepairFromQARequest,
+    OnboardingRepairRequest,
     ExtractBrandBody,
     ExtractBrandResponse,
     GenerateStarterBrandBody,
@@ -76,10 +77,17 @@ from app.modules.packs.logo_generation import (
     get_logo_variant_urls,
 )
 from app.modules.packs.brand_identity_suggestions import suggest_typography, suggest_palette
-from app.modules.packs.onboarding_jobs import (
+from app.modules.packs.onboarding.public import (
+    dispatch_onboarding_job_from_api,
+    enqueue_onboarding_qa_repair,
+    enqueue_onboarding_stage_repair,
+    get_onboarding_artifact_lineage,
+    enqueue_onboarding_job,
     get_onboarding_job_status,
+    request_onboarding_job_pause,
+    resume_onboarding_job,
+    run_onboarding_job,
 )
-from app.modules.sprint.day_readiness import get_day_readiness_state, is_day_ready_to_complete
 
 router = APIRouter()
 
@@ -90,32 +98,10 @@ def list_my_packs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List packs for the authenticated user with campaign status."""
-    from app.modules.campaign.models import Campaign
-
+    """List projects for the authenticated user."""
     packs = list_packs_for_user(db, current_user.id, include_archived=include_archived)
-    pack_ids = [p.id for p in packs]
-    active_pack_ids = set()
-    packs_with_campaign = set()
-    if pack_ids:
-        campaign_rows = (
-            db.query(Campaign.pack_id, func.bool_or(Campaign.is_active).label("has_active"))
-            .filter(Campaign.pack_id.in_(pack_ids))
-            .group_by(Campaign.pack_id)
-            .all()
-        )
-        active_pack_ids = {r.pack_id for r in campaign_rows if r.has_active}
-        packs_with_campaign = {r.pack_id for r in campaign_rows}
-    items = []
-    for p in packs:
-        data = PackRead.model_validate(p).model_dump()
-        campaign_is_active: bool | None
-        if p.id not in packs_with_campaign:
-            campaign_is_active = None
-        else:
-            campaign_is_active = p.id in active_pack_ids
-        items.append(PackListItem(**data, campaign_is_active=campaign_is_active))
-    return PackList(items=items, total=len(packs))
+    items = [PackListItem(**PackRead.model_validate(p).model_dump()) for p in packs]
+    return PackList(items=items, total=len(items))
 
 
 @router.post("", response_model=PackRead, status_code=status.HTTP_201_CREATED)
@@ -136,18 +122,14 @@ def get_pack_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get full pack overview: Brand OS through Proof Vault (for overview page)."""
+    """Get full project overview: Brand OS through generated assets."""
     pack = get_pack_for_user(db, pack_id, current_user.id)
     if not pack:
         raise NotFoundError("Pack not found")
 
     from app.modules.brand_os.models import BrandOS
-    from app.modules.campaign.models import Campaign as CampaignModel
     from app.modules.builder.models import BuilderProject
-    from app.modules.sprint.models import Sprint, SPRINT_STATUS_ACTIVE
-    from app.modules.clients.models import LEAD_STATUS_QUALIFIED, Lead
     from app.modules.docs.models import Document
-    from app.modules.proof_vault.models import Proof
     from app.modules.creative.models import Asset
 
     meta = db.execute(
@@ -162,21 +144,6 @@ def get_pack_summary(
                 .limit(1)
                 .scalar_subquery()
                 .label("brand_strategy"),
-            select(CampaignModel.id)
-                .where(CampaignModel.pack_id == pack_id, CampaignModel.is_active.is_(True))
-                .limit(1)
-                .scalar_subquery()
-                .label("campaign_id"),
-            select(CampaignModel.goal)
-                .where(CampaignModel.pack_id == pack_id, CampaignModel.is_active.is_(True))
-                .limit(1)
-                .scalar_subquery()
-                .label("campaign_goal"),
-            select(CampaignModel.primary_cta)
-                .where(CampaignModel.pack_id == pack_id, CampaignModel.is_active.is_(True))
-                .limit(1)
-                .scalar_subquery()
-                .label("campaign_cta"),
             select(BuilderProject.live_url)
                 .where(
                     BuilderProject.pack_id == pack_id,
@@ -197,12 +164,6 @@ def get_pack_summary(
                 .limit(1)
                 .scalar_subquery()
                 .label("site_published_at"),
-            select(Sprint.current_day)
-                .where(Sprint.pack_id == pack_id, Sprint.status == SPRINT_STATUS_ACTIVE)
-                .order_by(Sprint.started_at.desc())
-                .limit(1)
-                .scalar_subquery()
-                .label("sprint_day"),
         )
     ).one()._mapping
 
@@ -218,24 +179,11 @@ def get_pack_summary(
     else:
         mission, vision, has_positioning = None, None, False
 
-    has_campaign = meta["campaign_id"] is not None
+    primary_cta = (pack.primary_cta or "").strip() or None
     has_site = meta["site_live_url"] is not None
-    sprint_day = meta["sprint_day"]
-    has_sprint = sprint_day is not None
     counts = (
         db.execute(
             select(
-                select(func.count(Lead.id))
-                .where(Lead.pack_id == pack_id)
-                .scalar_subquery()
-                .label("leads_total"),
-                select(func.count(Lead.id))
-                .where(
-                    Lead.pack_id == pack_id,
-                    Lead.status == LEAD_STATUS_QUALIFIED,
-                )
-                .scalar_subquery()
-                .label("leads_qualified"),
                 select(func.count(Document.id))
                 .where(Document.pack_id == pack_id, Document.type == "proposal")
                 .scalar_subquery()
@@ -292,10 +240,6 @@ def get_pack_summary(
                 )
                 .scalar_subquery()
                 .label("invoices_overdue"),
-                select(func.count(Proof.id))
-                .where(Proof.pack_id == pack_id)
-                .scalar_subquery()
-                .label("proofs_count"),
                 select(func.count(Asset.id))
                 .where(Asset.pack_id == pack_id)
                 .scalar_subquery()
@@ -306,13 +250,6 @@ def get_pack_summary(
         ._mapping
     )
 
-    goal_summary = None
-    if has_campaign and meta["campaign_goal"]:
-        g = meta["campaign_goal"] if isinstance(meta["campaign_goal"], dict) else {}
-        goal_summary = (g.get("description") or g.get("title") or str(g))[:200]
-
-    # Plan & Tracker = 14-day sprint (MVP)
-
     return PackSummaryResponse(
         pack=PackRead.model_validate(pack),
         brand_os=BrandOSSummary(
@@ -321,22 +258,15 @@ def get_pack_summary(
             has_positioning=has_positioning,
         ) if has_brand_os else None,
         campaign=CampaignSummary(
-            primary_cta=meta["campaign_cta"],
-            goal_summary=goal_summary,
-        ) if has_campaign else None,
+            primary_cta=primary_cta,
+            goal_summary=(pack.core_concept or "")[:200] or None,
+        ) if primary_cta else None,
         website=WebsiteSummary(
             live_url=meta["site_live_url"],
             published_at=meta["site_published_at"].isoformat() if meta["site_published_at"] else None,
         ) if has_site else None,
-        plan_tracker=PlanTrackerSummary(
-            horizon="14" if has_sprint else None,
-            sprint_day=sprint_day,
-            has_sprint=has_sprint,
-        ) if has_sprint else None,
-        leads=LeadsSummary(
-            total=int(counts["leads_total"] or 0),
-            qualified=int(counts["leads_qualified"] or 0),
-        ),
+        plan_tracker=None,
+        leads=LeadsSummary(),
         proposals=ProposalsSummary(
             total=int(counts["proposals_total"] or 0),
             sent=int(counts["proposals_sent"] or 0),
@@ -349,71 +279,8 @@ def get_pack_summary(
             paid=int(counts["invoices_paid"] or 0),
             overdue=int(counts["invoices_overdue"] or 0),
         ),
-        proofs_count=int(counts["proofs_count"] or 0),
         assets_count=int(counts["assets_count"] or 0),
     )
-
-
-@router.get("/{pack_id}/gates", response_model=PackGatesResponse)
-def get_pack_gates(
-    pack_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Evaluate all gates for a pack and return section unlock status."""
-    pack = get_pack_for_user(db, pack_id, current_user.id)
-    if not pack:
-        raise NotFoundError("Pack not found")
-
-    from app.core.errors import GateBlockedError
-    from app.core.gates import (
-        can_generate_website,
-        can_generate_assets,
-        can_create_proposal,
-        can_create_invoice,
-        can_pass_pack_gate,
-        can_pass_paywall_gate,
-        can_pass_day7_gate,
-        can_pass_day8_gate,
-    )
-    from app.modules.sprint.services import get_active_sprint_for_pack
-
-    active_sprint = get_active_sprint_for_pack(db, pack_id)
-    current_day = active_sprint.current_day if active_sprint else None
-
-    pack_ok, pack_msg = can_pass_pack_gate(pack)
-    paywall_ok, paywall_msg = can_pass_paywall_gate(db, current_user.id, current_day or 0)
-    d7_ok, d7_msg = can_pass_day7_gate(db, pack)
-    d8_ok, d8_msg = can_pass_day8_gate(db, pack)
-
-    def _try_gate(fn, *args) -> SectionUnlock:
-        try:
-            fn(*args)
-            return SectionUnlock(unlocked=True)
-        except GateBlockedError as e:
-            return SectionUnlock(unlocked=False, reason=str(e))
-
-    sections: dict[str, SectionUnlock] = {
-        "brand_os": SectionUnlock(unlocked=True),
-        "website": _try_gate(can_generate_website, db, pack),
-        "posters": _try_gate(can_generate_assets, db, pack),
-        "ad_factory": _try_gate(can_generate_assets, db, pack),
-        "leads": SectionUnlock(unlocked=True),
-        "proposal": _try_gate(can_create_proposal, db, pack),
-        "invoice": _try_gate(can_create_invoice, db, pack),
-        "proof_vault": SectionUnlock(unlocked=True),
-    }
-
-    return PackGatesResponse(
-        pack_gate=GateStatus(passed=pack_ok, message=pack_msg or None),
-        paywall_gate=GateStatus(passed=paywall_ok, message=paywall_msg or None),
-        day7_gate=GateStatus(passed=d7_ok, message=d7_msg or None),
-        day8_gate=GateStatus(passed=d8_ok, message=d8_msg or None),
-        current_day=current_day,
-        has_sprint=active_sprint is not None,
-        sections=sections,
-    )
-
 
 @router.get("/{pack_id}/day-readiness", response_model=DayReadinessResponse)
 def get_day_readiness(
@@ -422,14 +289,20 @@ def get_day_readiness(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Return whether all required questions for the given day (0-3) have been answered."""
+    """Return whether the pack has enough onboarding information to continue."""
     pack = get_pack_for_user(db, pack_id, current_user.id)
     if not pack:
         raise NotFoundError("Pack not found")
 
-    from app.modules.sprint.day_readiness import is_day_ready_to_complete
-
-    ready = is_day_ready_to_complete(db, pack_id, day)
+    _ = day
+    answers = pack.onboarding_answers or {}
+    required_fields = (
+        "what_do_you_do",
+        "why_started",
+        "who_are_your_customers",
+        "primary_cta",
+    )
+    ready = all(str(answers.get(field) or "").strip() for field in required_fields)
     return DayReadinessResponse(ready=ready)
 
 
@@ -453,18 +326,12 @@ def patch_pack(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update pack (name, client_id, Day 0 fields). Sets day_0_completed_at when brand_name + primary_cta + usp_statement are all set."""
+    """Update project foundation and onboarding fields."""
     pack = get_pack_for_user(db, pack_id, current_user.id)
     if not pack:
         raise NotFoundError("Pack not found")
-    from app.modules.clients.services import get_for_user as get_client_for_user
     from datetime import datetime, timezone
     data = body.model_dump(exclude_unset=True)
-    if "client_id" in data:
-        cid = data["client_id"]
-        if cid is not None and get_client_for_user(db, cid, current_user.id) is None:
-            raise NotFoundError("Client not found")
-        pack.client_id = cid
     if "name" in data:
         pack.name = data["name"]
     if "pack_type" in data and data["pack_type"] in ("enquiries", "quotes", "sales"):
@@ -476,34 +343,6 @@ def patch_pack(
     for key in day0_fields + day13_fields:
         if key in data:
             setattr(pack, key, data[key])
-
-    # Convenience: if Day 0 sets pack.primary_cta but no active Campaign exists yet,
-    # auto-create an active Campaign so downstream gates (website) can proceed.
-    if "primary_cta" in data:
-        cta = (pack.primary_cta or "").strip()
-        if cta:
-            from app.modules.campaign.services import get_active_for_pack as get_active_campaign
-            active_campaign = get_active_campaign(db, pack_id)
-            if active_campaign:
-                if not pack.active_campaign_id:
-                    pack.active_campaign_id = active_campaign.id
-            else:
-                if not pack.active_campaign_id:
-                    from app.core.governance import validate_one_cta
-                    from app.modules.campaign.models import Campaign
-
-                    validate_one_cta(cta)
-                    campaign = Campaign(
-                        pack_id=pack_id,
-                        version="A",
-                        primary_cta=cta,
-                        goal=None,
-                        angles=[],
-                        is_active=True,
-                    )
-                    db.add(campaign)
-                    db.flush()
-                    pack.active_campaign_id = campaign.id
     if "onboarding_answers" in data and data["onboarding_answers"]:
         pack = merge_onboarding_answers(
             db,
@@ -590,17 +429,49 @@ def _run_onboarding_background(pack_id: UUID) -> None:
 
 
 def _require_step_2_finalization_ready(db: Session, pack: Pack) -> None:
+    del db
     answers = pack.onboarding_answers or {}
+    required_fields = (
+        ("what_do_you_do", "Tell us what you do before completing onboarding."),
+        ("why_started", "Share why you started it before completing onboarding."),
+        (
+            "who_are_your_customers",
+            "Tell us who your customers are before completing onboarding.",
+        ),
+        ("primary_cta", "Tell us what you want people to do before completing onboarding."),
+    )
+    for key, message in required_fields:
+        if str(answers.get(key) or "").strip():
+            continue
+        raise BadRequestError(message)
+
     if answers.get("has_existing_brand") not in {"yes", "no"}:
         raise BadRequestError(
-            "Please complete Step 0 and indicate whether this is an existing brand."
+            "Tell us whether you already have a logo or website before completing onboarding."
         )
-    for day in (0, 1, 2):
-        readiness = get_day_readiness_state(db, pack.id, day)
-        if readiness.get("ready"):
-            continue
-        message = readiness.get("reason") or f"Step {day} is not ready to complete."
-        raise BadRequestError(message)
+
+    has_existing_brand = answers.get("has_existing_brand") == "yes"
+    if has_existing_brand:
+        has_brand_input = any(
+            str(answers.get(key) or "").strip()
+            for key in ("brand_url", "wordmark_svg_or_url", "generated_logo_url", "extracted_brand")
+        )
+        if not has_brand_input:
+            raise BadRequestError(
+                "Add your website URL or upload a logo before completing onboarding."
+            )
+        return
+
+    if not str(answers.get("brand_name") or "").strip():
+        raise BadRequestError("Add your brand name before completing onboarding.")
+
+    raw_vibe = answers.get("vibe_chips")
+    if isinstance(raw_vibe, list):
+        has_vibes = any(str(item).strip() for item in raw_vibe)
+    else:
+        has_vibes = str(raw_vibe or "").strip() not in {"", "[]"}
+    if not has_vibes:
+        raise BadRequestError("Pick a brand vibe before completing onboarding.")
 
 
 def _build_brand_os_summary_text(brand_os_row) -> str:
@@ -646,165 +517,40 @@ def _resolve_brand_os_id(value) -> UUID | None:
 
 @router.post(
     "/{pack_id}/onboarding/complete",
-    response_model=OnboardingCompleteResponse,
+    response_model=OnboardingCompleteAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 def complete_onboarding_route(
     pack_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Finalize onboarding after Step 2 and generate Brand OS synchronously."""
+    """Mark onboarding complete and kick off the background onboarding pipeline."""
     pack = get_pack_for_user(db, pack_id, current_user.id)
     if not pack:
         raise NotFoundError("Pack not found")
     _require_step_2_finalization_ready(db, pack)
-
+    answers = pack.onboarding_answers or {}
     sync_pack_target_audience(pack)
-    finalization_payload = build_step_2_finalization_payload(pack)
-    fingerprint = fingerprint_payload(finalization_payload)
-    answers = pack.onboarding_answers or {}
-    is_existing_brand = answers.get("has_existing_brand") == "yes"
-
-    cached = get_step_2_finalization_cache(pack) or {}
-    if cached.get("fingerprint") != fingerprint:
-        cached = {"fingerprint": fingerprint}
-
-    brand_os_row = None
-    cached_brand_os_id = cached.get("brand_os_id")
-    if isinstance(cached_brand_os_id, str):
-        try:
-            brand_os_row = get_brand_os_by_id_and_pack(db, UUID(cached_brand_os_id), pack_id)
-        except ValueError:
-            brand_os_row = None
-    if brand_os_row is None:
-        brand_os_row = get_brand_os_by_source_job_id(db, pack_id, fingerprint)
-    if brand_os_row is None:
-        generated_brand_os = generate_brand_os(
-            db,
-            pack_id,
-            source_job_id=fingerprint,
-            allow_without_onboarding_complete=True,
-        )
-        generated_brand_os_id = _resolve_brand_os_id(generated_brand_os)
-        if generated_brand_os_id is not None:
-            brand_os_row = get_brand_os_by_id_and_pack(db, generated_brand_os_id, pack_id)
-        if brand_os_row is None:
-            brand_os_row = get_brand_os_by_source_job_id(db, pack_id, fingerprint)
-    if brand_os_row is None:
-        raise BadRequestError("Brand OS generation failed. Please retry.")
-
-    cached["brand_os_id"] = str(brand_os_row.id)
-    cached["brand_os_version"] = brand_os_row.version
-    set_step_2_finalization_cache(pack, cached)
+    complete_onboarding(db, pack, answers=answers, commit=False)
+    job = enqueue_onboarding_job(db, pack_id)
     db.commit()
     db.refresh(pack)
 
-    starter_brand_response: GenerateStarterBrandResponse | None = None
-    logo_response: GenerateLogoResponse | None = None
+    job_id = str(job.get("job_id") or "")
+    try:
+        dispatch_onboarding_job_from_api(pack_id, job_id)
+    except Exception:
+        result = run_onboarding_job(pack_id, job_id)
+        while result.retry:
+            result = run_onboarding_job(pack_id, job_id)
 
-    if not is_existing_brand:
-        cached_starter_brand = cached.get("starter_brand")
-        if isinstance(cached_starter_brand, dict):
-            try:
-                starter_brand_response = GenerateStarterBrandResponse.model_validate(cached_starter_brand)
-            except Exception:
-                starter_brand_response = None
-        if starter_brand_response is None:
-            starter_brand_result = generate_starter_brand(
-                brand_name=(pack.brand_name or pack.name or "My Brand"),
-                vibe_chips=resolve_pack_vibe_chips(pack),
-                onboarding_context=build_onboarding_context(pack),
-                pack_id=str(pack_id),
-            )
-            wordmark = starter_brand_result["wordmark_svg_or_url"]
-            pack = append_suggested_logos(
-                db,
-                pack,
-                get_logo_variant_urls(starter_brand_result) or [wordmark],
-                commit=False,
-            )
-            pack = merge_onboarding_answers(
-                db,
-                pack,
-                {
-                    "wordmark_svg_or_url": wordmark,
-                    "generated_logo_url": starter_brand_result.get("logo_url"),
-                    "transparent_logo_url": starter_brand_result.get("transparent_logo_url"),
-                    "palette": starter_brand_result["palette"],
-                },
-                commit=False,
-            )
-            starter_brand_response = GenerateStarterBrandResponse(
-                wordmark_svg_or_url=wordmark,
-                palette=starter_brand_result["palette"],
-                logo_url=starter_brand_result.get("logo_url"),
-                transparent_logo_url=starter_brand_result.get("transparent_logo_url"),
-            )
-            cached["starter_brand"] = starter_brand_response.model_dump()
-            set_step_2_finalization_cache(pack, cached)
-            db.commit()
-            db.refresh(pack)
-
-        cached_logo = cached.get("logo")
-        if isinstance(cached_logo, dict):
-            try:
-                logo_response = GenerateLogoResponse.model_validate(cached_logo)
-            except Exception:
-                logo_response = None
-        if logo_response is None:
-            palette = starter_brand_response.palette if starter_brand_response else None
-            if not isinstance(palette, dict) or not palette:
-                palette = extract_palette_from_answers(pack.onboarding_answers or {})
-            logo_result = generate_logo(
-                brand_name=(pack.brand_name or pack.name or "My Brand"),
-                prompt="distinctive, creative logo, professional and memorable, not generic",
-                pack_id=str(pack_id),
-                color_scheme="use the provided palette",
-                brand_os_summary=_build_brand_os_summary_text(brand_os_row),
-                color_palette=palette,
-            )
-            logo_url = logo_result.get("logo_url") or get_logo_primary_asset_url(logo_result) or ""
-            pack = append_suggested_logos(
-                db,
-                pack,
-                get_logo_variant_urls(logo_result),
-                commit=False,
-            )
-            pack = merge_onboarding_answers(
-                db,
-                pack,
-                {
-                    "generated_logo_url": logo_result.get("logo_url"),
-                    "transparent_logo_url": logo_result.get("transparent_logo_url"),
-                },
-                commit=False,
-            )
-            logo_response = GenerateLogoResponse(
-                logo_url=logo_url,
-                wordmark_svg_or_url=logo_result.get("wordmark_svg_or_url"),
-                transparent_logo_url=logo_result.get("transparent_logo_url"),
-            )
-            cached["logo"] = logo_response.model_dump()
-            set_step_2_finalization_cache(pack, cached)
-            db.commit()
-            db.refresh(pack)
-
-    answers = pack.onboarding_answers or {}
-    pack = complete_onboarding(db, pack, answers=answers, commit=False)
-    cached["completed_at"] = (
-        pack.onboarding_completed_at.isoformat() if pack.onboarding_completed_at else None
+    payload = OnboardingCompleteAccepted(
+        status="processing",
+        pack_id=str(pack_id),
+        job_id=job_id or None,
     )
-    set_step_2_finalization_cache(pack, cached)
-    db.commit()
-    db.refresh(pack)
-
-    return OnboardingCompleteResponse(
-        pack=PackRead.model_validate(pack),
-        is_existing_brand=is_existing_brand,
-        brand_os=brand_os_read_from_orm(brand_os_row),
-        starter_brand=starter_brand_response,
-        logo=logo_response,
-    )
+    return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content=payload.model_dump())
 
 
 @router.get("/{pack_id}/onboarding/status", response_model=OnboardingJobStatusResponse)
@@ -818,6 +564,132 @@ def onboarding_status_route(
     if not pack:
         raise NotFoundError("Pack not found")
     return OnboardingJobStatusResponse(**get_onboarding_job_status(pack))
+
+
+@router.get("/{pack_id}/onboarding/artifacts", response_model=OnboardingArtifactLineageResponse)
+def onboarding_artifact_lineage_route(
+    pack_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get the latest typed onboarding artifacts and their lineage metadata."""
+    pack = get_pack_for_user(db, pack_id, current_user.id)
+    if not pack:
+        raise NotFoundError("Pack not found")
+    return OnboardingArtifactLineageResponse(items=get_onboarding_artifact_lineage(pack))
+
+
+@router.post("/{pack_id}/onboarding/repair", response_model=OnboardingJobStatusResponse)
+def repair_onboarding_route(
+    pack_id: UUID,
+    body: OnboardingRepairRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Queue a bounded onboarding repair run from the requested stage onward."""
+    pack = get_pack_for_user(db, pack_id, current_user.id)
+    if not pack:
+        raise NotFoundError("Pack not found")
+    try:
+        job = enqueue_onboarding_stage_repair(
+            db,
+            pack_id,
+            stage_name=body.stage,
+            include_downstream=body.include_downstream,
+            reason=body.reason,
+        )
+    except ValueError as exc:
+        raise BadRequestError(str(exc)) from exc
+
+    db.commit()
+    db.refresh(pack)
+
+    job_id = str(job.get("job_id") or "")
+    if job_id:
+        try:
+            dispatch_onboarding_job_from_api(pack_id, job_id)
+        except Exception:
+            result = run_onboarding_job(pack_id, job_id)
+            while result.retry:
+                result = run_onboarding_job(pack_id, job_id)
+        db.refresh(pack)
+    return OnboardingJobStatusResponse(**get_onboarding_job_status(pack))
+
+
+@router.post("/{pack_id}/onboarding/repair-from-qa", response_model=OnboardingJobStatusResponse)
+def repair_onboarding_from_qa_route(
+    pack_id: UUID,
+    body: OnboardingRepairFromQARequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Queue the smallest repairable onboarding rerun from the latest QA report."""
+    pack = get_pack_for_user(db, pack_id, current_user.id)
+    if not pack:
+        raise NotFoundError("Pack not found")
+    try:
+        job = enqueue_onboarding_qa_repair(
+            db,
+            pack_id,
+            include_downstream=body.include_downstream,
+            reason=body.reason,
+        )
+    except ValueError as exc:
+        raise BadRequestError(str(exc)) from exc
+
+    db.commit()
+    db.refresh(pack)
+
+    job_id = str(job.get("job_id") or "")
+    if job_id:
+        try:
+            dispatch_onboarding_job_from_api(pack_id, job_id)
+        except Exception:
+            result = run_onboarding_job(pack_id, job_id)
+            while result.retry:
+                result = run_onboarding_job(pack_id, job_id)
+        db.refresh(pack)
+    return OnboardingJobStatusResponse(**get_onboarding_job_status(pack))
+
+
+@router.post("/{pack_id}/onboarding/stop", response_model=OnboardingJobStatusResponse)
+def stop_onboarding_route(
+    pack_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Request a safe pause for the durable onboarding background job."""
+    pack = get_pack_for_user(db, pack_id, current_user.id)
+    if not pack:
+        raise NotFoundError("Pack not found")
+    status_payload = request_onboarding_job_pause(db, pack_id)
+    return OnboardingJobStatusResponse(**status_payload)
+
+
+@router.post("/{pack_id}/onboarding/continue", response_model=OnboardingJobStatusResponse)
+def continue_onboarding_route(
+    pack_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Resume a paused onboarding background job or clear a pending stop request."""
+    pack = get_pack_for_user(db, pack_id, current_user.id)
+    if not pack:
+        raise NotFoundError("Pack not found")
+
+    status_payload = resume_onboarding_job(db, pack_id)
+    job_id = str(status_payload.get("job_id") or "")
+    if status_payload.get("status") == "queued" and job_id:
+        try:
+            dispatch_onboarding_job_from_api(pack_id, job_id)
+        except Exception:
+            result = run_onboarding_job(pack_id, job_id)
+            while result.retry:
+                result = run_onboarding_job(pack_id, job_id)
+        db.refresh(pack)
+        status_payload = get_onboarding_job_status(pack)
+
+    return OnboardingJobStatusResponse(**status_payload)
 
 
 @router.post("/{pack_id}/onboarding/extract-brand", response_model=ExtractBrandResponse)

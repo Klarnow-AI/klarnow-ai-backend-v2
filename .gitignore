@@ -20,9 +20,6 @@ wheels/
 .cursor/
 .claude/
 
-# Docs
-/docs/
-
 # Node / Next.js
 node_modules
 .next

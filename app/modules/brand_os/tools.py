@@ -1,13 +1,16 @@
 """Brand OS tools: generate_brand_os (Strategy Agent), suggest_field_value. Writes only via this layer."""
 
 import json
-from typing import Any
+from time import monotonic
+from typing import Any, Callable
 from uuid import UUID
 
+from openai import APITimeoutError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.errors import DomainGateBlockedError, DomainNotFoundError
+from app.core.logging import get_logger
 from app.modules.brand_os.domain_schema import BrandOS as BrandOSDomain
 from app.modules.brand_os.models import BrandOS
 from app.modules.brand_os.services import get_active_for_pack, get_by_source_job_id, list_versions_for_pack
@@ -19,6 +22,8 @@ from app.shared.services.openai_compatible import (
     get_fast_model,
     has_openai_compatible_provider,
 )
+
+logger = get_logger("klarnow.brand_os")
 
 
 GENERATE_BRAND_OS_SCHEMA = {
@@ -169,7 +174,54 @@ def _build_brand_os_context_payload(
     return payload
 
 
-def _call_openai_for_brand_os(context: str) -> BrandOSDomain:
+def _format_timeout_seconds(timeout_seconds: float) -> str:
+    if float(timeout_seconds).is_integer():
+        return str(int(timeout_seconds))
+    return f"{timeout_seconds:.1f}".rstrip("0").rstrip(".")
+
+
+def _brand_os_timeout_message(timeout_seconds: float) -> str:
+    return (
+        "Brand OS generation timed out after "
+        f"{_format_timeout_seconds(timeout_seconds)} seconds while waiting for the AI provider."
+    )
+
+
+def _remaining_brand_os_timeout(deadline: float, total_timeout_seconds: float) -> float:
+    remaining = deadline - monotonic()
+    if remaining <= 0:
+        raise RuntimeError(_brand_os_timeout_message(total_timeout_seconds))
+    return max(1.0, remaining)
+
+
+def _is_brand_os_timeout_error(exc: Exception) -> bool:
+    if isinstance(exc, (APITimeoutError, TimeoutError)):
+        return True
+    return "timed out" in str(exc).lower()
+
+
+def _brand_os_failure_message(exc: Exception) -> str:
+    detail = str(exc).strip() or exc.__class__.__name__
+    return f"Brand OS generation failed: {detail}"
+
+
+def _report_brand_os_progress(
+    progress_callback: Callable[[str], None] | None,
+    message: str,
+) -> None:
+    if not progress_callback:
+        return
+    try:
+        progress_callback(message)
+    except Exception:
+        logger.warning("brand_os_progress_callback_failed | message=%s", message)
+
+
+def _call_openai_for_brand_os(
+    context: str,
+    *,
+    progress_callback: Callable[[str], None] | None = None,
+) -> BrandOSDomain:
     """
     Generate Brand OS content from context using a two-step chain-of-thought approach:
     1. Brief reasoning pass to identify core brand signals
@@ -178,14 +230,18 @@ def _call_openai_for_brand_os(context: str) -> BrandOSDomain:
     settings = get_settings()
     if not has_openai_compatible_provider():
         return _stub_brand_os_domain()
-    client = create_sync_openai_client()
+    client = create_sync_openai_client(max_retries=0)
     if not client:
         return _stub_brand_os_domain()
     context_trimmed = context[:6000]
+    timeout_seconds = max(float(settings.brand_os_request_timeout_seconds), 1.0)
+    deadline = monotonic() + timeout_seconds
 
     # Step 1: Brief reasoning pass — identify key brand signals before generating
     reasoning = ""
     if settings.ai_brand_os_reasoning_enabled:
+        reasoning_started = monotonic()
+        _report_brand_os_progress(progress_callback, "Brand OS reasoning started.")
         try:
             reasoning_response = client.chat.completions.create(
                 model=get_default_model(),
@@ -211,9 +267,28 @@ def _call_openai_for_brand_os(context: str) -> BrandOSDomain:
                 ],
                 temperature=0.4,
                 max_tokens=300,
+                timeout=_remaining_brand_os_timeout(deadline, timeout_seconds),
             )
             reasoning = reasoning_response.choices[0].message.content or ""
-        except Exception:
+            logger.info(
+                "brand_os_reasoning_step_completed | duration_ms=%.2f",
+                (monotonic() - reasoning_started) * 1000,
+            )
+            _report_brand_os_progress(
+                progress_callback,
+                f"Brand OS reasoning completed in {monotonic() - reasoning_started:.2f}s.",
+            )
+        except Exception as exc:
+            reasoning_duration_seconds = monotonic() - reasoning_started
+            logger.warning(
+                "brand_os_reasoning_step_failed | duration_ms=%.2f | error=%s",
+                reasoning_duration_seconds * 1000,
+                exc,
+            )
+            _report_brand_os_progress(
+                progress_callback,
+                f"Brand OS reasoning failed after {reasoning_duration_seconds:.2f}s; continuing without it.",
+            )
             pass  # Reasoning step failed — proceed with direct generation
 
     # Step 2: Structured generation using reasoning as additional context
@@ -233,6 +308,8 @@ def _call_openai_for_brand_os(context: str) -> BrandOSDomain:
         + "Be specific to this brand — no generic templates. Return only valid JSON matching the schema."
     )
 
+    generation_started = monotonic()
+    _report_brand_os_progress(progress_callback, "Brand OS final generation started.")
     try:
         completion = client.chat.completions.create(
             model=get_default_model(),
@@ -254,11 +331,41 @@ def _call_openai_for_brand_os(context: str) -> BrandOSDomain:
                 },
             ],
             temperature=0.6,
+            timeout=_remaining_brand_os_timeout(deadline, timeout_seconds),
         )
         content = completion.choices[0].message.content or "{}"
+        logger.info(
+            "brand_os_generation_step_completed | duration_ms=%.2f | content_chars=%s",
+            (monotonic() - generation_started) * 1000,
+            len(content),
+        )
+        _report_brand_os_progress(
+            progress_callback,
+            f"Brand OS final generation completed in {monotonic() - generation_started:.2f}s.",
+        )
         return BrandOSDomain.model_validate(json.loads(_strip_markdown_fences(content)))
-    except Exception:
-        return _stub_brand_os_domain()
+    except Exception as exc:
+        generation_duration_seconds = monotonic() - generation_started
+        if _is_brand_os_timeout_error(exc):
+            message = _brand_os_timeout_message(timeout_seconds)
+            _report_brand_os_progress(
+                progress_callback,
+                f"Brand OS final generation timed out after {generation_duration_seconds:.2f}s.",
+            )
+            if str(exc).strip() == message:
+                raise
+            raise RuntimeError(message) from exc
+        logger.warning(
+            "brand_os_generation_step_failed | duration_ms=%.2f | error_type=%s | error=%s",
+            generation_duration_seconds * 1000,
+            exc.__class__.__name__,
+            exc,
+        )
+        _report_brand_os_progress(
+            progress_callback,
+            f"Brand OS final generation failed after {generation_duration_seconds:.2f}s: {exc}",
+        )
+        raise RuntimeError(_brand_os_failure_message(exc)) from exc
 
 
 def generate_brand_os(
@@ -267,6 +374,7 @@ def generate_brand_os(
     onboarding_answers: dict | None = None,
     source_job_id: str | None = None,
     allow_without_onboarding_complete: bool = False,
+    progress_callback: Callable[[str], None] | None = None,
 ) -> dict:
     """Create a new Brand OS version (A or B) for the pack. Strategy Agent only."""
     pack_id = UUID(str(pack_id)) if isinstance(pack_id, str) else pack_id
@@ -318,7 +426,7 @@ def generate_brand_os(
         else:
             context = f"New pack: {pack.name}"
 
-    content = _call_openai_for_brand_os(context)
+    content = _call_openai_for_brand_os(context, progress_callback=progress_callback)
     existing_versions = [b.version for b in list_versions_for_pack(db, pack_id)]
     version = _next_version(existing_versions)
 

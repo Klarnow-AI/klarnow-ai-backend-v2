@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 from json import JSONDecodeError
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -10,10 +10,8 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
 from app.core.errors import BadRequestError, NotFoundError, ServiceUnavailableError
-from app.core.gates import can_generate_website
 from app.modules.packs.models import User
 from app.modules.packs.services import get_pack_for_user
-from app.modules.clients.services import create_lead_with_followups
 from app.modules.builder.public_site_schemas import (
     PublicLeadCaptureBody,
     PublicLeadCaptureResponse,
@@ -279,7 +277,6 @@ async def generate_project(
     if not body.files:
         raise BadRequestError("Missing files")
 
-    can_generate_website(db, pack)
     brand_context = load_generation_brand_context(db, project.pack_id, pack=pack)
 
     try:
@@ -360,7 +357,7 @@ def serve_published_site(project_id: UUID, db=Depends(get_db)):
     status_code=status.HTTP_201_CREATED,
 )
 async def capture_builder_lead(project_id: UUID, request: Request, db=Depends(get_db)):
-    """Capture a lead submitted from a published builder site (no auth)."""
+    """Capture a contact submission from a published builder site (no auth)."""
     body = await _parse_public_lead_capture_request(request)
     # Honeypot: bots often fill every field
     if body.website and str(body.website).strip():
@@ -369,25 +366,8 @@ async def capture_builder_lead(project_id: UUID, request: Request, db=Depends(ge
         raise HTTPException(status_code=400, detail="Please provide your name")
     if not (body.email and str(body.email).strip()) and not (body.phone and str(body.phone).strip()):
         raise HTTPException(status_code=400, detail="Please provide at least an email or phone number")
-    pack_id: UUID | None = None
     metadata = load_published_metadata(project_id=project_id)
-    if metadata and metadata.get("pack_id"):
-        try:
-            pack_id = UUID(str(metadata["pack_id"]))
-        except (TypeError, ValueError):
-            pack_id = None
-    if pack_id is None:
-        project = get_published(db, project_id)
-        if not project:
-            raise HTTPException(status_code=404, detail="Site not found or not yet published")
-        pack_id = project.pack_id
-    lead = create_lead_with_followups(
-        db,
-        pack_id=pack_id,
-        name=body.name,
-        email=body.email,
-        phone=body.phone,
-        summary=body.summary,
-        source="builder_site",
-    )
-    return PublicLeadCaptureResponse(lead_id=str(lead.id))
+    if not metadata and not get_published(db, project_id):
+        raise HTTPException(status_code=404, detail="Site not found or not yet published")
+    submission_id = str(uuid4())
+    return PublicLeadCaptureResponse(submission_id=submission_id, lead_id=submission_id)

@@ -8,7 +8,6 @@ from fastapi.responses import StreamingResponse
 from app.core.auth.deps import get_current_user
 from app.core.db.session import get_db
 from app.core.errors import BadRequestError, NotFoundError, ServiceUnavailableError
-from app.core.gates import can_generate_assets
 from app.modules.creative.generation import (
     create_poster_generation_stream,
     normalize_reference_images,
@@ -129,7 +128,6 @@ async def generate_posters(
     if not pack:
         raise NotFoundError("Pack not found")
 
-    can_generate_assets(db, pack)
     brand_context = load_generation_brand_context(db, body.pack_id, pack=pack)
 
     try:
@@ -149,6 +147,7 @@ async def generate_posters(
             reference_images=reference_images,
             generation_mode=body.generation_mode,
             edit_variant=body.edit_variant,
+            slot_id=body.slot_id,
             existing_files=existing_files,
         )
     except ValueError as exc:
