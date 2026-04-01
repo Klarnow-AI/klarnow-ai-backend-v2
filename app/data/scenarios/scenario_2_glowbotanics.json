@@ -1,0 +1,28 @@
+{
+  "scenario_id": "glowbotanics",
+  "scenario_name": "Glow Botanics — Ecommerce Skincare Brand",
+  "business_input": {
+    "business_name": "Glow Botanics",
+    "industry": "Natural skincare ecommerce",
+    "location": "Online, UK-based",
+    "target_audience": "Health-conscious women aged 22-38 who prefer vegan, cruelty-free skincare with transparent ingredient sourcing",
+    "offer": "Curated collection of 15 botanical skincare products, hero product is Vitamin C Brightening Serum at £32. Subscription box 'The Glow Edit' at £18.99/month",
+    "brand_preferences": "Fresh, natural, feminine, premium but accessible",
+    "goals": "Reach £10k monthly revenue, build email list to 5000 subscribers",
+    "differentiator": "All ingredients sourced from UK botanical gardens, fully recyclable packaging, plant-derived formulations developed with a cosmetic chemist"
+  },
+  "source_documents": [
+    {
+      "text": "Glow Botanics launched in early 2024 after founder Amara Osei spent two years formulating products with a cosmetic chemist in Birmingham. Every ingredient is plant-derived and sourced where possible from UK botanical suppliers. Our bestseller is the Vitamin C Brightening Serum — it uses kakadu plum extract instead of synthetic ascorbic acid. We currently sell through our Shopify store and have 2,300 email subscribers. Our customers frequently mention that they love the minimal, recyclable packaging. We also offer a subscription box called 'The Glow Edit' with three mini products monthly for £18.99.",
+      "source_type": "founder_notes"
+    },
+    {
+      "text": "Product Range: Vitamin C Brightening Serum (£32) - kakadu plum extract, hyaluronic acid. Rosehip Repair Night Oil (£28) - cold-pressed rosehip, evening primrose. Chamomile Cleansing Balm (£22) - chamomile extract, sweet almond oil. Green Tea Toner Mist (£18) - matcha, witch hazel. The Glow Edit Subscription Box (£18.99/month) - 3 mini products, exclusive access to new launches.",
+      "source_type": "products"
+    },
+    {
+      "text": "Customer reviews: 'My skin has never looked better. I love knowing exactly where every ingredient comes from.' - Emma, Bristol. 'The packaging is gorgeous and recyclable. This is how skincare should be.' - Jade, London. 'Switched from The Ordinary and honestly prefer Glow Botanics. The serum is incredible.' - Priya, Edinburgh.",
+      "source_type": "testimonials"
+    }
+  ]
+}

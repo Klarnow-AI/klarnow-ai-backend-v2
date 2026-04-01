@@ -33,6 +33,9 @@ from app.modules.builder.routes import router as builder_router, public_router a
 from app.modules.builder.subdomain_routes import router as builder_subdomain_router
 from app.modules.ad_factory.routes import router as ad_factory_router
 from app.modules.waitlist.routes import router as waitlist_router
+from app.routers.scenarios import router as dissertation_scenarios_router
+from app.routers.pipeline import router as dissertation_pipeline_router
+from app.routers.evaluation import router as dissertation_evaluation_router
 
 GENERIC_SERVER_ERROR_MESSAGE = "Something went wrong on our side. Please try again."
 
@@ -177,3 +180,8 @@ app.include_router(ad_factory_router, prefix="/api/v1/ad-factory", tags=["ad-fac
 app.include_router(waitlist_router)
 # Subdomain site serving: GET / and POST /lead when Host is *.sites_domain
 app.include_router(builder_subdomain_router, prefix="", tags=["sites-subdomain"])
+
+# Dissertation: multi-agent RAG evaluation endpoints
+app.include_router(dissertation_scenarios_router)
+app.include_router(dissertation_pipeline_router)
+app.include_router(dissertation_evaluation_router)
