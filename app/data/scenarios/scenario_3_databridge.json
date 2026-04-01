@@ -1,0 +1,28 @@
+{
+  "scenario_id": "databridge",
+  "scenario_name": "DataBridge Solutions — B2B Data Analytics Consultancy",
+  "business_input": {
+    "business_name": "DataBridge Solutions",
+    "industry": "Data analytics consultancy for mid-market companies",
+    "location": "London, UK",
+    "target_audience": "CTOs, Heads of Data, and operations directors at companies with 50-500 employees who need better data infrastructure but are not ready for enterprise platforms",
+    "offer": "Data audit and strategy packages starting at £5,000. Ongoing analytics retainers from £2,500/month. Proprietary DataBridge Assessment Framework",
+    "brand_preferences": "Authoritative, technical credibility, modern, results-driven",
+    "goals": "Land 3 enterprise contracts in Q2, establish thought leadership through content marketing",
+    "differentiator": "Founded by former Big Four consultants, proprietary assessment framework, guaranteed 90-day implementation timeline"
+  },
+  "source_documents": [
+    {
+      "text": "DataBridge Solutions was co-founded by James Chen and Priya Sharma, both former Deloitte data consultants, in 2023. We specialise in helping mid-market companies that have outgrown spreadsheet-based reporting but are not ready for full enterprise data platforms. Our DataBridge Assessment Framework scores companies across 5 dimensions: data quality, infrastructure maturity, team capability, governance readiness, and analytics adoption. The assessment takes 2 weeks and produces a prioritised 12-month roadmap. Our current clients include a logistics company with 200 employees, a fintech startup post-Series B, and a healthcare provider chain. We have delivered 14 assessments to date with 100% client recommendation rate.",
+      "source_type": "founder_notes"
+    },
+    {
+      "text": "Service packages: DataBridge Assessment (£5,000) - 2-week audit across 5 dimensions, 12-month roadmap deliverable. Analytics Retainer (£2,500/month) - ongoing support including dashboard development, data pipeline management, and monthly strategy reviews. Data Team Upskill Programme (£8,000) - 6-week training for internal data teams. Quick-Start Data Stack Setup (£12,000) - full implementation of recommended analytics stack within 90 days.",
+      "source_type": "services"
+    },
+    {
+      "text": "Case study: A logistics company with 200 staff was spending 15 hours per week on manual Excel reporting. After our assessment and 90-day implementation, they reduced reporting time by 80% and identified £340k in operational savings. The CTO said: 'DataBridge gave us a clear roadmap and actually delivered on time. First consultants I have worked with who did that.'",
+      "source_type": "case_study"
+    }
+  ]
+}

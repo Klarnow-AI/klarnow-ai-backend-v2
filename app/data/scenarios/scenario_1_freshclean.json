@@ -1,0 +1,28 @@
+{
+  "scenario_id": "freshclean",
+  "scenario_name": "FreshClean Pro — Local Service Business",
+  "business_input": {
+    "business_name": "FreshClean Pro",
+    "industry": "Residential and commercial cleaning services",
+    "location": "Manchester, UK",
+    "target_audience": "Busy professionals and small office managers aged 28-50 who need reliable, eco-friendly cleaning",
+    "offer": "Weekly and biweekly deep cleaning packages starting at £65, using non-toxic, eco-friendly products",
+    "brand_preferences": "Professional but approachable, clean and minimal aesthetic, trustworthy",
+    "goals": "Acquire 20 new recurring clients in 3 months",
+    "differentiator": "Eco-friendly products, DBS-checked uniformed staff, same-day booking availability"
+  },
+  "source_documents": [
+    {
+      "text": "FreshClean Pro was founded in 2023 by Sarah Mitchell, a former facilities manager who noticed that most cleaning companies in Manchester offered inconsistent quality and used harsh chemicals. Our team of 12 cleaners are all DBS-checked and trained in eco-cleaning methods. We serve residential properties in South Manchester and commercial offices in the city centre. Our most popular package is the weekly home refresh at £65 which includes kitchen deep clean, bathroom sanitisation, and living area vacuuming. We also offer one-off post-tenancy cleans. Clients book through our website or WhatsApp.",
+      "source_type": "founder_notes"
+    },
+    {
+      "text": "Services: Weekly Home Refresh (£65) - kitchen deep clean, bathroom sanitisation, living area vacuum and mop. Biweekly Deep Clean (£85) - full house deep clean including windows, skirting boards, and appliance exteriors. One-Off Post-Tenancy Clean (£150-250) - full property restoration clean. Commercial Office Clean - custom pricing based on square footage. All services use EcoVerde certified non-toxic cleaning products.",
+      "source_type": "services"
+    },
+    {
+      "text": "What our clients say: 'Finally a cleaning company that actually turns up on time and does a thorough job. Love that they use eco products too.' - Rachel T, Didsbury. 'We switched our office cleaning to FreshClean Pro six months ago. The difference is night and day.' - Mark S, Deansgate.",
+      "source_type": "testimonials"
+    }
+  ]
+}
