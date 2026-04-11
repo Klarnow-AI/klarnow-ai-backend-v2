@@ -25,33 +25,28 @@ from app.core.failure_alerts import capture_request_body_preview, queue_failure_
 from app.core.metrics import record_request, snapshot
 from app.core.request_context import set_correlation_id
 from app.core.auth.routes import router as auth_router
-from app.modules.packs.routes import router as packs_router
-from app.modules.brand_os.routes import router as brand_os_router
+from app.modules.billing.routes import router as billing_router
+from app.modules.api_keys.routes import router as api_keys_router
 from app.modules.creative.routes import router as creative_router
-from app.modules.docs.routes import router as docs_router
 from app.modules.builder.routes import router as builder_router, public_router as builder_public_router
-from app.modules.builder.subdomain_routes import router as builder_subdomain_router
-from app.modules.ad_factory.routes import router as ad_factory_router
 from app.modules.waitlist.routes import router as waitlist_router
-from app.routers.scenarios import router as dissertation_scenarios_router
-from app.routers.pipeline import router as dissertation_pipeline_router
-from app.routers.evaluation import router as dissertation_evaluation_router
+from app.modules.projects.routes import router as projects_router
+from app.modules.packs.routes import router as packs_router
+from app.modules.packs.export_routes import router as export_router
 
 GENERIC_SERVER_ERROR_MESSAGE = "Something went wrong on our side. Please try again."
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from app.modules.agents.register_tools import register_all_tools
     log = logging.getLogger("uvicorn.error")
     log.info("CORS allowed origins: %s", settings.cors_allow_origins)
-    register_all_tools()
     yield
 
 
 app = FastAPI(
     title="Klarnow AI",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -169,19 +164,16 @@ def metrics():
     }
 
 
+# ── Primary API: project-centric v2 routes promoted to /api/v1 ─────────────
+app.include_router(projects_router, prefix="/api/v1", tags=["projects"])
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
-app.include_router(packs_router, prefix="/api/v1/projects", tags=["projects"])
-app.include_router(brand_os_router, prefix="/api/v1", tags=["brand-os"])
+app.include_router(billing_router, prefix="/api/v1/billing", tags=["billing"])
+app.include_router(api_keys_router, prefix="/api/v1/api-keys", tags=["api-keys"])
+app.include_router(waitlist_router)
+
+# ── Legacy routes kept temporarily (export, creative, builder) ──────────────
+app.include_router(packs_router, prefix="/api/v1/legacy/packs", tags=["legacy-packs"])
+app.include_router(export_router, prefix="/api/v1/legacy/packs", tags=["legacy-export"])
 app.include_router(creative_router, prefix="/api/v1/creative", tags=["creative"])
-app.include_router(docs_router, prefix="/api/v1/projects/{pack_id}/docs", tags=["docs"])
 app.include_router(builder_router, prefix="/api/v1/builder", tags=["builder"])
 app.include_router(builder_public_router, prefix="/p", tags=["sites"])
-app.include_router(ad_factory_router, prefix="/api/v1/ad-factory", tags=["ad-factory"])
-app.include_router(waitlist_router)
-# Subdomain site serving: GET / and POST /lead when Host is *.sites_domain
-app.include_router(builder_subdomain_router, prefix="", tags=["sites-subdomain"])
-
-# Dissertation: multi-agent RAG evaluation endpoints
-app.include_router(dissertation_scenarios_router)
-app.include_router(dissertation_pipeline_router)
-app.include_router(dissertation_evaluation_router)

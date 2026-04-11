@@ -133,6 +133,9 @@ class Settings(BaseSettings):
     ad_factory_default_credit_balance: int = 0
     ad_factory_credit_reservation_minutes: int = 30
 
+    # Billing enforcement: set to False to bypass all tier/feature gates (dev mode)
+    billing_enforcement_enabled: bool = True
+
     # Optional: Stripe (Connect + Invoicing)
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""

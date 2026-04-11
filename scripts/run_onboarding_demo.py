@@ -1,10 +1,10 @@
 """
-Create a fresh demo project and run the onboarding flow end-to-end without HTTP.
+Create a fresh demo pack and run the onboarding flow end-to-end without HTTP.
 
 Examples:
   python scripts/run_onboarding_demo.py
   python scripts/run_onboarding_demo.py --show-artifacts
-  python scripts/run_onboarding_demo.py --project-name "My Demo" --brand-name "Acme Studio"
+  python scripts/run_onboarding_demo.py --pack-name "My Demo" --brand-name "Acme Studio"
 """
 
 from __future__ import annotations
@@ -31,9 +31,9 @@ def _print_json(payload) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Create a fresh demo project and run the onboarding flow end-to-end.",
+        description="Create a fresh demo pack and run the onboarding flow end-to-end.",
     )
-    parser.add_argument("--project-name", default="Onboarding Demo Project")
+    parser.add_argument("--pack-name", default="Onboarding Demo Project")
     parser.add_argument("--brand-name", default="Northstar Launch Studio")
     parser.add_argument("--owner-email", help="Optional email for the generated demo owner.")
     parser.add_argument(
@@ -71,7 +71,7 @@ def main() -> int:
     _print_json(
         {
             "owner_email": result["owner_email"],
-            "project": result["project"],
+            "pack": result["pack"],
             "job_result": result["job_result"],
             "status": result["status"],
         }

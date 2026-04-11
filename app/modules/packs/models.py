@@ -30,6 +30,11 @@ class User(Base):
     # Stripe Connect: one connected account per user for invoicing
     stripe_connect_account_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     stripe_connect_onboarding_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Stripe Billing: subscription tier
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    tier: Mapped[str] = mapped_column(String(32), default="free", nullable=False)
+    tier_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Inactivity recovery: when set, Next Action may show "Restart" or "Simplify offer"
     last_activity_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

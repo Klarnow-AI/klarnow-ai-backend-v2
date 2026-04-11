@@ -29,7 +29,7 @@ logger = get_logger("klarnow.brand_os")
 GENERATE_BRAND_OS_SCHEMA = {
     "type": "object",
     "properties": {
-        "pack_id": {"type": "string", "format": "uuid", "description": "Pack id"},
+        "pack_id": {"type": "string", "format": "uuid", "description": "Project id"},
         "onboarding_answers": {
             "type": "object",
             "description": "Optional override; otherwise uses pack.onboarding_answers",

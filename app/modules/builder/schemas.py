@@ -1,4 +1,4 @@
-"""Builder project Pydantic schemas."""
+"""Builder pack Pydantic schemas."""
 
 from datetime import datetime
 from typing import Literal
@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.shared.generation_schemas import GenerationMessage
 
 
-class BuilderProjectCreate(BaseModel):
+class BuilderPackCreate(BaseModel):
     pack_id: UUID
     name: str = "Untitled Project"
 
@@ -22,7 +22,7 @@ class BuilderProjectUpdate(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-class BuilderProjectRead(BaseModel):
+class BuilderPackRead(BaseModel):
     id: UUID
     pack_id: UUID
     user_id: UUID
@@ -39,8 +39,8 @@ class BuilderProjectRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class BuilderProjectList(BaseModel):
-    items: list[BuilderProjectRead]
+class BuilderPackList(BaseModel):
+    items: list[BuilderPackRead]
     total: int
 
 

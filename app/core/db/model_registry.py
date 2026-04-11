@@ -3,13 +3,12 @@
 from importlib import import_module
 
 _MODEL_MODULES = (
-    "app.modules.ad_factory.models",
     "app.modules.agents.models",
     "app.modules.brand_os.models",
     "app.modules.builder.models",
     "app.modules.creative.models",
-    "app.modules.docs.models",
     "app.modules.packs.models",
+    "app.modules.projects.models",
     "app.modules.waitlist.models",
 )
 

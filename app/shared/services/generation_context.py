@@ -8,12 +8,24 @@ from sqlalchemy.orm import Session
 from app.core.errors import DomainNotFoundError
 from app.modules.brand_os.services import get_active_for_pack
 from app.modules.packs.models import Pack
-from app.modules.packs.onboarding.artifact_store import get_artifact
-from app.modules.packs.onboarding.artifacts import (
-    ARTIFACT_TYPE_BRAND_IDENTITY_PROFILE,
-    ARTIFACT_TYPE_BRAND_OS,
-    ARTIFACT_TYPE_NORMALIZED_BUSINESS_PROFILE,
-)
+# Inline artifact type constants (previously imported from deleted onboarding module)
+ARTIFACT_TYPE_NORMALIZED_BUSINESS_PROFILE = "normalized_business_profile"
+ARTIFACT_TYPE_BRAND_OS = "brand_os"
+ARTIFACT_TYPE_BRAND_IDENTITY_PROFILE = "brand_identity_profile"
+
+
+def get_artifact(pack, artifact_type: str):
+    """Extract an artifact from pack.onboarding_answers (legacy compat)."""
+    answers = getattr(pack, "onboarding_answers", None) or {}
+    artifacts = answers.get("_onboarding_artifacts", {})
+    envelope = artifacts.get(artifact_type)
+    if not envelope or not isinstance(envelope, dict):
+        return None
+    data = envelope.get("data", {})
+    if not data:
+        return None
+    # Return as a simple namespace so getattr works
+    return type("Artifact", (), data)()
 from app.shared.generation_schemas import (
     GenerationAudiencePersona,
     GenerationBrandContext,

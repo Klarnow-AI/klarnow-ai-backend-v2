@@ -1,4 +1,4 @@
-"""Builder project services. CRUD scoped to user via pack ownership."""
+"""Builder pack services. CRUD scoped to user via pack ownership."""
 
 import json
 import re
@@ -122,14 +122,14 @@ _DEPLOY_FOOTER = """\
 
 def build_deploy_html(
     files: dict,
-    project_id: str | None = None,
+    pack_id: str | None = None,
     lead_url: str | None = None,
     site_title: str | None = None,
     favicon_href: str | None = None,
     theme_color: str | None = None,
 ) -> str:
-    """Build a self-contained HTML page from a dict of project files.
-    If lead_url is set (e.g. /lead for subdomain), use it; else use /p/{project_id}/lead when project_id is set.
+    """Build a self-contained HTML page from a dict of pack files.
+    If lead_url is set (e.g. /lead for subdomain), use it; else use /p/{pack_id}/lead when pack_id is set.
     """
     app_code = files.get("/App.tsx") or files.get("App.tsx") or ""
 
@@ -166,25 +166,25 @@ def build_deploy_html(
             header,
             f'  <script>window.KLARO_LEAD_URL="{escape(lead_url, quote=True)}";</script>',
         )
-    elif project_id:
+    elif pack_id:
         header = _inject_head_tag(
             header,
-            f'  <script>window.KLARO_LEAD_URL="/p/{escape(project_id, quote=True)}/lead";</script>',
+            f'  <script>window.KLARO_LEAD_URL="/p/{escape(pack_id, quote=True)}/lead";</script>',
         )
 
     return header + escaped + _DEPLOY_FOOTER
 
 
-def published_html_key(project_id: UUID | str) -> str:
-    return f"builder/published/by-project/{project_id}/index.html"
+def published_html_key(pack_id: UUID | str) -> str:
+    return f"builder/published/by-pack/{pack_id}/index.html"
 
 
-def published_metadata_key(project_id: UUID | str) -> str:
-    return f"builder/published/by-project/{project_id}/meta.json"
+def published_metadata_key(pack_id: UUID | str) -> str:
+    return f"builder/published/by-pack/{pack_id}/meta.json"
 
 
-def published_snapshot_key(project_id: UUID | str) -> str:
-    return f"builder/published/by-project/{project_id}/snapshot.json"
+def published_snapshot_key(pack_id: UUID | str) -> str:
+    return f"builder/published/by-pack/{pack_id}/snapshot.json"
 
 
 def published_subdomain_html_key(subdomain: str) -> str:
@@ -207,14 +207,14 @@ def _decode_json_bytes(raw: bytes | None) -> dict | None:
 
 def load_published_html(
     *,
-    project_id: UUID | str | None = None,
+    pack_id: UUID | str | None = None,
     subdomain: str | None = None,
 ) -> str | None:
     if not storage_enabled():
         return None
     key: str | None = None
-    if project_id is not None:
-        key = published_html_key(project_id)
+    if pack_id is not None:
+        key = published_html_key(pack_id)
     elif subdomain:
         key = published_subdomain_html_key(subdomain)
     if not key:
@@ -230,14 +230,14 @@ def load_published_html(
 
 def load_published_metadata(
     *,
-    project_id: UUID | str | None = None,
+    pack_id: UUID | str | None = None,
     subdomain: str | None = None,
 ) -> dict | None:
     if not storage_enabled():
         return None
     key: str | None = None
-    if project_id is not None:
-        key = published_metadata_key(project_id)
+    if pack_id is not None:
+        key = published_metadata_key(pack_id)
     elif subdomain:
         key = published_subdomain_metadata_key(subdomain)
     if not key:
@@ -245,18 +245,18 @@ def load_published_metadata(
     return _decode_json_bytes(download_file(key))
 
 
-def load_published_snapshot(project: BuilderProject) -> dict | None:
+def load_published_snapshot(pack: BuilderProject) -> dict | None:
     if storage_enabled():
-        snapshot = _decode_json_bytes(download_file(published_snapshot_key(project.id)))
+        snapshot = _decode_json_bytes(download_file(published_snapshot_key(pack.id)))
         if snapshot is not None:
             return snapshot
-    if isinstance(project.published_files, dict):
-        return dict(project.published_files)
+    if isinstance(pack.published_files, dict):
+        return dict(pack.published_files)
     return None
 
 
 def publish_project_artifacts(
-    project: BuilderProject,
+    pack: BuilderProject,
     *,
     lead_url: str,
     previous_subdomain_slug: str | None = None,
@@ -266,11 +266,11 @@ def publish_project_artifacts(
     if not storage_enabled():
         return False
 
-    files = dict(project.files or {})
+    files = dict(pack.files or {})
     page_meta = site_meta or {}
     html = build_deploy_html(
         files,
-        project_id=str(project.id),
+        pack_id=str(pack.id),
         lead_url=lead_url,
         site_title=page_meta.get("site_title"),
         favicon_href=page_meta.get("favicon_href"),
@@ -278,15 +278,15 @@ def publish_project_artifacts(
     )
     metadata = json.dumps(
         {
-            "project_id": str(project.id),
-            "pack_id": str(project.pack_id),
-            "subdomain_slug": project.subdomain_slug,
+            "pack_id": str(pack.id),
+            "pack_id": str(pack.pack_id),
+            "subdomain_slug": pack.subdomain_slug,
             "lead_url": lead_url,
             "site_title": page_meta.get("site_title"),
             "favicon_href": page_meta.get("favicon_href"),
             "theme_color": page_meta.get("theme_color"),
             "published_at": (
-                project.published_at.isoformat() if project.published_at else datetime.now(timezone.utc).isoformat()
+                pack.published_at.isoformat() if pack.published_at else datetime.now(timezone.utc).isoformat()
             ),
         },
         sort_keys=True,
@@ -294,25 +294,25 @@ def publish_project_artifacts(
     snapshot = json.dumps(files, sort_keys=True).encode("utf-8")
 
     upload_file(
-        published_html_key(project.id),
+        published_html_key(pack.id),
         html.encode("utf-8"),
         content_type="text/html; charset=utf-8",
         cache_control=_PUBLIC_HTML_CACHE_CONTROL,
     )
     upload_file(
-        published_metadata_key(project.id),
+        published_metadata_key(pack.id),
         metadata,
         content_type="application/json",
         cache_control=_PUBLIC_META_CACHE_CONTROL,
     )
     upload_file(
-        published_snapshot_key(project.id),
+        published_snapshot_key(pack.id),
         snapshot,
         content_type="application/json",
         cache_control=_PRIVATE_SNAPSHOT_CACHE_CONTROL,
     )
 
-    current_subdomain = (project.subdomain_slug or "").strip().lower() or None
+    current_subdomain = (pack.subdomain_slug or "").strip().lower() or None
     previous_subdomain = (previous_subdomain_slug or "").strip().lower() or None
     if previous_subdomain and previous_subdomain != current_subdomain:
         delete_file(published_subdomain_html_key(previous_subdomain))
@@ -334,7 +334,7 @@ def publish_project_artifacts(
 
 
 def remove_published_artifacts(
-    project_id: UUID | str,
+    pack_id: UUID | str,
     *,
     subdomain_slug: str | None = None,
 ) -> bool:
@@ -342,9 +342,9 @@ def remove_published_artifacts(
     if not storage_enabled():
         return False
 
-    delete_file(published_html_key(project_id))
-    delete_file(published_metadata_key(project_id))
-    delete_file(published_snapshot_key(project_id))
+    delete_file(published_html_key(pack_id))
+    delete_file(published_metadata_key(pack_id))
+    delete_file(published_snapshot_key(pack_id))
     subdomain = (subdomain_slug or "").strip().lower()
     if subdomain:
         delete_file(published_subdomain_html_key(subdomain))
@@ -363,7 +363,7 @@ def get_for_pack(db: Session, pack_id: UUID, user_id: UUID) -> BuilderProject | 
 
 @log_service_action()
 def get_for_pack_any(db: Session, pack_id: UUID) -> BuilderProject | None:
-    """Fetch the builder project for a pack without user scoping (internal use)."""
+    """Fetch the builder pack for a pack without user scoping (internal use)."""
     return (
         db.query(BuilderProject)
         .filter(BuilderProject.pack_id == pack_id)
@@ -373,7 +373,7 @@ def get_for_pack_any(db: Session, pack_id: UUID) -> BuilderProject | None:
 
 @log_service_action()
 def get_published_for_pack(db: Session, pack_id: UUID) -> BuilderProject | None:
-    """Fetch the published builder project for a pack (internal use)."""
+    """Fetch the published builder pack for a pack (internal use)."""
     return (
         db.query(BuilderProject)
         .filter(
@@ -387,10 +387,10 @@ def get_published_for_pack(db: Session, pack_id: UUID) -> BuilderProject | None:
 
 
 @log_service_action()
-def get_by_id(db: Session, project_id: UUID, user_id: UUID) -> BuilderProject | None:
+def get_by_id(db: Session, pack_id: UUID, user_id: UUID) -> BuilderProject | None:
     return (
         db.query(BuilderProject)
-        .filter(BuilderProject.id == project_id, BuilderProject.user_id == user_id)
+        .filter(BuilderProject.id == pack_id, BuilderProject.user_id == user_id)
         .first()
     )
 
@@ -412,80 +412,80 @@ def create(
     pack_id: UUID,
     name: str = "Untitled Project",
 ) -> BuilderProject:
-    project = BuilderProject(user_id=user_id, pack_id=pack_id, name=name)
-    db.add(project)
+    pack = BuilderProject(user_id=user_id, pack_id=pack_id, name=name)
+    db.add(pack)
     db.commit()
-    db.refresh(project)
-    return project
+    db.refresh(pack)
+    return pack
 
 
 @log_service_action()
 def update(
     db: Session,
-    project: BuilderProject,
+    pack: BuilderProject,
     name: str | None = None,
     files: dict | None = None,
     messages: list | None = None,
 ) -> BuilderProject:
     if name is not None:
-        project.name = name
+        pack.name = name
     if files is not None:
-        project.files = files
+        pack.files = files
     if messages is not None:
-        project.messages = messages
+        pack.messages = messages
     db.commit()
-    db.refresh(project)
-    return project
+    db.refresh(pack)
+    return pack
 
 
 @log_service_action()
-def delete(db: Session, project: BuilderProject) -> None:
-    db.delete(project)
+def delete(db: Session, pack: BuilderProject) -> None:
+    db.delete(pack)
     db.commit()
 
 
 @log_service_action()
 def publish(
     db: Session,
-    project: BuilderProject,
+    pack: BuilderProject,
     live_url: str,
     *,
     persist_published_files: bool = True,
     commit: bool = True,
 ) -> BuilderProject:
-    project.live_url = live_url
-    project.published_at = datetime.now(timezone.utc)
-    project.published_files = dict(project.files) if persist_published_files and project.files else None
+    pack.live_url = live_url
+    pack.published_at = datetime.now(timezone.utc)
+    pack.published_files = dict(pack.files) if persist_published_files and pack.files else None
     if commit:
         db.commit()
-        db.refresh(project)
-    return project
+        db.refresh(pack)
+    return pack
 
 
 @log_service_action()
 def unpublish(
     db: Session,
-    project: BuilderProject,
+    pack: BuilderProject,
     *,
     commit: bool = True,
 ) -> BuilderProject:
     """Clear live_url, published_at, subdomain_slug, and published_files."""
-    project.live_url = None
-    project.published_at = None
-    project.published_files = None
-    project.subdomain_slug = None
+    pack.live_url = None
+    pack.published_at = None
+    pack.published_files = None
+    pack.subdomain_slug = None
     if commit:
         db.commit()
-        db.refresh(project)
-    return project
+        db.refresh(pack)
+    return pack
 
 
-def get_published(db: Session, project_id: UUID) -> BuilderProject | None:
-    """Fetch a project by ID only if it has been published (no user auth required)."""
+def get_published(db: Session, pack_id: UUID) -> BuilderProject | None:
+    """Fetch a pack by ID only if it has been published (no user auth required)."""
     return (
         db.query(BuilderProject)
         .filter(
-            BuilderProject.id == project_id,
+            BuilderProject.id == pack_id,
             BuilderProject.live_url.isnot(None),
         )
         .first()
@@ -493,7 +493,7 @@ def get_published(db: Session, project_id: UUID) -> BuilderProject | None:
 
 
 def slug_from_name(name: str) -> str:
-    """Produce a DNS-safe subdomain slug from a pack/project name: [a-z0-9-], max 63 chars."""
+    """Produce a DNS-safe subdomain slug from a pack/pack name: [a-z0-9-], max 63 chars."""
     if not name or not name.strip():
         return "site"
     s = name.strip().lower()
@@ -507,19 +507,19 @@ def slug_from_name(name: str) -> str:
 def ensure_unique_subdomain_slug(
     db: Session,
     base_slug: str,
-    project_id: UUID,
+    pack_id: UUID,
 ) -> str:
     """Return a unique subdomain_slug for the given base_slug (e.g. from pack name).
-    If base_slug is reserved or taken, appends -2, -3, ... or short project id.
+    If base_slug is reserved or taken, appends -2, -3, ... or short pack id.
     """
     slug = base_slug or "site"
     if slug in _RESERVED_SUBDOMAINS:
-        slug = f"{slug}-{str(project_id).replace('-', '')[:8]}"
+        slug = f"{slug}-{str(pack_id).replace('-', '')[:8]}"
     existing = (
         db.query(BuilderProject.subdomain_slug)
         .filter(
             BuilderProject.subdomain_slug == slug,
-            BuilderProject.id != project_id,
+            BuilderProject.id != pack_id,
         )
         .first()
     )
@@ -531,17 +531,17 @@ def ensure_unique_subdomain_slug(
             db.query(BuilderProject.subdomain_slug)
             .filter(
                 BuilderProject.subdomain_slug == candidate,
-                BuilderProject.id != project_id,
+                BuilderProject.id != pack_id,
             )
             .first()
             is None
         ):
             return candidate
-    return f"{base_slug}-{str(project_id).replace('-', '')[:8]}"
+    return f"{base_slug}-{str(pack_id).replace('-', '')[:8]}"
 
 
 def get_published_by_subdomain(db: Session, subdomain: str) -> BuilderProject | None:
-    """Resolve a published builder project by subdomain (subdomain_slug). No auth."""
+    """Resolve a published builder pack by subdomain (subdomain_slug). No auth."""
     if not subdomain or not subdomain.strip():
         return None
     slug = subdomain.strip().lower()

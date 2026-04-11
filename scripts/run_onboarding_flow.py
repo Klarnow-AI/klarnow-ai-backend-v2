@@ -1,5 +1,5 @@
 """
-Run the onboarding flow directly for a project without using HTTP.
+Run the onboarding flow directly for a pack without using HTTP.
 
 Examples:
   python scripts/run_onboarding_flow.py <pack_id>
@@ -347,13 +347,13 @@ def _print_outputs(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Run the onboarding flow directly for a project without using HTTP.",
+        description="Run the onboarding flow directly for a pack without using HTTP.",
     )
     parser.add_argument("pack_id", help="Project UUID")
     parser.add_argument(
         "--status-only",
         action="store_true",
-        help="Only print the latest onboarding status for the project.",
+        help="Only print the latest onboarding status for the pack.",
     )
     parser.add_argument(
         "--show-events",

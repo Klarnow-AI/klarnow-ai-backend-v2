@@ -1,4 +1,4 @@
-"""Builder project model. One project per pack, stores generated files and chat history."""
+"""Builder pack model. One pack per pack, stores generated files and chat history."""
 
 import uuid
 from datetime import datetime, timezone
@@ -16,7 +16,7 @@ def utc_now() -> datetime:
 
 class BuilderProject(Base):
     __tablename__ = "builder_project"
-    __table_args__ = (UniqueConstraint("pack_id", name="uq_builder_project_pack_id"),)
+    __table_args__ = (UniqueConstraint("pack_id", name="uq_builder_project_project_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

@@ -1,4 +1,4 @@
-"""Website generation helpers for builder projects."""
+"""Website generation helpers for builder packs."""
 
 from collections.abc import AsyncIterator
 from typing import Literal

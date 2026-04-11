@@ -261,8 +261,12 @@ class MarkdownReferenceKB:
     def _get_redis(self):
         """Return a Redis client if configured, else None."""
         try:
-            from app.modules.packs.onboarding_queue import get_redis_client
-            return get_redis_client()
+            import redis
+            from app.core.config import get_settings
+            url = get_settings().redis_url
+            if not url:
+                return None
+            return redis.Redis.from_url(url)
         except Exception:
             return None
 

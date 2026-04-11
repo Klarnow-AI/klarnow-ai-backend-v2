@@ -90,7 +90,7 @@ class PackRead(PackBase):
 
 
 class PackPatch(BaseModel):
-    """Partial update for project foundation and onboarding fields."""
+    """Partial update for pack foundation and onboarding fields."""
 
     name: str | None = None
     pack_type: str | None = None
@@ -120,7 +120,7 @@ class DayReadinessResponse(BaseModel):
 
 
 class PackListItem(PackRead):
-    """Project list item."""
+    """Pack list item."""
 
 
 class PackList(BaseModel):

@@ -45,9 +45,10 @@ def verify_token(token: str) -> TokenPayload:
     # --- Redis cache lookup ---
     redis = None
     try:
-        from app.modules.packs.onboarding_queue import get_redis_client, redis_queue_enabled
-        if redis_queue_enabled():
-            redis = get_redis_client()
+        import redis as redis_lib
+        url = settings.redis_url
+        if url:
+            redis = redis_lib.Redis.from_url(url)
             cached = redis.hgetall(_cache_key(token))
             if cached and cached.get("token") == token:
                 return TokenPayload(
