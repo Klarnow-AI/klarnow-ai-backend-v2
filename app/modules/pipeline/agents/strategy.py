@@ -16,9 +16,15 @@ brand strategy. Focus on:
 - An audience summary that captures who the business serves and why
 - Core values that feel authentic to the founder's story
 - A brand voice description that matches the tone preferences
-- Key messages with headlines and supporting points
+- Key messages: each item MUST be a JSON object with exactly two string fields:
+  "headline" (short hook) and "supporting_point" (one concrete proof, stat, or detail — never empty)
 - Competitive differentiation rooted in the business's actual advantages
 - A primary CTA that aligns with the business goals
+- 3-5 `tagline_options`: short (≤8 word) brand taglines. Distinct in angle,
+  not rewordings of each other. These feed the website and creative agents.
+- 2-6 `voice_rules`: one-line constraints on ALL downstream copy (e.g.
+  "never use emojis", "default to active voice", "no exclamation points",
+  "use plain English — avoid SaaS jargon"). Rules, not descriptions.
 
 Be specific and actionable. Avoid generic platitudes. Ground everything in the actual business details provided."""
 
@@ -27,6 +33,7 @@ async def run(
     *,
     project: Project,
     inputs: dict[str, dict[str, Any]],
+    on_progress: Any = None,  # noqa: ARG001 — single-LLM stage, no partial output
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     normalized = inputs.get(ArtifactType.NORMALIZED_INPUT, {})
 
@@ -35,7 +42,9 @@ async def run(
 {json.dumps(normalized, indent=2)}
 
 Generate a positioning statement, audience summary, core values, brand voice,
-key messages, competitive differentiation, and primary CTA."""
+3–5 key_messages (each with both headline and supporting_point), competitive differentiation,
+primary CTA, 3–5 tagline_options, 2–6 voice_rules, and optional elevator_pitch, mission, vision
+if they fit the profile."""
 
     result, metadata = await generate_structured(
         system_prompt=SYSTEM_PROMPT,

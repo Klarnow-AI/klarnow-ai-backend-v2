@@ -167,6 +167,68 @@ class ArtifactRegenerateRequest(BaseModel):
     instructions: str | None = None  # optional user guidance for the rerun
 
 
+class ImagineAssetBody(BaseModel):
+    """Create one new creative asset on-demand from a user prompt."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    prompt: str = Field(..., min_length=1, max_length=500)
+    # ``asset_type`` and ``format`` mirror the values the copywriter emits
+    # on its own specs so rendering stays uniform across pipeline and
+    # on-demand tiles.
+    asset_type: str = Field(..., min_length=1, max_length=64)
+    format: str = Field(..., min_length=1, max_length=32)
+
+
+class ImagineAssetResponse(BaseModel):
+    """Returned immediately after a spec is queued — carries the id the
+    client needs to track its optimistic tile against the polled artifact.
+    """
+
+    artifact_id: UUID
+    spec_id: str
+
+
+class CreativeAssetSpecPatch(BaseModel):
+    """Partial update to a single ``AssetSpec`` inside a campaign.
+
+    Every field is optional — the canvas editor patches just the tab the
+    user is working in (copy, tokens, or raw JSX). ``None`` means "leave
+    as-is"; the service layer drops null keys before merging.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    headline: str | None = Field(default=None, max_length=500)
+    body_copy: str | None = Field(default=None, max_length=2000)
+    cta_text: str | None = Field(default=None, max_length=120)
+    layout_notes: str | None = Field(default=None, max_length=1000)
+    design_token_overrides: dict[str, str] | None = None
+    # Raw JSX source from the power-user tab. Capped to keep abusive pastes
+    # from ballooning the artifact row — the real designer pass stays well
+    # under this.
+    jsx_code: str | None = Field(default=None, max_length=50_000)
+
+
+class CreativeAssetSpecRead(BaseModel):
+    """Single asset spec, as returned by the canvas editor endpoints."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    asset_type: str
+    format: str
+    headline: str
+    body_copy: str | None = None
+    cta_text: str | None = None
+    layout_notes: str | None = None
+    design_token_overrides: dict[str, str] = Field(default_factory=dict)
+    jsx_code: str = ""
+    width_px: int = 1080
+    height_px: int = 1080
+    status: str = "ok"
+
+
 # ---------------------------------------------------------------------------
 # SourceDocument
 # ---------------------------------------------------------------------------

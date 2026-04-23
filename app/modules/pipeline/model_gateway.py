@@ -33,36 +33,38 @@ async def generate_structured(
     model_tier: str = "default",
     temperature: float = 0.1,
 ) -> tuple[T, dict[str, Any]]:
-    """Call LLM and parse response into a Pydantic model.
+    """Call the LLM and parse the response into a Pydantic model.
 
-    Returns (parsed_model, metadata_dict) where metadata includes
-    model_id, token_usage, and latency_ms.
+    Returns ``(parsed_model, metadata_dict)`` where ``metadata`` carries
+    ``model_id``, ``latency_ms`` and ``token_usage`` so the orchestrator can
+    persist them on the ``StageRun`` for cost/latency tracking.
     """
     model_id = MODEL_TIERS.get(model_tier, MODEL_TIERS["default"])
     llm = _get_llm()
 
     start = time.perf_counter()
-    result = await llm.parse(
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        response_model=response_model,
+    result, usage = await llm.parse(
+        system=system_prompt,
+        user=user_prompt,
+        schema=response_model,
         model=model_id,
         temperature=temperature,
     )
     latency_ms = int((time.perf_counter() - start) * 1000)
 
     logger.info(
-        "[ModelGateway] tier=%s model=%s schema=%s latency_ms=%d",
+        "[ModelGateway] tier=%s model=%s schema=%s latency_ms=%d total_tokens=%d",
         model_tier,
         model_id,
         response_model.__name__,
         latency_ms,
+        usage.get("total_tokens", 0),
     )
 
     metadata = {
         "model_id": model_id,
         "latency_ms": latency_ms,
-        "token_usage": {},  # TODO: extract from LLM response when available
+        "token_usage": usage,
     }
     return result, metadata
 
@@ -75,17 +77,21 @@ async def generate_text(
     temperature: float = 0.7,
     max_tokens: int | None = None,
 ) -> tuple[str, dict[str, Any]]:
-    """Call LLM and return raw text response.
+    """Call the LLM and return a raw text response.
 
-    Returns (text, metadata_dict).
+    Returns ``(text, metadata_dict)``.
     """
     model_id = MODEL_TIERS.get(model_tier, MODEL_TIERS["default"])
     llm = _get_llm()
 
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+
     start = time.perf_counter()
-    text = await llm.chat(
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
+    text, usage = await llm.chat(
+        messages=messages,
         model=model_id,
         temperature=temperature,
         max_tokens=max_tokens,
@@ -93,16 +99,17 @@ async def generate_text(
     latency_ms = int((time.perf_counter() - start) * 1000)
 
     logger.info(
-        "[ModelGateway] tier=%s model=%s text_len=%d latency_ms=%d",
+        "[ModelGateway] tier=%s model=%s text_len=%d latency_ms=%d total_tokens=%d",
         model_tier,
         model_id,
         len(text),
         latency_ms,
+        usage.get("total_tokens", 0),
     )
 
     metadata = {
         "model_id": model_id,
         "latency_ms": latency_ms,
-        "token_usage": {},
+        "token_usage": usage,
     }
     return text, metadata

@@ -4,18 +4,26 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Awaitable, Callable
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.modules.projects.models import Artifact, GenerationRun, StageRun
-from app.modules.projects.services import create_artifact
+from app.modules.projects.services import create_artifact, update_artifact_payload
 from app.schemas import ARTIFACT_SCHEMA_VERSION
 from app.schemas.enums import ArtifactType, StageStatus
 
 from .config import STAGE_MAP
+
+# Agents receive this callable when they want to publish partial work (e.g.
+# brand identity colours + typography before the logo image has finished
+# rendering, or individual poster PNGs as each one comes back). The
+# orchestrator wires it up so that the first call *creates* a draft artifact
+# row and subsequent calls *update it in place*, so the frontend can poll
+# the same artifact id and watch fields fill in.
+ProgressCallback = Callable[[dict[str, Any]], Awaitable[None]]
 
 logger = logging.getLogger(__name__)
 
@@ -112,3 +120,53 @@ def persist_artifact(
         created_by_stage=stage_name,
         schema_version=ARTIFACT_SCHEMA_VERSION,
     )
+
+
+def build_progress_callback(
+    db: Session,
+    *,
+    project_id: UUID,
+    artifact_type: str,
+    stage_name: str,
+    holder: dict[str, Artifact | None],
+) -> ProgressCallback:
+    """Return an ``on_progress`` callable agents can invoke mid-stage.
+
+    The first call creates a DRAFT artifact row at the next version number
+    and stashes it in ``holder["artifact"]``. Every subsequent call just
+    rewrites ``json_payload`` on that same row. Each call commits so that
+    the frontend — which polls ``GET /projects/{id}/artifacts`` at ~1.5 s —
+    can see partially-filled work (e.g. colours and typography before the
+    logo image is ready).
+
+    ``execute_stage`` looks at ``holder["artifact"]`` after the agent returns
+    to decide whether to create a fresh artifact (no progress was emitted)
+    or finalise the existing draft with the agent's final payload.
+    """
+
+    async def _on_progress(payload: dict[str, Any]) -> None:
+        try:
+            existing = holder.get("artifact")
+            if existing is None:
+                artifact = persist_artifact(
+                    db,
+                    project_id=project_id,
+                    artifact_type=artifact_type,
+                    payload=payload,
+                    stage_name=stage_name,
+                )
+                holder["artifact"] = artifact
+            else:
+                update_artifact_payload(db, existing, payload)
+            db.commit()
+        except Exception:  # pragma: no cover - progress updates are best-effort
+            # A failed progress write must never crash the agent: the final
+            # artifact at stage end is still the source of truth. Roll back
+            # the partial write and keep going.
+            logger.warning(
+                "progress callback failed for stage=%s; continuing", stage_name,
+                exc_info=True,
+            )
+            db.rollback()
+
+    return _on_progress

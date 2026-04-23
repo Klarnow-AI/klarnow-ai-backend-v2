@@ -33,35 +33,28 @@ STAGES: tuple[StageDefinition, ...] = (
         model_tier="reasoning",
     ),
     StageDefinition(
-        name="identity",
-        artifact_type=ArtifactType.IDENTITY,
+        name="brand_identity",
+        artifact_type=ArtifactType.BRAND_IDENTITY,
         depends_on=("strategy",),
         approval_gate=True,
         model_tier="creative",
     ),
     StageDefinition(
-        name="design_system",
-        artifact_type=ArtifactType.DESIGN_SYSTEM,
-        depends_on=("identity",),
-        model_tier="creative",
-    ),
-    StageDefinition(
-        name="website_planner",
-        artifact_type=ArtifactType.WEBSITE_BLUEPRINT,
-        depends_on=("design_system",),
-        approval_gate=True,
-        model_tier="reasoning",
-    ),
-    StageDefinition(
         name="website_builder",
+        # The builder now owns planning: it runs a reasoning-tier blueprint
+        # pass internally, then builds from it. Hence it takes the same three
+        # upstream inputs the old planner did (profile + strategy + identity)
+        # rather than depending on a separate planner stage. The approval gate
+        # sits here — users review the built website, not a plan spec.
         artifact_type=ArtifactType.WEBSITE_BUILD,
-        depends_on=("website_planner",),
+        depends_on=("input_normalizer", "strategy", "brand_identity"),
+        approval_gate=True,
         model_tier="builder",
     ),
     StageDefinition(
         name="creative_asset",
         artifact_type=ArtifactType.CREATIVE_CAMPAIGN,
-        depends_on=("design_system",),
+        depends_on=("strategy", "brand_identity"),
         model_tier="creative",
     ),
     StageDefinition(

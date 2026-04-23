@@ -53,6 +53,32 @@ FAILURE_ALERT_MAX_RETRY_ATTEMPTS = 3
 FAILURE_ALERT_DEFAULT_RETRY_AFTER_SECONDS = 1.0
 FAILURE_ALERT_MAX_RETRY_AFTER_SECONDS = 30.0
 
+# Routine 4xx responses that represent expected, client-driven outcomes
+# (auth, permission, not-found, validation, conflict, rate-limit). These
+# should NOT page us — we only want to be alerted on server errors (5xx) and
+# unexpected 4xx status codes.
+ROUTINE_CLIENT_ERROR_STATUS_CODES: frozenset[int] = frozenset(
+    {
+        HTTPStatus.BAD_REQUEST,
+        HTTPStatus.UNAUTHORIZED,
+        HTTPStatus.FORBIDDEN,
+        HTTPStatus.NOT_FOUND,
+        HTTPStatus.CONFLICT,
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        HTTPStatus.TOO_MANY_REQUESTS,
+    }
+)
+ROUTINE_CLIENT_ERROR_CATEGORIES: frozenset[str] = frozenset(
+    {
+        "auth",
+        "permission",
+        "not_found",
+        "validation",
+        "conflict",
+        "rate_limit",
+    }
+)
+
 _FAILURE_ALERT_RATE_LIMIT_LOCK = threading.Lock()
 _FAILURE_ALERT_SCHEDULED_SEND_TIMES: deque[float] = deque(
     maxlen=FAILURE_ALERT_MAX_SENDS_PER_WINDOW
@@ -128,7 +154,7 @@ async def capture_request_body_preview(request: Request) -> None:
 
 
 def queue_failure_alert_if_needed(request: Request, response: Response) -> None:
-    if response.status_code < 400:
+    if not _should_send_failure_alert(request, response):
         return
     if getattr(request.state, "failure_alert_queued", False):
         return
@@ -145,6 +171,26 @@ def queue_failure_alert_if_needed(request: Request, response: Response) -> None:
 
     request.state.failure_alert_queued = True
     _append_background_task(response, send_failure_alert_email, alert)
+
+
+def _should_send_failure_alert(request: Request, response: Response) -> bool:
+    status_code = response.status_code
+    if status_code < 400:
+        return False
+    # Always alert on server-side failures.
+    if status_code >= 500:
+        return True
+    # Skip 4xx responses that represent routine, client-driven outcomes. We
+    # prefer the error category set via `set_failure_alert_context` when
+    # available (more precise than status-code mapping) and fall back to a
+    # conservative list of well-known routine status codes.
+    context = _get_failure_alert_context(request)
+    category = _clean_text(context.get("category")) if context else None
+    if category and category in ROUTINE_CLIENT_ERROR_CATEGORIES:
+        return False
+    if status_code in ROUTINE_CLIENT_ERROR_STATUS_CODES:
+        return False
+    return True
 
 
 def build_failure_alert(request: Request, response: Response) -> FailureAlert | None:

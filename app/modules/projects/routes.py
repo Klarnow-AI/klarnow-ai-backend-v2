@@ -27,6 +27,10 @@ from .schemas import (
     ArtifactRegenerateRequest,
     ExportJobCreate,
     ExportJobRead,
+    CreativeAssetSpecPatch,
+    CreativeAssetSpecRead,
+    ImagineAssetBody,
+    ImagineAssetResponse,
     OnboardingFormSubmission,
     ProjectCreate,
     ProjectListItem,
@@ -68,7 +72,17 @@ def _run_pipeline_background(run_id: str) -> None:
 
 
 def _resume_pipeline_background(run_id: str) -> None:
-    """Resume pipeline after an approval gate in a background thread."""
+    """Resume a run's orchestrator loop in a background thread.
+
+    Used for two cases:
+    - **Approval gate:** an artifact was just approved; any ``NEEDS_REVIEW``
+      stages whose artifact is now ``approved`` get promoted to ``COMPLETED``
+      before the loop picks up again.
+    - **Pause → resume:** the run was paused by the user and has since been
+      flipped back to ``RUNNING`` by ``resume_run``. The promotion step
+      above is a no-op in this case (no approved artifacts waiting), and the
+      loop simply picks up from the next pending stage.
+    """
     from app.modules.pipeline.orchestrator import run_pipeline
     from app.modules.projects.models import Artifact, GenerationRun
     from app.schemas.enums import StageStatus
@@ -91,6 +105,69 @@ def _resume_pipeline_background(run_id: str) -> None:
         logger.info("Background pipeline resume: run %s finished with status %s", run_id, run.status)
     except Exception:
         logger.exception("Background pipeline resume: run %s failed", run_id)
+    finally:
+        db.close()
+
+
+def _design_creative_asset_background(
+    project_id: str,
+    artifact_id: str,
+    spec_id: str,
+    prompt: str,
+    asset_type: str,
+    asset_format: str,
+) -> None:
+    """Run the imagine flow (copy + JSX) for a single pending spec.
+
+    Mirrors the shape of ``_run_pipeline_background``: opens its own DB
+    session because the request session is already closed by the time this
+    lands on a background task worker.
+    """
+    db = SessionLocal()
+    try:
+        services.design_pending_creative_asset(
+            db,
+            UUID(project_id),
+            UUID(artifact_id),
+            spec_id,
+            prompt=prompt,
+            asset_type=asset_type,
+            asset_format=asset_format,
+        )
+    except Exception:
+        logger.exception(
+            "Imagine asset: design failed for spec %s on artifact %s",
+            spec_id,
+            artifact_id,
+        )
+    finally:
+        db.close()
+
+
+def _redesign_creative_asset_background(
+    project_id: str,
+    artifact_id: str,
+    spec_id: str,
+) -> None:
+    """Re-run the JSX designer for one spec after copy/token edits.
+
+    Same pattern as ``_design_creative_asset_background`` — fresh DB
+    session, swallow failures so the worker never crashes the task queue.
+    """
+    db = SessionLocal()
+    try:
+        services.redesign_creative_asset(
+            db,
+            UUID(project_id),
+            UUID(artifact_id),
+            spec_id,
+        )
+    except Exception:
+        logger.exception(
+            "Redesign asset: failed for spec %s on artifact %s",
+            spec_id,
+            artifact_id,
+        )
     finally:
         db.close()
 
@@ -282,6 +359,65 @@ def cancel_run(
     return _run_with_stages(db, run)
 
 
+@router.post("/runs/{run_id}/pause", response_model=RunRead)
+def pause_run(
+    run_id: UUID,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Request the background pipeline to pause after the current stage.
+
+    We only flip the status here — the orchestrator polls the run row
+    between stages and exits cleanly on its own. Clients should keep
+    polling; the status will flip to ``paused`` once the current stage
+    finishes (usually within seconds).
+    """
+    run = services.get_run(db, run_id)
+    services.get_project(db, run.project_id, user.id)
+    services.pause_run(db, run)
+    db.commit()
+    return _run_with_stages(db, run)
+
+
+@router.post("/runs/{run_id}/resume", response_model=RunRead)
+def resume_run(
+    run_id: UUID,
+    background_tasks: BackgroundTasks,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Resume a paused run. Flips the status to ``running`` and schedules the
+    orchestrator in a background task to pick up from the next pending
+    stage."""
+    run = services.get_run(db, run_id)
+    services.get_project(db, run.project_id, user.id)
+    services.resume_run(db, run)
+    db.commit()
+    background_tasks.add_task(_resume_pipeline_background, str(run.id))
+    return _run_with_stages(db, run)
+
+
+@router.post("/runs/{run_id}/retry", response_model=RunRead)
+def retry_run(
+    run_id: UUID,
+    background_tasks: BackgroundTasks,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Retry a failed or cancelled run from the point it stopped.
+
+    Only the stages that didn't finish successfully are reset — completed
+    and needs_review stages stay put, so the user doesn't pay the cost
+    of re-running everything that already passed.
+    """
+    run = services.get_run(db, run_id)
+    services.get_project(db, run.project_id, user.id)
+    services.retry_run(db, run)
+    db.commit()
+    background_tasks.add_task(_resume_pipeline_background, str(run.id))
+    return _run_with_stages(db, run)
+
+
 def _run_with_stages(db: Session, run) -> dict:
     """Serialize a run with its stage runs attached."""
     stages = [StageRunRead.model_validate(s) for s in run.stage_runs]
@@ -355,6 +491,127 @@ def regenerate_artifact(
     return JSONResponse(
         status_code=status.HTTP_202_ACCEPTED,
         content={"message": "Regeneration queued", "artifact_id": str(artifact_id), "run_id": str(run.id)},
+    )
+
+
+@router.post(
+    "/projects/{project_id}/creative-assets",
+    response_model=ImagineAssetResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def imagine_creative_asset(
+    project_id: UUID,
+    body: ImagineAssetBody,
+    background_tasks: BackgroundTasks,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Append a pending creative asset and kick off copy + JSX generation.
+
+    Returns immediately with the newly-appended spec id so the frontend can
+    render an optimistic "imagining…" tile. The heavy lifting happens in
+    :func:`_design_creative_asset_background`, and the UI picks up the
+    finished spec via the existing artifact-poll loop.
+    """
+    services.get_project(db, project_id, user.id)
+    artifact, spec_id = services.append_pending_creative_asset(
+        db,
+        project_id,
+        prompt=body.prompt,
+        asset_type=body.asset_type,
+        asset_format=body.format,
+    )
+    db.commit()
+    background_tasks.add_task(
+        _design_creative_asset_background,
+        str(project_id),
+        str(artifact.id),
+        spec_id,
+        body.prompt,
+        body.asset_type,
+        body.format,
+    )
+    return ImagineAssetResponse(artifact_id=artifact.id, spec_id=spec_id)
+
+
+@router.get(
+    "/artifacts/{artifact_id}/creative-assets/{spec_id}",
+    response_model=CreativeAssetSpecRead,
+)
+def get_creative_asset_spec_route(
+    artifact_id: UUID,
+    spec_id: str,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    artifact = services.get_artifact(db, artifact_id)
+    services.get_project(db, artifact.project_id, user.id)
+    return services.get_creative_asset_spec(db, artifact_id, spec_id)
+
+
+@router.patch(
+    "/artifacts/{artifact_id}/creative-assets/{spec_id}",
+    response_model=CreativeAssetSpecRead,
+)
+def patch_creative_asset_spec_route(
+    artifact_id: UUID,
+    spec_id: str,
+    body: CreativeAssetSpecPatch,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Save edits from the canvas editor onto a single asset spec.
+
+    The patch body is whichever tab the user is working in (copy, tokens,
+    or raw JSX). We apply and commit synchronously so the response carries
+    the final spec; callers that want a fresh designer pass on top of the
+    edit call the sibling ``/render`` route right after.
+    """
+    artifact = services.get_artifact(db, artifact_id)
+    services.get_project(db, artifact.project_id, user.id)
+    updated = services.patch_creative_asset_spec(
+        db, artifact_id, spec_id, body.model_dump(exclude_none=True)
+    )
+    db.commit()
+    return updated
+
+
+@router.post(
+    "/artifacts/{artifact_id}/creative-assets/{spec_id}/render",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def render_creative_asset_spec_route(
+    artifact_id: UUID,
+    spec_id: str,
+    background_tasks: BackgroundTasks,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Kick off a fresh designer pass for this single spec.
+
+    Flips the spec to ``"pending"`` inline and queues the LLM call in the
+    background so the request returns fast. The client picks up the new
+    JSX on its next artifact poll (or its own targeted spec fetch).
+    """
+    artifact = services.get_artifact(db, artifact_id)
+    project = services.get_project(db, artifact.project_id, user.id)
+    # Validate the spec exists before scheduling the worker — avoids a
+    # background task that quietly does nothing because the client typo'd
+    # the id.
+    services.get_creative_asset_spec(db, artifact_id, spec_id)
+    background_tasks.add_task(
+        _redesign_creative_asset_background,
+        str(project.id),
+        str(artifact_id),
+        spec_id,
+    )
+    return JSONResponse(
+        status_code=status.HTTP_202_ACCEPTED,
+        content={
+            "message": "Redesign queued",
+            "artifact_id": str(artifact_id),
+            "spec_id": spec_id,
+        },
     )
 
 

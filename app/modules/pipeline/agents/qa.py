@@ -32,13 +32,29 @@ Also report:
 - overall_status: passed if all checks pass, warning if any warnings, failed if any failures
 - consistency_score: 0-100 (deduct 20 per failure, 5 per warning)
 - issues: list of specific problems found with severity and suggested fixes
-- recommendations: actionable improvement suggestions"""
+- recommendations: actionable improvement suggestions
+
+Strict schema rules (do NOT break these):
+- `checks[*].status` MUST be one of: "passed", "warning", "failed".
+- `issues[*].severity` MUST be one of: "low", "medium", "high".
+  Do NOT use "warning" / "error" / "info" / "critical" — those belong on
+  `checks[*].status`, not on issue severity.
+    * low    — cosmetic / nice-to-have
+    * medium — noticeable inconsistency worth fixing before ship
+    * high   — blocks ship / factually wrong / breaks the brand
+- `checks[*].affected_artifact` and `issues[*].affected_artifact` MUST be an
+  array of artifact-type strings. Use `[]` when nothing is affected. Example:
+    "affected_artifact": ["creative_campaign", "website_build"]
+  NOT a single string, NOT null.
+- Output must be a raw JSON object matching the schema — no wrapping in
+  `properties`, no extra keys outside the schema."""
 
 
 async def run(
     *,
     project: Project,
     inputs: dict[str, dict[str, Any]],
+    on_progress: Any = None,  # noqa: ARG001 — single-LLM stage, no partial output
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     # QA receives all prior artifacts
     artifacts_summary = {k: v for k, v in inputs.items()}

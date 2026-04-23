@@ -6,9 +6,13 @@ from enum import StrEnum
 class ArtifactType(StrEnum):
     NORMALIZED_INPUT = "normalized_input"
     STRATEGY = "strategy"
-    IDENTITY = "identity"
-    DESIGN_SYSTEM = "design_system"
-    WEBSITE_BLUEPRINT = "website_blueprint"
+    # Merged visual stage — replaces the old split between textual ``IDENTITY``
+    # (archetype, taglines, voice) and token-based ``DESIGN_SYSTEM`` (colors,
+    # typography). Voice / taglines now live on :class:`Strategy` because
+    # they're text that *feeds* downstream generation, not a visual deliverable.
+    BRAND_IDENTITY = "brand_identity"
+    # No standalone WEBSITE_BLUEPRINT artifact anymore — the builder owns
+    # planning internally and emits the plan embedded in ``WEBSITE_BUILD``.
     WEBSITE_BUILD = "website_build"
     CREATIVE_CAMPAIGN = "creative_campaign"
     QA_REPORT = "qa_report"
@@ -26,6 +30,7 @@ class ProjectStatus(StrEnum):
 class RunStatus(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
+    PAUSED = "paused"
     NEEDS_REVIEW = "needs_review"
     COMPLETED = "completed"
     FAILED = "failed"
